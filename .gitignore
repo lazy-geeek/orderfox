@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Custom
+
+.vscode/
+.idx/
+samples/
+PRD.md
+TASK.md
+
+.kilocodeignore
+.kilocode/
