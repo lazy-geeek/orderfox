@@ -30,10 +30,15 @@ googleapis-common-protos==1.70.0
 grpcio==1.71.0
 grpcio-status==1.71.0
 h11==0.16.0
+httpcore==1.0.9
 httplib2==0.22.0
+httpx==0.28.1
 idna==3.10
+iniconfig==2.1.0
 msgpack==1.1.0
 multidict==6.4.4
+packaging==25.0
+pluggy==1.6.0
 propcache==0.3.1
 proto-plus==1.26.1
 protobuf==5.29.4
@@ -45,6 +50,8 @@ pydantic==2.11.5
 pydantic_core==2.33.2
 PyJWT==2.10.1
 pyparsing==3.2.3
+pytest==8.3.5
+pytest-asyncio==0.26.0
 python-dotenv==1.1.0
 requests==2.32.3
 rsa==4.9.1
