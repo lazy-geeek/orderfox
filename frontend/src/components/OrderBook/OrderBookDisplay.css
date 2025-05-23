@@ -1,0 +1,207 @@
+.order-book-display {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.order-book-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.order-book-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.symbol-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-indicator.connected {
+  color: #28a745;
+}
+
+.status-indicator.disconnected {
+  color: #dc3545;
+}
+
+.status-text {
+  font-size: 11px;
+  color: #666;
+}
+
+.depth-selector {
+  padding: 8px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.depth-selector label {
+  font-size: 11px;
+  color: #666;
+}
+
+.depth-select {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.order-book-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.section-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  font-weight: 600;
+  font-size: 11px;
+  color: #666;
+}
+
+.asks-header {
+  color: #dc3545;
+}
+
+.bids-header {
+  color: #28a745;
+}
+
+.order-level {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 4px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.order-level:hover {
+  background: #f8f9fa;
+}
+
+.ask-level .price {
+  color: #dc3545;
+}
+
+.bid-level .price {
+  color: #28a745;
+}
+
+.amount, .total {
+  color: #333;
+}
+
+.spread-section {
+  padding: 8px 16px;
+  background: #fff3cd;
+  border-top: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.spread-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.spread-label {
+  color: #666;
+}
+
+.spread-value {
+  font-weight: 600;
+  color: #856404;
+}
+
+.spread-percentage {
+  color: #856404;
+}
+
+.order-book-footer {
+  padding: 8px 16px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: #666;
+}
+
+.loading-state, .error-state, .no-symbol-state {
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-message {
+  color: #dc3545;
+  margin-bottom: 12px;
+}
+
+.retry-button {
+  padding: 6px 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.retry-button:hover {
+  background: #0056b3;
+}
+
+.no-data {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}

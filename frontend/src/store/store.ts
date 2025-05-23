@@ -1,7 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
+import marketDataReducer from '../features/marketData/marketDataSlice';
 
-// Initially, there are no reducers. This will be populated later.
-const rootReducer = {};
+const rootReducer = {
+  marketData: marketDataReducer,
+};
 
 export const store = configureStore({
   reducer: rootReducer,
