@@ -8,6 +8,7 @@ particularly for market data operations.
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
+from enum import Enum
 
 
 class SymbolInfo(BaseModel):
@@ -155,6 +156,116 @@ class Ticker(BaseModel):
                 "volume": 1250.75,
                 "quote_volume": 54125000.00,
                 "timestamp": "2024-01-01T12:00:00Z",
+            }
+        }
+    )
+
+
+class TradeSide(str, Enum):
+    """
+    Enum for trade side options.
+    """
+
+    LONG = "long"
+    SHORT = "short"
+    CLOSE = "close"
+
+
+class OrderType(str, Enum):
+    """
+    Enum for order type options.
+    """
+
+    MARKET = "market"
+    LIMIT = "limit"
+
+
+class Position(BaseModel):
+    """
+    Schema for trading position information.
+
+    Represents a current trading position with entry price,
+    current market price, and unrealized profit/loss.
+    """
+
+    symbol: str = Field(..., description="Trading symbol")
+    side: str = Field(..., description="Position side (long/short)")
+    size: float = Field(..., description="Position size")
+    entryPrice: float = Field(..., description="Entry price of the position", gt=0)
+    markPrice: float = Field(..., description="Current mark price", gt=0)
+    unrealizedPnl: float = Field(..., description="Unrealized profit and loss")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "symbol": "BTCUSDT",
+                "side": "long",
+                "size": 0.5,
+                "entryPrice": 43000.00,
+                "markPrice": 43250.00,
+                "unrealizedPnl": 125.00,
+            }
+        }
+    )
+
+
+class TradeRequest(BaseModel):
+    """
+    Schema for trade request.
+
+    Represents a request to open, close, or modify a trading position.
+    """
+
+    symbol: str = Field(..., description="Trading symbol")
+    side: TradeSide = Field(..., description="Trade side (long/short/close)")
+    amount: float = Field(..., description="Trade amount", gt=0)
+    type: OrderType = Field(..., description="Order type (market/limit)")
+    price: Optional[float] = Field(
+        None, description="Limit price (required for limit orders)", gt=0
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "symbol": "BTCUSDT",
+                "side": "long",
+                "amount": 0.5,
+                "type": "market",
+                "price": None,
+            }
+        }
+    )
+
+
+class TradeResponse(BaseModel):
+    """
+    Schema for trade response.
+
+    Represents the response after executing a trade request,
+    including status, message, and optional order/position information.
+    """
+
+    status: str = Field(..., description="Trade execution status")
+    message: str = Field(..., description="Response message")
+    orderId: Optional[str] = Field(None, description="Order ID if applicable")
+    positionInfo: Optional[Position] = Field(
+        None, description="Updated position information"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "message": "Trade executed successfully",
+                "orderId": "12345678",
+                "positionInfo": {
+                    "symbol": "BTCUSDT",
+                    "side": "long",
+                    "size": 0.5,
+                    "entryPrice": 43000.00,
+                    "markPrice": 43250.00,
+                    "unrealizedPnl": 125.00,
+                },
             }
         }
     )

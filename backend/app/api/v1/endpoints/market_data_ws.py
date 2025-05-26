@@ -10,6 +10,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
 from app.api.v1.endpoints.connection_manager import connection_manager
+from app.api.v1.endpoints.trading import trading_engine_service_instance
 
 router = APIRouter()
 

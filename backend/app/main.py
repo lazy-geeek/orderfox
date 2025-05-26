@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints.market_data_http import router as market_data_http_router
 from app.api.v1.endpoints.market_data_ws import router as market_data_ws_router
+from app.api.v1.endpoints import trading as trading_router
 
 # Create FastAPI app instance
 app = FastAPI(title="Trading Bot API", version="1.0.0")
@@ -18,6 +19,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(market_data_http_router, prefix="/api/v1", tags=["market-data-http"])
 app.include_router(market_data_ws_router, prefix="/api/v1", tags=["market-data-ws"])
+app.include_router(trading_router.router, prefix="/api/v1/trading", tags=["trading"])
 
 
 # Root endpoint

@@ -10,6 +10,7 @@ import asyncio
 import json
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
+from app.services.trading_engine_service import TradingEngineService
 
 
 class ConnectionManager:
@@ -128,6 +129,22 @@ class ConnectionManager:
 
                     # Broadcast to all connected clients for this symbol
                     await self.broadcast_to_symbol(symbol, formatted_data)
+
+                    # Pass order book update to trading engine service
+                    try:
+                        # Import the shared trading engine service instance
+                        from app.api.v1.endpoints.trading import (
+                            trading_engine_service_instance,
+                        )
+
+                        await trading_engine_service_instance.process_order_book_update(
+                            symbol, order_book_data
+                        )
+                    except Exception as e:
+                        # Log error but don't interrupt the streaming
+                        print(
+                            f"Error processing order book update in trading engine for {symbol}: {str(e)}"
+                        )
 
                 except Exception as e:
                     error_data = {
