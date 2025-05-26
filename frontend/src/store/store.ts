@@ -1,8 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import marketDataReducer from '../features/marketData/marketDataSlice';
+import tradingReducer from '../features/trading/tradingSlice';
 
 const rootReducer = {
   marketData: marketDataReducer,
+  trading: tradingReducer,
 };
 
 export const store = configureStore({

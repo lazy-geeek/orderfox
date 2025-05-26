@@ -3,6 +3,8 @@ import SymbolSelector from '../components/SymbolSelector';
 import CandlestickChart from '../components/Chart/CandlestickChart';
 import OrderBookDisplay from '../components/OrderBook/OrderBookDisplay';
 import PositionsTable from '../components/Positions/PositionsTable';
+import TradingModeToggle from '../components/TradingModeToggle';
+import ManualTradeForm from '../components/ManualTrade';
 
 /**
  * MainLayout component that defines the overall page structure for the crypto trading bot.
@@ -28,7 +30,15 @@ const MainLayout: React.FC = () => {
         borderBottom: '2px solid #34495e'
       }}>
         <h1 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem' }}>Crypto Trading Bot</h1>
-        <SymbolSelector />
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem'
+        }}>
+          <SymbolSelector />
+          <TradingModeToggle />
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -51,9 +61,11 @@ const MainLayout: React.FC = () => {
         <aside style={{
           flex: 1,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          gap: '1rem'
         }}>
           <OrderBookDisplay />
+          <ManualTradeForm />
         </aside>
       </div>
 

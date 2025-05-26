@@ -1,43 +1,41 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { fetchOpenPositions, executePaperTrade, executeLiveTrade } from '../../features/trading/tradingSlice';
 import './PositionsTable.css';
 
+// Position interface matching backend schema
 interface Position {
   symbol: string;
-  side: 'Long' | 'Short';
+  side: string;
   size: number;
   entryPrice: number;
-  currentPrice: number;
-  pnl: number;
+  markPrice: number;
+  unrealizedPnl: number;
 }
 
 const PositionsTable: React.FC = () => {
-  // Placeholder data for demonstration
-  const positions: Position[] = [
-    {
-      symbol: 'BTC/USDT',
-      side: 'Long',
-      size: 0.1,
-      entryPrice: 60000,
-      currentPrice: 61000,
-      pnl: 100
-    },
-    {
-      symbol: 'ETH/USDT',
-      side: 'Short',
-      size: 2,
-      entryPrice: 3000,
-      currentPrice: 2950,
-      pnl: 100
-    },
-    {
-      symbol: 'ADA/USDT',
-      side: 'Long',
-      size: 1000,
-      entryPrice: 0.45,
-      currentPrice: 0.47,
-      pnl: 20
+  const dispatch = useAppDispatch();
+  const { openPositions, tradingMode, isSubmittingTrade } = useAppSelector((state) => state.trading);
+
+  // Fetch positions on mount and when trading mode changes
+  useEffect(() => {
+    dispatch(fetchOpenPositions());
+  }, [dispatch, tradingMode]);
+
+  const handleClosePosition = async (position: Position) => {
+    const tradeDetails = {
+      symbol: position.symbol,
+      side: 'close',
+      amount: position.size,
+      type: 'market'
+    };
+
+    if (tradingMode === 'paper') {
+      dispatch(executePaperTrade(tradeDetails));
+    } else {
+      dispatch(executeLiveTrade(tradeDetails));
     }
-  ];
+  };
 
   const formatPrice = (price: number): string => {
     return price.toLocaleString('en-US', {
@@ -54,38 +52,49 @@ const PositionsTable: React.FC = () => {
   return (
     <div className="positions-table-container">
       <h3 className="positions-title">Open Positions</h3>
-      <table className="positions-table">
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Side</th>
-            <th>Size</th>
-            <th>Entry Price</th>
-            <th>Current Price</th>
-            <th>PnL (USDT)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {positions.map((position, index) => (
-            <tr key={index}>
-              <td className="symbol">{position.symbol}</td>
-              <td className={`side ${position.side.toLowerCase()}`}>
-                {position.side}
-              </td>
-              <td className="size">{position.size}</td>
-              <td className="entry-price">${formatPrice(position.entryPrice)}</td>
-              <td className="current-price">${formatPrice(position.currentPrice)}</td>
-              <td className={`pnl ${position.pnl >= 0 ? 'positive' : 'negative'}`}>
-                {formatPnL(position.pnl)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {positions.length === 0 && (
+      {openPositions.length === 0 ? (
         <div className="no-positions">
-          No open positions
+          No open positions.
         </div>
+      ) : (
+        <table className="positions-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Size</th>
+              <th>Entry Price</th>
+              <th>Current Price</th>
+              <th>PnL (USDT)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {openPositions.map((position: Position, index: number) => (
+              <tr key={index}>
+                <td className="symbol">{position.symbol}</td>
+                <td className={`side ${position.side.toLowerCase()}`}>
+                  {position.side.charAt(0).toUpperCase() + position.side.slice(1)}
+                </td>
+                <td className="size">{position.size}</td>
+                <td className="entry-price">${formatPrice(position.entryPrice)}</td>
+                <td className="current-price">${formatPrice(position.markPrice)}</td>
+                <td className={`pnl ${position.unrealizedPnl >= 0 ? 'positive' : 'negative'}`}>
+                  {formatPnL(position.unrealizedPnl)}
+                </td>
+                <td className="actions">
+                  <button
+                    className="close-button"
+                    onClick={() => handleClosePosition(position)}
+                    disabled={isSubmittingTrade}
+                  >
+                    {isSubmittingTrade ? 'Closing...' : 'Close'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
