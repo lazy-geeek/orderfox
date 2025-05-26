@@ -5,6 +5,7 @@ This module provides FastAPI HTTP endpoints for fetching market data including
 symbols, order books, and candlestick data from the exchange.
 """
 
+import re
 from typing import List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
@@ -28,19 +29,42 @@ async def get_symbols():
     try:
         exchange = exchange_service.get_exchange()
 
+        # Try to explicitly set the market type to futures
+        exchange.options["defaultType"] = "future"
+
         # Load markets to get symbol information
         markets = exchange.load_markets()
 
         symbols = []
-        for market_id, market in markets.items():
-            # Filter for USDT perpetual futures
-            if (
-                market.get("type") == "future"
-                and market.get("quote") == "USDT"
-                and market.get("contract")
-                and market.get("active", True)
-            ):
 
+        for market_id, market in markets.items():
+            # Filter for USDT-quoted active markets
+            is_usdt_quoted = market.get("quote") == "USDT"
+            is_active = market.get("active", True)
+
+            # Must be a futures market (not spot)
+            is_future = (
+                market.get("type") == "future"
+                or market.get("future") == True
+                or market.get("contract") == True
+            )
+
+            # Exclude spot markets explicitly
+            is_spot = market.get("type") == "spot" or market.get("spot") == True
+
+            if not (is_usdt_quoted and is_active and is_future and not is_spot):
+                continue
+
+            # Key filter: Exclude dated futures by checking if the symbol ID contains date patterns
+            # Perpetual contracts: BTCUSDT, ETHUSDT, etc.
+            # Dated futures: BTCUSDT_250627, ETHUSDT_250328, etc.
+            symbol_id = market.get("id", "")
+
+            # Check if symbol contains date pattern (underscore followed by 6 digits)
+            has_date_pattern = bool(re.search(r"_\d{6}$", symbol_id))
+
+            # Only include symbols that don't have date patterns (i.e., perpetuals)
+            if not has_date_pattern:
                 symbols.append(
                     SymbolInfo(
                         id=market["id"],

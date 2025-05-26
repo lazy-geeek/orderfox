@@ -26,7 +26,9 @@ class TestSymbolsEndpoint:
     def test_get_symbols_success(self, mock_exchange_service):
         """Test successful retrieval of symbols."""
         # Mock exchange and markets data
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
         mock_markets = {
@@ -36,7 +38,10 @@ class TestSymbolsEndpoint:
                 "base": "BTC",
                 "quote": "USDT",
                 "type": "future",
+                "future": True,
+                "spot": False,
                 "contract": True,
+                "swap": True,  # Perpetual swap
                 "active": True,
             },
             "ETHUSDT": {
@@ -45,7 +50,10 @@ class TestSymbolsEndpoint:
                 "base": "ETH",
                 "quote": "USDT",
                 "type": "future",
+                "future": True,
+                "spot": False,
                 "contract": True,
+                "swap": True,  # Perpetual swap
                 "active": True,
             },
             "ADAUSDT": {
@@ -54,7 +62,22 @@ class TestSymbolsEndpoint:
                 "base": "ADA",
                 "quote": "USDT",
                 "type": "spot",  # Should be filtered out
+                "future": False,
+                "spot": True,
                 "contract": False,
+                "swap": False,
+                "active": True,
+            },
+            "BTCUSDT_250627": {
+                "id": "BTCUSDT_250627",
+                "symbol": "BTC/USDT:USDT-250627",
+                "base": "BTC",
+                "quote": "USDT",
+                "type": "future",
+                "future": True,
+                "spot": False,
+                "contract": True,
+                "swap": False,  # Dated future - should be filtered out
                 "active": True,
             },
         }
@@ -66,7 +89,9 @@ class TestSymbolsEndpoint:
         # Assertions
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2  # Only futures should be returned
+        assert (
+            len(data) == 2
+        )  # Only perpetual swaps should be returned (not dated futures or spot)
         assert data[0]["symbol"] == "BTC/USDT"
         assert data[1]["symbol"] == "ETH/USDT"
 
@@ -94,7 +119,9 @@ class TestOrderBookEndpoint:
     def test_get_orderbook_success(self, mock_exchange_service):
         """Test successful retrieval of order book."""
         # Mock exchange and order book data
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
         mock_orderbook_data = {
@@ -125,7 +152,9 @@ class TestOrderBookEndpoint:
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
     def test_get_orderbook_exchange_error(self, mock_exchange_service):
         """Test error handling when exchange fails."""
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
         mock_exchange.fetch_order_book.side_effect = Exception("Symbol not found")
 
@@ -142,7 +171,9 @@ class TestCandlesEndpoint:
     def test_get_candles_success(self, mock_exchange_service):
         """Test successful retrieval of candles."""
         # Mock exchange and OHLCV data
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
         mock_ohlcv_data = [
@@ -185,7 +216,9 @@ class TestCandlesEndpoint:
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
     def test_get_candles_default_parameters(self, mock_exchange_service):
         """Test candles endpoint with default parameters."""
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
         mock_exchange.fetch_ohlcv.return_value = []
 
@@ -210,7 +243,9 @@ class TestCandlesEndpoint:
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
     def test_get_candles_exchange_error(self, mock_exchange_service):
         """Test error handling when exchange fails."""
-        mock_exchange = AsyncMock()
+        from unittest.mock import MagicMock
+
+        mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
         mock_exchange.fetch_ohlcv.side_effect = Exception("Network error")
 
