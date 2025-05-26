@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import apiClient from '../../services/apiClient';
 import marketDataReducer, {
   setSelectedSymbol,
   updateOrderBookFromWebSocket,
@@ -10,8 +11,13 @@ import marketDataReducer, {
 
 // Mock apiClient
 jest.mock('../../services/apiClient', () => ({
-  get: jest.fn()
+  __esModule: true,
+  default: {
+    get: jest.fn()
+  }
 }));
+
+const mockGet = (apiClient as any).get;
 
 type TestStore = ReturnType<typeof configureStore<{
   marketData: ReturnType<typeof marketDataReducer>;
@@ -95,19 +101,112 @@ describe('marketDataSlice', () => {
   });
 
   describe('async thunks', () => {
-    test('fetchSymbols should be defined', () => {
-      expect(fetchSymbols).toBeDefined();
-      expect(typeof fetchSymbols).toBe('function');
+    beforeEach(() => {
+      jest.clearAllMocks();
     });
 
-    test('fetchOrderBook should be defined', () => {
-      expect(fetchOrderBook).toBeDefined();
-      expect(typeof fetchOrderBook).toBe('function');
+    describe('fetchSymbols', () => {
+      test('should handle successful fetch', async () => {
+        const mockSymbols = [
+          { id: 'BTCUSDT', symbol: 'BTC/USDT' },
+          { id: 'ETHUSDT', symbol: 'ETH/USDT' }
+        ];
+        
+        mockGet.mockResolvedValueOnce({ data: mockSymbols });
+
+        await store.dispatch(fetchSymbols());
+        
+        const state = store.getState().marketData;
+        expect(state.symbolsList).toEqual(mockSymbols);
+        expect(state.symbolsLoading).toBe(false);
+        expect(state.symbolsError).toBe(null);
+      });
+
+      test('should handle API error with detail', async () => {
+        const errorMessage = 'API service unavailable';
+        mockGet.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(fetchSymbols());
+        
+        const state = store.getState().marketData;
+        expect(state.symbolsError).toBe(errorMessage);
+        expect(state.symbolsLoading).toBe(false);
+      });
+
+      test('should handle network error with fallback message', async () => {
+        mockGet.mockRejectedValueOnce(new Error('Network error'));
+
+        await store.dispatch(fetchSymbols());
+        
+        const state = store.getState().marketData;
+        expect(state.symbolsError).toBe('Could not load trading symbols. Please try again later.');
+        expect(state.symbolsLoading).toBe(false);
+      });
     });
 
-    test('fetchCandles should be defined', () => {
-      expect(fetchCandles).toBeDefined();
-      expect(typeof fetchCandles).toBe('function');
+    describe('fetchOrderBook', () => {
+      test('should handle successful fetch', async () => {
+        const mockOrderBook = {
+          symbol: 'BTCUSDT',
+          bids: [{ price: 50000, amount: 1.5 }],
+          asks: [{ price: 50100, amount: 2.0 }],
+          timestamp: Date.now()
+        };
+        
+        mockGet.mockResolvedValueOnce({ data: mockOrderBook });
+
+        await store.dispatch(fetchOrderBook('BTCUSDT'));
+        
+        const state = store.getState().marketData;
+        expect(state.currentOrderBook).toEqual(mockOrderBook);
+        expect(state.isLoading).toBe(false);
+        expect(state.error).toBe(null);
+      });
+
+      test('should handle API error', async () => {
+        const errorMessage = 'Order book not found';
+        mockGet.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(fetchOrderBook('INVALID'));
+        
+        const state = store.getState().marketData;
+        expect(state.error).toBe(errorMessage);
+        expect(state.isLoading).toBe(false);
+      });
+    });
+
+    describe('fetchCandles', () => {
+      test('should handle successful fetch', async () => {
+        const mockCandles = [
+          { timestamp: Date.now(), open: 50000, high: 51000, low: 49000, close: 50500, volume: 100 }
+        ];
+        
+        mockGet.mockResolvedValueOnce({ data: mockCandles });
+
+        await store.dispatch(fetchCandles({ symbol: 'BTCUSDT' }));
+        
+        const state = store.getState().marketData;
+        expect(state.currentCandles).toEqual(mockCandles);
+        expect(state.isLoading).toBe(false);
+        expect(state.error).toBe(null);
+      });
+
+      test('should handle API error', async () => {
+        const errorMessage = 'Chart data unavailable';
+        mockGet.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(fetchCandles({ symbol: 'INVALID' }));
+        
+        const state = store.getState().marketData;
+        expect(state.error).toBe(errorMessage);
+        expect(state.isLoading).toBe(false);
+      });
     });
   });
 

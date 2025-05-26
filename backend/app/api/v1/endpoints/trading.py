@@ -1,3 +1,10 @@
+"""
+Trading API endpoints.
+
+This module provides FastAPI endpoints for executing trades, managing positions,
+and controlling trading modes (paper vs live trading).
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import List, Dict, Any
 
@@ -10,9 +17,6 @@ from app.api.v1.schemas import (
 )
 from app.services.trading_engine_service import TradingEngineService
 
-# Consider how the TradingEngineService will be provided/instantiated.
-# For now, we can instantiate it directly or use a simple dependency.
-
 router = APIRouter()
 
 
@@ -20,12 +24,15 @@ router = APIRouter()
 # In a larger app, you might use FastAPI's dependency injection system more formally
 # (e.g., with a global instance or a factory function).
 def get_trading_engine_service():
-    # If you make TradingEngineService a singleton or manage its instance elsewhere,
-    # retrieve it here. For now, a new instance per request or a module-level instance.
-    # Let's use a module-level instance for simplicity in this placeholder phase.
-    # This is NOT suitable for production if the service has state that shouldn't be shared
-    # across all requests in this manner without proper concurrency handling.
-    # However, for placeholder purposes, it's straightforward.
+    """
+    Dependency injection function to provide TradingEngineService instance.
+
+    Returns the module-level trading engine service instance. In production,
+    this would be replaced with proper dependency injection and service lifecycle management.
+
+    Returns:
+        TradingEngineService: The trading engine service instance
+    """
     return trading_engine_service_instance
 
 
@@ -39,7 +46,20 @@ async def execute_trade_endpoint(
     service: TradingEngineService = Depends(get_trading_engine_service),
 ):
     """
-    Accepts a trade request and executes it using the trading engine.
+    Execute a trading order (buy/sell) in the current trading mode.
+
+    Processes trade requests and executes them through the trading engine.
+    Supports both paper trading (simulation) and live trading modes.
+
+    Args:
+        trade_request: Trade details including symbol, side, amount, type, and price
+        service: Injected trading engine service
+
+    Returns:
+        TradeResponse: Execution status, order ID, and position information
+
+    Raises:
+        HTTPException: If trade execution fails or parameters are invalid
     """
     try:
         # The service's execute_trade expects enum values if you defined them as such.
@@ -94,7 +114,20 @@ async def get_open_positions_endpoint(
     service: TradingEngineService = Depends(get_trading_engine_service),
 ):
     """
-    Fetches and returns a list of open positions from the trading engine.
+    Retrieve all open trading positions for the current trading mode.
+
+    Returns position data including symbol, side, size, entry price, mark price,
+    and unrealized P&L. For paper trading, returns simulated positions.
+    For live trading, fetches actual positions from the exchange.
+
+    Args:
+        service: Injected trading engine service
+
+    Returns:
+        List[PositionSchema]: List of open positions with P&L information
+
+    Raises:
+        HTTPException: If position retrieval fails
     """
     try:
         # The service.get_open_positions() placeholder returns a List[Dict[str, Any]]
@@ -134,14 +167,28 @@ async def get_open_positions_endpoint(
 
 @router.post("/set_trading_mode", response_model=Dict[str, str])
 async def set_trading_mode_endpoint(
-    mode_data: Dict[str, str] = Body(
-        ..., example={"mode": "paper"}
-    ),  # Use Body for request body
+    mode_data: Dict[str, str] = Body(..., example={"mode": "paper"}),
     service: TradingEngineService = Depends(get_trading_engine_service),
 ):
     """
-    Sets the trading mode (e.g., "paper" or "live").
-    Expects a JSON body like: {"mode": "paper"}
+    Set the trading mode for the application.
+
+    Switches between paper trading (simulation) and live trading modes.
+    Paper mode is recommended for testing strategies safely without real money.
+
+    Args:
+        mode_data: JSON body containing mode ("paper" or "live")
+        service: Injected trading engine service
+
+    Returns:
+        Dict containing status and confirmation message
+
+    Raises:
+        HTTPException: If mode is invalid or setting fails
+
+    Example:
+        POST /set_trading_mode
+        {"mode": "paper"}
     """
     try:
         mode = mode_data.get("mode")

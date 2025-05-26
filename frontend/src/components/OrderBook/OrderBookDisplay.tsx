@@ -3,10 +3,21 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { fetchOrderBook, updateOrderBookFromWebSocket } from '../../features/marketData/marketDataSlice';
 import './OrderBookDisplay.css';
 
+/**
+ * Props for the OrderBookDisplay component
+ */
 interface OrderBookDisplayProps {
+  /** Optional CSS class name for styling */
   className?: string;
 }
 
+/**
+ * OrderBookDisplay component shows real-time bid/ask prices and volumes.
+ *
+ * Displays market depth data with live updates via WebSocket connection.
+ * Shows configurable number of price levels and provides visual indicators
+ * for market liquidity and spread.
+ */
 const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   const dispatch = useAppDispatch();
   const { selectedSymbol, currentOrderBook, isLoading, error } = useAppSelector(
@@ -19,9 +30,16 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   const [displayDepth, setDisplayDepth] = useState(10);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // WebSocket connection management
+  /**
+   * Establish WebSocket connection for real-time order book updates.
+   *
+   * Closes any existing connection before creating a new one to prevent
+   * multiple connections for the same symbol.
+   *
+   * @param symbol - Trading symbol to subscribe to (e.g., 'BTCUSDT')
+   */
   const connectWebSocket = useCallback((symbol: string) => {
-    // Close existing connection if any
+    // Close existing connection if any to prevent memory leaks
     if (wsRef.current) {
       wsRef.current.close();
     }

@@ -14,6 +14,8 @@ const createMockStore = (initialState: Partial<{
   tradingMode: TradingMode;
   isSubmittingTrade: boolean;
   tradeError: string | null;
+  positionsLoading: boolean;
+  positionsError: string | null;
 }> = {}) => {
   return configureStore({
     reducer: {
@@ -26,6 +28,8 @@ const createMockStore = (initialState: Partial<{
         tradingMode: 'paper' as TradingMode,
         isSubmittingTrade: false,
         tradeError: null,
+        positionsLoading: false,
+        positionsError: null,
         ...initialState,
       },
     },

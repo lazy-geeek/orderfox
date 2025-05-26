@@ -1,43 +1,81 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import apiClient from '../../services/apiClient';
 
-// Types
+/**
+ * Trading symbol information
+ */
 interface Symbol {
+  /** Exchange symbol ID */
   id: string;
+  /** Trading pair symbol (e.g., 'BTCUSDT') */
   symbol: string;
+  /** Base asset (e.g., 'BTC') */
   baseAsset?: string;
+  /** Quote asset (e.g., 'USDT') */
   quoteAsset?: string;
 }
 
+/**
+ * Single price level in the order book
+ */
 interface OrderBookLevel {
+  /** Price level */
   price: number;
+  /** Volume/amount at this price level */
   amount: number;
 }
 
+/**
+ * Complete order book data with bids and asks
+ */
 interface OrderBook {
+  /** Trading symbol */
   symbol: string;
+  /** Buy orders (bids) sorted by price descending */
   bids: OrderBookLevel[];
+  /** Sell orders (asks) sorted by price ascending */
   asks: OrderBookLevel[];
+  /** Timestamp of the order book snapshot */
   timestamp: number;
 }
 
+/**
+ * Candlestick/OHLCV data for price charts
+ */
 interface Candle {
+  /** Candle timestamp */
   timestamp: number;
+  /** Opening price */
   open: number;
+  /** Highest price */
   high: number;
+  /** Lowest price */
   low: number;
+  /** Closing price */
   close: number;
+  /** Trading volume */
   volume: number;
 }
 
+/**
+ * Redux state for market data management
+ */
 interface MarketDataState {
+  /** Currently selected trading symbol */
   selectedSymbol: string | null;
+  /** List of available trading symbols */
   symbolsList: Symbol[];
+  /** Current order book data */
   currentOrderBook: OrderBook | null;
+  /** Current candlestick data */
   currentCandles: Candle[];
+  /** Loading state for market data operations */
   isLoading: boolean;
+  /** Error message for market data operations */
   error: string | null;
+  /** Loading state for symbols list */
   symbolsLoading: boolean;
+  /** Error message for symbols loading */
   symbolsError: string | null;
 }
 
@@ -60,7 +98,11 @@ export const fetchSymbols = createAsyncThunk(
       const response = await apiClient.get('/symbols');
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch symbols');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not load trading symbols. Please try again later.'
+      );
     }
   }
 );
@@ -72,7 +114,11 @@ export const fetchOrderBook = createAsyncThunk(
       const response = await apiClient.get(`/orderbook/${symbol}`);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch order book');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not load order book data. Please try again later.'
+      );
     }
   }
 );
@@ -86,7 +132,11 @@ export const fetchCandles = createAsyncThunk(
       });
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch candles');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not load chart data. Please try again later.'
+      );
     }
   }
 );

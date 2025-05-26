@@ -10,6 +10,8 @@ interface TradingState {
   tradingMode: TradingMode;
   isSubmittingTrade: boolean;
   tradeError: string | null;
+  positionsLoading: boolean;
+  positionsError: string | null;
 }
 
 interface TradeDetails {
@@ -26,6 +28,8 @@ const initialState: TradingState = {
   tradingMode: 'paper',
   isSubmittingTrade: false,
   tradeError: null,
+  positionsLoading: false,
+  positionsError: null,
 };
 
 // Async thunks
@@ -36,7 +40,11 @@ export const fetchOpenPositions = createAsyncThunk(
       const response = await apiClient.get('/positions');
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch open positions');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not load your positions. Please try again later.'
+      );
     }
   }
 );
@@ -55,7 +63,11 @@ export const executePaperTrade = createAsyncThunk(
       
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to execute paper trade');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not execute paper trade. Please check your order details and try again.'
+      );
     }
   }
 );
@@ -74,7 +86,11 @@ export const executeLiveTrade = createAsyncThunk(
       
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to execute live trade');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not execute live trade. Please check your order details and try again.'
+      );
     }
   }
 );
@@ -86,7 +102,11 @@ export const setTradingModeApi = createAsyncThunk(
       await apiClient.post('/set_trading_mode', { mode });
       return mode;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to set trading mode');
+      return rejectWithValue(
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        'Could not change trading mode. Please try again.'
+      );
     }
   }
 );
@@ -101,6 +121,9 @@ const tradingSlice = createSlice({
     clearTradeError: (state) => {
       state.tradeError = null;
     },
+    clearPositionsError: (state) => {
+      state.positionsError = null;
+    },
     addToTradeHistory: (state, action: PayloadAction<any>) => {
       state.tradeHistory.unshift(action.payload);
       // Keep only the latest 100 trades
@@ -113,13 +136,16 @@ const tradingSlice = createSlice({
     // Fetch open positions
     builder
       .addCase(fetchOpenPositions.pending, (state) => {
-        // Note: Not setting isSubmittingTrade here as this is just fetching data
+        state.positionsLoading = true;
+        state.positionsError = null;
       })
       .addCase(fetchOpenPositions.fulfilled, (state, action) => {
+        state.positionsLoading = false;
         state.openPositions = action.payload;
       })
       .addCase(fetchOpenPositions.rejected, (state, action) => {
-        state.tradeError = action.payload as string;
+        state.positionsLoading = false;
+        state.positionsError = action.payload as string;
       })
       // Execute paper trade
       .addCase(executePaperTrade.pending, (state) => {
@@ -171,6 +197,7 @@ const tradingSlice = createSlice({
 export const {
   setTradingMode,
   clearTradeError,
+  clearPositionsError,
   addToTradeHistory,
 } = tradingSlice.actions;
 

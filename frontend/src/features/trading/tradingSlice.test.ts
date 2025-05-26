@@ -1,7 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
+import apiClient from '../../services/apiClient';
 import tradingReducer, {
   setTradingMode,
   clearTradeError,
+  clearPositionsError,
   addToTradeHistory,
   fetchOpenPositions,
   executePaperTrade,
@@ -11,9 +13,15 @@ import tradingReducer, {
 
 // Mock apiClient
 jest.mock('../../services/apiClient', () => ({
-  get: jest.fn(),
-  post: jest.fn(),
+  __esModule: true,
+  default: {
+    get: jest.fn(),
+    post: jest.fn()
+  }
 }));
+
+const mockGet = (apiClient as any).get;
+const mockPost = (apiClient as any).post;
 
 type TestStore = ReturnType<typeof configureStore<{
   trading: ReturnType<typeof tradingReducer>;
@@ -38,6 +46,8 @@ describe('tradingSlice', () => {
       expect(state.tradingMode).toBe('paper');
       expect(state.isSubmittingTrade).toBe(false);
       expect(state.tradeError).toBe(null);
+      expect(state.positionsLoading).toBe(false);
+      expect(state.positionsError).toBe(null);
     });
   });
 
@@ -60,11 +70,29 @@ describe('tradingSlice', () => {
         tradingMode: 'paper' as const,
         isSubmittingTrade: false,
         tradeError: 'Some error',
+        positionsLoading: false,
+        positionsError: null,
       };
       
       const action = clearTradeError();
       const newState = tradingReducer(initialState, action);
       expect(newState.tradeError).toBe(null);
+    });
+
+    test('clearPositionsError should clear positions error', () => {
+      const initialState = {
+        openPositions: [],
+        tradeHistory: [],
+        tradingMode: 'paper' as const,
+        isSubmittingTrade: false,
+        tradeError: null,
+        positionsLoading: false,
+        positionsError: 'Positions error',
+      };
+      
+      const action = clearPositionsError();
+      const newState = tradingReducer(initialState, action);
+      expect(newState.positionsError).toBe(null);
     });
 
     test('addToTradeHistory should add trade to history', () => {
@@ -82,6 +110,8 @@ describe('tradingSlice', () => {
         tradingMode: 'paper' as const,
         isSubmittingTrade: false,
         tradeError: null,
+        positionsLoading: false,
+        positionsError: null,
       };
 
       const newTrade = { id: 'new' };
@@ -107,24 +137,136 @@ describe('tradingSlice', () => {
   });
 
   describe('async thunks', () => {
-    test('fetchOpenPositions should be defined', () => {
-      expect(fetchOpenPositions).toBeDefined();
-      expect(typeof fetchOpenPositions).toBe('function');
+    beforeEach(() => {
+      jest.clearAllMocks();
     });
 
-    test('executePaperTrade should be defined', () => {
-      expect(executePaperTrade).toBeDefined();
-      expect(typeof executePaperTrade).toBe('function');
+    describe('fetchOpenPositions', () => {
+      test('should handle successful fetch', async () => {
+        const mockPositions = [
+          { symbol: 'BTCUSDT', side: 'long', size: 0.1, entryPrice: 50000, markPrice: 51000, unrealizedPnl: 100 }
+        ];
+        
+        mockGet.mockResolvedValueOnce({ data: mockPositions });
+
+        await store.dispatch(fetchOpenPositions());
+        
+        const state = store.getState().trading;
+        expect(state.openPositions).toEqual(mockPositions);
+        expect(state.positionsLoading).toBe(false);
+        expect(state.positionsError).toBe(null);
+      });
+
+      test('should handle API error', async () => {
+        const errorMessage = 'Positions service unavailable';
+        mockGet.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(fetchOpenPositions());
+        
+        const state = store.getState().trading;
+        expect(state.positionsError).toBe(errorMessage);
+        expect(state.positionsLoading).toBe(false);
+      });
+
+      test('should handle network error with fallback message', async () => {
+        mockGet.mockRejectedValueOnce(new Error('Network error'));
+
+        await store.dispatch(fetchOpenPositions());
+        
+        const state = store.getState().trading;
+        expect(state.positionsError).toBe('Could not load your positions. Please try again later.');
+        expect(state.positionsLoading).toBe(false);
+      });
     });
 
-    test('executeLiveTrade should be defined', () => {
-      expect(executeLiveTrade).toBeDefined();
-      expect(typeof executeLiveTrade).toBe('function');
+    describe('executePaperTrade', () => {
+      test('should handle successful trade execution', async () => {
+        const tradeDetails = { symbol: 'BTCUSDT', side: 'long', amount: 0.1, type: 'market' };
+        const mockTradeResult = { id: 'trade123', ...tradeDetails, status: 'filled' };
+        
+        mockPost.mockResolvedValueOnce({ data: mockTradeResult });
+        mockGet.mockResolvedValueOnce({ data: [] }); // fetchOpenPositions call
+
+        await store.dispatch(executePaperTrade(tradeDetails));
+        
+        const state = store.getState().trading;
+        expect(state.isSubmittingTrade).toBe(false);
+        expect(state.tradeError).toBe(null);
+        expect(state.tradeHistory[0]).toEqual(mockTradeResult);
+      });
+
+      test('should handle trade execution error', async () => {
+        const tradeDetails = { symbol: 'BTCUSDT', side: 'long', amount: 0.1, type: 'market' };
+        const errorMessage = 'Insufficient balance';
+        
+        mockPost.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(executePaperTrade(tradeDetails));
+        
+        const state = store.getState().trading;
+        expect(state.tradeError).toBe(errorMessage);
+        expect(state.isSubmittingTrade).toBe(false);
+      });
     });
 
-    test('setTradingModeApi should be defined', () => {
-      expect(setTradingModeApi).toBeDefined();
-      expect(typeof setTradingModeApi).toBe('function');
+    describe('executeLiveTrade', () => {
+      test('should handle successful trade execution', async () => {
+        const tradeDetails = { symbol: 'BTCUSDT', side: 'long', amount: 0.1, type: 'market' };
+        const mockTradeResult = { id: 'trade123', ...tradeDetails, status: 'filled' };
+        
+        mockPost.mockResolvedValueOnce({ data: mockTradeResult });
+        mockGet.mockResolvedValueOnce({ data: [] }); // fetchOpenPositions call
+
+        await store.dispatch(executeLiveTrade(tradeDetails));
+        
+        const state = store.getState().trading;
+        expect(state.isSubmittingTrade).toBe(false);
+        expect(state.tradeError).toBe(null);
+        expect(state.tradeHistory[0]).toEqual(mockTradeResult);
+      });
+
+      test('should handle trade execution error', async () => {
+        const tradeDetails = { symbol: 'BTCUSDT', side: 'long', amount: 0.1, type: 'market' };
+        const errorMessage = 'Market closed';
+        
+        mockPost.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(executeLiveTrade(tradeDetails));
+        
+        const state = store.getState().trading;
+        expect(state.tradeError).toBe(errorMessage);
+        expect(state.isSubmittingTrade).toBe(false);
+      });
+    });
+
+    describe('setTradingModeApi', () => {
+      test('should handle successful mode change', async () => {
+        mockPost.mockResolvedValueOnce({ data: {} });
+
+        await store.dispatch(setTradingModeApi('live'));
+        
+        const state = store.getState().trading;
+        expect(state.tradingMode).toBe('live');
+        expect(state.tradeError).toBe(null);
+      });
+
+      test('should handle mode change error', async () => {
+        const errorMessage = 'Live trading not enabled';
+        mockPost.mockRejectedValueOnce({
+          response: { data: { detail: errorMessage } }
+        });
+
+        await store.dispatch(setTradingModeApi('live'));
+        
+        const state = store.getState().trading;
+        expect(state.tradeError).toBe(errorMessage);
+      });
     });
   });
 

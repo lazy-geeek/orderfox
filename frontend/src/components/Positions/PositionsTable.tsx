@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { fetchOpenPositions, executePaperTrade, executeLiveTrade } from '../../features/trading/tradingSlice';
+import { fetchOpenPositions, executePaperTrade, executeLiveTrade, clearPositionsError } from '../../features/trading/tradingSlice';
 import './PositionsTable.css';
 
 // Position interface matching backend schema
@@ -15,7 +15,7 @@ interface Position {
 
 const PositionsTable: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { openPositions, tradingMode, isSubmittingTrade } = useAppSelector((state) => state.trading);
+  const { openPositions, tradingMode, isSubmittingTrade, positionsLoading, positionsError } = useAppSelector((state) => state.trading);
 
   // Fetch positions on mount and when trading mode changes
   useEffect(() => {
@@ -48,6 +48,62 @@ const PositionsTable: React.FC = () => {
     const sign = pnl >= 0 ? '+' : '';
     return `${sign}${pnl.toFixed(2)}`;
   };
+
+  const handleRetryFetch = () => {
+    dispatch(clearPositionsError());
+    dispatch(fetchOpenPositions());
+  };
+
+  // Render loading state
+  if (positionsLoading) {
+    return (
+      <div className="positions-table-container">
+        <h3 className="positions-title">Open Positions</h3>
+        <div className="loading-state" style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '2rem',
+          color: '#666'
+        }}>
+          Loading positions...
+        </div>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (positionsError) {
+    return (
+      <div className="positions-table-container">
+        <h3 className="positions-title">Open Positions</h3>
+        <div className="error-state" style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '2rem',
+          color: '#d32f2f'
+        }}>
+          <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+            Failed to load positions: {positionsError}
+          </div>
+          <button
+            onClick={handleRetryFetch}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#1976d2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="positions-table-container">

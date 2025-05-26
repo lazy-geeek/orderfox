@@ -29,7 +29,7 @@ async def get_symbols():
         exchange = exchange_service.get_exchange()
 
         # Load markets to get symbol information
-        markets = await exchange.load_markets()
+        markets = exchange.load_markets()
 
         symbols = []
         for market_id, market in markets.items():
@@ -79,7 +79,7 @@ async def get_orderbook(symbol: str):
         exchange = exchange_service.get_exchange()
 
         # Fetch order book data
-        order_book_data = await exchange.fetch_order_book(symbol)
+        order_book_data = exchange.fetch_order_book(symbol)
 
         # Convert to our schema format
         bids = [
@@ -157,7 +157,7 @@ async def get_candles(
         exchange = exchange_service.get_exchange()
 
         # Fetch OHLCV data
-        ohlcv_data = await exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+        ohlcv_data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
 
         # Convert to our schema format
         candles = []

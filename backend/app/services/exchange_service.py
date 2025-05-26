@@ -1,7 +1,11 @@
 import ccxt
 import ccxtpro
 from typing import Optional, Dict, Any
+from fastapi import HTTPException
 from app.core.config import settings
+from app.core.logging_config import get_logger
+
+logger = get_logger("exchange_service")
 
 
 class ExchangeService:
@@ -19,34 +23,56 @@ class ExchangeService:
             ccxt.Exchange: Initialized Binance exchange instance
 
         Raises:
-            Exception: If API keys are missing or initialization fails
+            HTTPException: If API keys are missing or initialization fails
         """
         try:
+            logger.info("Initializing CCXT Binance exchange...")
+
             if not settings.BINANCE_API_KEY or not settings.BINANCE_SECRET_KEY:
-                raise ValueError(
-                    "Binance API keys are required but not found in environment variables"
+                logger.warning("Binance API keys not found - initializing in demo mode")
+                # Initialize exchange without API keys for demo/public endpoints
+                self.exchange = ccxt.binance(
+                    {
+                        "sandbox": True,  # Always use sandbox for demo mode
+                        "enableRateLimit": True,
+                        "options": {
+                            "defaultType": "future",  # Use futures by default
+                        },
+                    }
+                )
+            else:
+                self.exchange = ccxt.binance(
+                    {
+                        "apiKey": settings.BINANCE_API_KEY,
+                        "secret": settings.BINANCE_SECRET_KEY,
+                        "sandbox": settings.DEBUG,  # Use sandbox in debug mode
+                        "enableRateLimit": True,
+                        "options": {
+                            "defaultType": "future",  # Use futures by default
+                        },
+                    }
                 )
 
-            self.exchange = ccxt.binance(
-                {
-                    "apiKey": settings.BINANCE_API_KEY,
-                    "secret": settings.BINANCE_SECRET_KEY,
-                    "sandbox": settings.DEBUG,  # Use sandbox in debug mode
-                    "enableRateLimit": True,
-                    "options": {
-                        "defaultType": "future",  # Use futures by default
-                    },
-                }
-            )
-
-            print(
+            logger.info(
                 f"CCXT Binance exchange initialized successfully (sandbox: {settings.DEBUG})"
             )
             return self.exchange
 
-        except Exception as e:
-            print(f"Error initializing CCXT exchange: {str(e)}")
+        except HTTPException:
             raise
+        except ccxt.NetworkError as e:
+            logger.error(f"Network error initializing CCXT exchange: {str(e)}")
+            raise HTTPException(status_code=503, detail="Exchange network error")
+        except ccxt.ExchangeError as e:
+            logger.error(f"Exchange error initializing CCXT exchange: {str(e)}")
+            raise HTTPException(status_code=502, detail="Exchange API error")
+        except Exception as e:
+            logger.error(
+                f"Unexpected error initializing CCXT exchange: {str(e)}", exc_info=True
+            )
+            raise HTTPException(
+                status_code=500, detail="Exchange initialization failed"
+            )
 
     def initialize_exchange_pro(self) -> Any:
         """
@@ -56,34 +82,59 @@ class ExchangeService:
             Any: Initialized Binance Pro exchange instance
 
         Raises:
-            Exception: If API keys are missing or initialization fails
+            HTTPException: If API keys are missing or initialization fails
         """
         try:
+            logger.info("Initializing CCXT Pro Binance exchange...")
+
             if not settings.BINANCE_API_KEY or not settings.BINANCE_SECRET_KEY:
-                raise ValueError(
-                    "Binance API keys are required but not found in environment variables"
+                logger.warning(
+                    "Binance API keys not found - initializing Pro exchange in demo mode"
+                )
+                # Initialize exchange without API keys for demo/public endpoints
+                self.exchange_pro = ccxtpro.binance(
+                    {
+                        "sandbox": True,  # Always use sandbox for demo mode
+                        "enableRateLimit": True,
+                        "options": {
+                            "defaultType": "future",  # Use futures by default
+                        },
+                    }
+                )
+            else:
+                self.exchange_pro = ccxtpro.binance(
+                    {
+                        "apiKey": settings.BINANCE_API_KEY,
+                        "secret": settings.BINANCE_SECRET_KEY,
+                        "sandbox": settings.DEBUG,  # Use sandbox in debug mode
+                        "enableRateLimit": True,
+                        "options": {
+                            "defaultType": "future",  # Use futures by default
+                        },
+                    }
                 )
 
-            self.exchange_pro = ccxtpro.binance(
-                {
-                    "apiKey": settings.BINANCE_API_KEY,
-                    "secret": settings.BINANCE_SECRET_KEY,
-                    "sandbox": settings.DEBUG,  # Use sandbox in debug mode
-                    "enableRateLimit": True,
-                    "options": {
-                        "defaultType": "future",  # Use futures by default
-                    },
-                }
-            )
-
-            print(
+            logger.info(
                 f"CCXT Pro Binance exchange initialized successfully (sandbox: {settings.DEBUG})"
             )
             return self.exchange_pro
 
-        except Exception as e:
-            print(f"Error initializing CCXT Pro exchange: {str(e)}")
+        except HTTPException:
             raise
+        except ccxt.NetworkError as e:
+            logger.error(f"Network error initializing CCXT Pro exchange: {str(e)}")
+            raise HTTPException(status_code=503, detail="Exchange network error")
+        except ccxt.ExchangeError as e:
+            logger.error(f"Exchange error initializing CCXT Pro exchange: {str(e)}")
+            raise HTTPException(status_code=502, detail="Exchange API error")
+        except Exception as e:
+            logger.error(
+                f"Unexpected error initializing CCXT Pro exchange: {str(e)}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500, detail="Exchange initialization failed"
+            )
 
     def get_exchange(self) -> ccxt.Exchange:
         """
@@ -115,18 +166,44 @@ class ExchangeService:
             Dict[str, Any]: Connection test results
         """
         try:
+            logger.info("Testing connection to Binance API...")
             exchange = self.get_exchange()
+
             # Test connection by fetching exchange status
             status = await exchange.fetch_status()
+
+            logger.info("Connection to Binance API successful")
             return {
                 "status": "success",
                 "exchange_status": status,
                 "message": "Connection to Binance API successful",
             }
-        except Exception as e:
+        except ccxt.NetworkError as e:
+            logger.error(f"Network error testing Binance API connection: {str(e)}")
             return {
                 "status": "error",
-                "message": f"Failed to connect to Binance API: {str(e)}",
+                "message": "Network error connecting to Binance API",
+            }
+        except ccxt.ExchangeError as e:
+            logger.error(f"Exchange error testing Binance API connection: {str(e)}")
+            return {
+                "status": "error",
+                "message": "Exchange API error",
+            }
+        except HTTPException as e:
+            logger.error(f"HTTP error testing Binance API connection: {str(e.detail)}")
+            return {
+                "status": "error",
+                "message": e.detail,
+            }
+        except Exception as e:
+            logger.error(
+                f"Unexpected error testing Binance API connection: {str(e)}",
+                exc_info=True,
+            )
+            return {
+                "status": "error",
+                "message": "Failed to connect to Binance API",
             }
 
 
