@@ -10,9 +10,11 @@ interface Symbol {
   /** Trading pair symbol (e.g., 'BTCUSDT') */
   symbol: string;
   /** Base asset (e.g., 'BTC') */
-  baseAsset?: string;
+  baseAsset: string;
   /** Quote asset (e.g., 'USDT') */
-  quoteAsset?: string;
+  quoteAsset: string;
+  /** User-friendly display name (e.g., 'BTC/USDT') */
+  uiName: string;
 }
 
 /**

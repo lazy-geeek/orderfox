@@ -56,6 +56,7 @@ async def get_symbols():
                     symbol=market["symbol"],
                     base_asset=market["base"],
                     quote_asset=market["quote"],
+                    ui_name=f"{market['base']}/{market['quote']}",
                 )
             )
 

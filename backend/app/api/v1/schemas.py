@@ -11,6 +11,13 @@ from datetime import datetime
 from enum import Enum
 
 
+def to_camel(string: str) -> str:
+    """Converts snake_case to camelCase."""
+    return "".join(
+        word.capitalize() if i > 0 else word for i, word in enumerate(string.split("_"))
+    )
+
+
 class SymbolInfo(BaseModel):
     """
     Schema for trading symbol information.
@@ -23,16 +30,22 @@ class SymbolInfo(BaseModel):
     symbol: str = Field(..., description="Trading symbol (e.g., 'BTCUSDT')")
     base_asset: str = Field(..., description="Base asset (e.g., 'BTC')")
     quote_asset: str = Field(..., description="Quote asset (e.g., 'USDT')")
+    ui_name: str = Field(
+        ..., description="User-friendly display name (e.g., 'BTC/USDT')"
+    )
 
     model_config = ConfigDict(
+        populate_by_name=True,
+        alias_generator=to_camel,
         json_schema_extra={
             "example": {
                 "id": "BTCUSDT",
-                "symbol": "BTCUSDT",
-                "base_asset": "BTC",
-                "quote_asset": "USDT",
+                "symbol": "BTC/USDT:USDT",
+                "baseAsset": "BTC",  # Changed to camelCase in example
+                "quoteAsset": "USDT",  # Changed to camelCase in example
+                "uiName": "BTC/USDT",  # Changed to camelCase in example
             }
-        }
+        },
     )
 
 

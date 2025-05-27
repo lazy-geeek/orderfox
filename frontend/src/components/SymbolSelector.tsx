@@ -70,7 +70,7 @@ const SymbolSelector: React.FC<SymbolSelectorProps> = ({ className }) => {
         <option value="">Select a symbol...</option>
         {symbolsList.map((symbol) => (
           <option key={symbol.id} value={symbol.id}>
-            {symbol.symbol}
+            {symbol.uiName}
           </option>
         ))}
       </select>
