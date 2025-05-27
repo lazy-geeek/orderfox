@@ -71,6 +71,9 @@ const SymbolSelector: React.FC<SymbolSelectorProps> = ({ className }) => {
         {symbolsList.map((symbol) => (
           <option key={symbol.id} value={symbol.id}>
             {symbol.uiName}
+            {typeof symbol.volume24h === 'number' && symbol.volume24h > 0 ?
+              ` (${(symbol.volume24h / 1000000).toFixed(2)}M)` :
+              ''}
           </option>
         ))}
       </select>

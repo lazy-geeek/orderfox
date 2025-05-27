@@ -15,6 +15,8 @@ interface Symbol {
   quoteAsset: string;
   /** User-friendly display name (e.g., 'BTC/USDT') */
   uiName: string;
+  /** 24-hour trading volume in quote currency */
+  volume24h?: number;
 }
 
 /**

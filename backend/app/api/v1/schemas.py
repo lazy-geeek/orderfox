@@ -33,6 +33,9 @@ class SymbolInfo(BaseModel):
     ui_name: str = Field(
         ..., description="User-friendly display name (e.g., 'BTC/USDT')"
     )
+    volume24h: Optional[float] = Field(
+        None, description="24-hour trading volume in quote currency"
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,

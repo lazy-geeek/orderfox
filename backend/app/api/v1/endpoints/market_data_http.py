@@ -34,6 +34,7 @@ async def get_symbols():
 
         # Load markets to get symbol information
         markets = exchange.load_markets()
+        tickers = exchange.fetch_tickers()
 
         symbols = []
 
@@ -50,6 +51,19 @@ async def get_symbols():
 
             if not (is_usdt_quoted and is_active and is_swap and not is_spot):
                 continue
+
+            # Get 24h volume from ticker data
+            ticker = tickers.get(market["symbol"])
+
+            volume24h = None
+            if ticker and "info" in ticker and "quoteVolume" in ticker["info"]:
+                try:
+                    volume24h = float(ticker["info"]["quoteVolume"])
+                except ValueError:
+                    volume24h = (
+                        None  # Handle cases where it might not be a valid number
+                    )
+
             symbols.append(
                 SymbolInfo(
                     id=market["id"],
@@ -57,11 +71,18 @@ async def get_symbols():
                     base_asset=market["base"],
                     quote_asset=market["quote"],
                     ui_name=f"{market['base']}/{market['quote']}",
+                    volume24h=volume24h,
                 )
             )
 
-        # Sort symbols alphabetically by symbol name
-        symbols.sort(key=lambda x: x.symbol)
+        # Sort symbols by 24h volume in descending order,
+        # with symbols without volume (None or 0) at the end
+        symbols.sort(
+            key=lambda x: (
+                x.volume24h is None or x.volume24h == 0,
+                -float(x.volume24h or 0),
+            )
+        )
 
         return symbols
 
