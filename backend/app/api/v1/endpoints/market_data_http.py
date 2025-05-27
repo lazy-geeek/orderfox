@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get("/symbols", response_model=List[SymbolInfo])
 async def get_symbols():
     """
-    Get all available USDT perpetual futures symbols from Binance.
+    Get all available USDT perpetual swap symbols from Binance.
 
     Returns:
         List[SymbolInfo]: List of available trading symbols
@@ -43,36 +43,21 @@ async def get_symbols():
             is_active = market.get("active", True)
 
             # Must be a futures market (not spot)
-            is_future = (
-                market.get("type") == "future"
-                or market.get("future") == True
-                or market.get("contract") == True
-            )
+            is_swap = market.get("type") == "swap"
 
             # Exclude spot markets explicitly
             is_spot = market.get("type") == "spot" or market.get("spot") == True
 
-            if not (is_usdt_quoted and is_active and is_future and not is_spot):
+            if not (is_usdt_quoted and is_active and is_swap and not is_spot):
                 continue
-
-            # Key filter: Exclude dated futures by checking if the symbol ID contains date patterns
-            # Perpetual contracts: BTCUSDT, ETHUSDT, etc.
-            # Dated futures: BTCUSDT_250627, ETHUSDT_250328, etc.
-            symbol_id = market.get("id", "")
-
-            # Check if symbol contains date pattern (underscore followed by 6 digits)
-            has_date_pattern = bool(re.search(r"_\d{6}$", symbol_id))
-
-            # Only include symbols that don't have date patterns (i.e., perpetuals)
-            if not has_date_pattern:
-                symbols.append(
-                    SymbolInfo(
-                        id=market["id"],
-                        symbol=market["symbol"],
-                        base_asset=market["base"],
-                        quote_asset=market["quote"],
-                    )
+            symbols.append(
+                SymbolInfo(
+                    id=market["id"],
+                    symbol=market["symbol"],
+                    base_asset=market["base"],
+                    quote_asset=market["quote"],
                 )
+            )
 
         # Sort symbols alphabetically by symbol name
         symbols.sort(key=lambda x: x.symbol)
