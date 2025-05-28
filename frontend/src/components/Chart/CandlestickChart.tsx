@@ -148,7 +148,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
       wsRef.current.close();
     }
 
-    const wsUrl = `ws://localhost:8000/ws/candles/${selectedSymbol}/${timeframe}`;
+    const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
+    const wsUrl = `${wsBaseUrl}/ws/candles/${selectedSymbol}/${timeframe}`;
     
     try {
       const ws = new WebSocket(wsUrl);
