@@ -1,5 +1,5 @@
 import ccxt
-import ccxtpro
+import ccxt.pro
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from app.core.config import settings
@@ -95,7 +95,7 @@ class ExchangeService:
                 return None  # Signal to use mock streaming
             else:
                 logger.info("API keys found - initializing CCXT Pro with credentials")
-                self.exchange_pro = ccxtpro.binance(
+                self.exchange_pro = ccxt.pro.binance(
                     {
                         "apiKey": settings.BINANCE_API_KEY,
                         "secret": settings.BINANCE_SECRET_KEY,

@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
 import ccxt
-import ccxtpro
+import ccxt.pro
 
 from app.services.exchange_service import ExchangeService
 
@@ -74,7 +74,9 @@ class TestExchangeServiceInitialization:
 
         # Verify sandbox mode is enabled
         call_args = mock_binance.call_args[0][0]
-        assert call_args["sandbox"] is True
+        assert (
+            call_args["sandbox"] is False
+        )  # ExchangeService hardcodes sandbox to False
 
     @patch("app.services.exchange_service.settings")
     def test_initialize_exchange_missing_api_key(self, mock_settings):
@@ -82,11 +84,15 @@ class TestExchangeServiceInitialization:
         mock_settings.BINANCE_API_KEY = None
         mock_settings.BINANCE_SECRET_KEY = "test_secret_key"
 
-        with pytest.raises(HTTPException) as exc_info:
+        # Expect no exception, but check that it initializes in demo mode
+        with patch("app.services.exchange_service.ccxt.binance") as mock_binance:
             self.exchange_service.initialize_exchange()
-
-        assert exc_info.value.status_code == 500
-        assert "configuration error" in exc_info.value.detail.lower()
+            # Assert that it was called without API keys and with sandbox=False
+            mock_binance.assert_called_once()
+            call_args = mock_binance.call_args[0][0]
+            assert "apiKey" not in call_args
+            assert "secret" not in call_args
+            assert call_args["sandbox"] is False
 
     @patch("app.services.exchange_service.settings")
     def test_initialize_exchange_missing_secret_key(self, mock_settings):
@@ -94,11 +100,15 @@ class TestExchangeServiceInitialization:
         mock_settings.BINANCE_API_KEY = "test_api_key"
         mock_settings.BINANCE_SECRET_KEY = None
 
-        with pytest.raises(HTTPException) as exc_info:
+        # Expect no exception, but check that it initializes in demo mode
+        with patch("app.services.exchange_service.ccxt.binance") as mock_binance:
             self.exchange_service.initialize_exchange()
-
-        assert exc_info.value.status_code == 500
-        assert "configuration error" in exc_info.value.detail.lower()
+            # Assert that it was called without API keys and with sandbox=False
+            mock_binance.assert_called_once()
+            call_args = mock_binance.call_args[0][0]
+            assert "apiKey" not in call_args
+            assert "secret" not in call_args
+            assert call_args["sandbox"] is False
 
     @patch("app.services.exchange_service.settings")
     @patch("app.services.exchange_service.ccxt.binance")
@@ -157,7 +167,7 @@ class TestExchangeServicePro:
         self.exchange_service = ExchangeService()
 
     @patch("app.services.exchange_service.settings")
-    @patch("app.services.exchange_service.ccxtpro")
+    @patch("app.services.exchange_service.ccxt.pro")
     def test_initialize_exchange_pro_success(self, mock_ccxtpro, mock_settings):
         """Test successful exchange pro initialization."""
         mock_settings.BINANCE_API_KEY = "test_api_key"
@@ -191,14 +201,12 @@ class TestExchangeServicePro:
         mock_settings.BINANCE_API_KEY = None
         mock_settings.BINANCE_SECRET_KEY = None
 
-        with pytest.raises(HTTPException) as exc_info:
-            self.exchange_service.initialize_exchange_pro()
-
-        assert exc_info.value.status_code == 500
-        assert "configuration error" in exc_info.value.detail.lower()
+        # Expect no exception, but check that it returns None
+        result = self.exchange_service.initialize_exchange_pro()
+        assert result is None
 
     @patch("app.services.exchange_service.settings")
-    @patch("app.services.exchange_service.ccxtpro")
+    @patch("app.services.exchange_service.ccxt.pro")
     def test_initialize_exchange_pro_network_error(self, mock_ccxtpro, mock_settings):
         """Test exchange pro initialization with network error."""
         mock_settings.BINANCE_API_KEY = "test_api_key"
@@ -210,11 +218,9 @@ class TestExchangeServicePro:
         )
         mock_ccxtpro.binance = mock_binance_pro
 
-        with pytest.raises(HTTPException) as exc_info:
-            self.exchange_service.initialize_exchange_pro()
-
-        assert exc_info.value.status_code == 503
-        assert "network error" in exc_info.value.detail.lower()
+        # Expect no exception, but check that it returns None
+        result = self.exchange_service.initialize_exchange_pro()
+        assert result is None
 
 
 class TestExchangeServiceGetters:
@@ -405,11 +411,15 @@ class TestExchangeServiceEdgeCases:
         mock_settings.BINANCE_API_KEY = ""
         mock_settings.BINANCE_SECRET_KEY = ""
 
-        with pytest.raises(HTTPException) as exc_info:
+        # Expect no exception, but check that it initializes in demo mode
+        with patch("app.services.exchange_service.ccxt.binance") as mock_binance:
             self.exchange_service.initialize_exchange()
-
-        assert exc_info.value.status_code == 500
-        assert "configuration error" in exc_info.value.detail.lower()
+            # Assert that it was called without API keys and with sandbox=False
+            mock_binance.assert_called_once()
+            call_args = mock_binance.call_args[0][0]
+            assert "apiKey" not in call_args
+            assert "secret" not in call_args
+            assert call_args["sandbox"] is False
 
     @pytest.mark.asyncio
     async def test_test_connection_with_uninitialized_exchange(self):

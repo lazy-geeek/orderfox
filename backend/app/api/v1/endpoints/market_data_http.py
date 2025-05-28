@@ -138,7 +138,9 @@ async def get_orderbook(symbol: str):
             symbol=symbol,
             bids=bids,
             asks=asks,
-            timestamp=datetime.fromtimestamp(order_book_data["timestamp"] / 1000),
+            timestamp=int(
+                order_book_data["timestamp"]
+            ),  # Keep as Unix timestamp in milliseconds
         )
 
     except Exception as e:
@@ -216,7 +218,7 @@ async def get_candles(
         for ohlcv in ohlcv_data:
             candles.append(
                 Candle(
-                    timestamp=datetime.fromtimestamp(ohlcv[0] / 1000),
+                    timestamp=int(ohlcv[0]),  # Keep as Unix timestamp in milliseconds
                     open=float(ohlcv[1]),
                     high=float(ohlcv[2]),
                     low=float(ohlcv[3]),

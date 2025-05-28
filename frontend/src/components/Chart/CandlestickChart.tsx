@@ -38,7 +38,26 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
    * ECharts expects: [timestamp, open, close, low, high, volume]
    */
   const formatCandleData = useCallback(() => {
-    return currentCandles.map(candle => [
+    console.log('Formatting candle data. currentCandles:', currentCandles);
+    if (!currentCandles || !Array.isArray(currentCandles) || currentCandles.length === 0) {
+      return [];
+    }
+
+    return currentCandles.filter(candle => {
+      // Ensure all required properties exist and are valid numbers
+      const isValid =
+        typeof candle.timestamp === 'number' &&
+        typeof candle.open === 'number' &&
+        typeof candle.close === 'number' &&
+        typeof candle.low === 'number' &&
+        typeof candle.high === 'number' &&
+        typeof candle.volume === 'number';
+      
+      if (!isValid) {
+        console.warn('Skipping invalid candle data:', candle);
+      }
+      return isValid;
+    }).map(candle => [
       candle.timestamp,
       candle.open,
       candle.close,
@@ -53,7 +72,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
    */
   const getChartOptions = useCallback(() => {
     const candleData = formatCandleData();
-    
+
     return {
       title: {
         text: selectedSymbol ? `${selectedSymbol} - ${timeframe}` : 'Select a Symbol',
@@ -69,12 +88,13 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
           type: 'cross'
         },
         formatter: function (params: any) {
-          const data = params[0];
+          // Ensure params[0] and params[0].data exist before accessing
+          const data = params && params.length > 0 ? params[0] : null;
           if (!data || !data.data) return '';
-          
+
           const [timestamp, open, close, low, high, volume] = data.data;
           const date = new Date(timestamp).toLocaleString();
-          
+
           return `
             <div>
               <strong>${date}</strong><br/>
@@ -125,7 +145,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
         {
           name: 'Candlestick',
           type: 'candlestick',
-          data: candleData,
+          data: candleData.length > 0 ? candleData : [], // Ensure data is not empty
           itemStyle: {
             color: '#00da3c',
             color0: '#ec0000',
@@ -368,14 +388,26 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
       </div>
 
       {/* Chart */}
-      <ReactECharts
-        ref={chartRef}
-        option={getChartOptions()}
-        style={{ height: '500px', width: '100%' }}
-        notMerge={true}
-        lazyUpdate={true}
-        theme="default"
-      />
+      {!isLoading && currentCandles.length > 0 ? (
+        <ReactECharts
+          key={`${selectedSymbol}-${timeframe}`} // Add key to force re-mount on symbol/timeframe change
+          ref={chartRef}
+          option={getChartOptions()}
+          style={{ height: '500px', width: '100%' }}
+          theme="default"
+        />
+      ) : !isLoading && currentCandles.length === 0 ? (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '400px',
+          fontSize: '16px',
+          color: '#666'
+        }}>
+          No chart data available for the selected symbol and timeframe.
+        </div>
+      ) : null /* Render nothing while loading, or handle with a specific loading indicator if preferred */}
     </div>
   );
 };

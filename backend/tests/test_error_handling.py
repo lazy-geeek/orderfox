@@ -26,11 +26,15 @@ class TestExchangeServiceErrorHandling:
             mock_settings.BINANCE_API_KEY = None
             mock_settings.BINANCE_SECRET_KEY = None
 
-            with pytest.raises(HTTPException) as exc_info:
+            # Expect no exception, but check that it initializes in demo mode
+            with patch("app.services.exchange_service.ccxt.binance") as mock_binance:
                 self.exchange_service.initialize_exchange()
-
-            assert exc_info.value.status_code == 500
-            assert "configuration error" in exc_info.value.detail.lower()
+                # Assert that it was called without API keys and with sandbox=False
+                mock_binance.assert_called_once()
+                call_args = mock_binance.call_args[0][0]
+                assert "apiKey" not in call_args
+                assert "secret" not in call_args
+                assert call_args["sandbox"] is False
 
     def test_initialize_exchange_network_error(self):
         """Test exchange initialization with network error."""

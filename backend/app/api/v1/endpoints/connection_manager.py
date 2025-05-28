@@ -150,7 +150,7 @@ class ConnectionManager:
                 return
 
             try:
-                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=1)
+                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=20)
                 logger.info(f"Exchange connection test successful for {symbol}")
             except Exception as e:
                 logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")

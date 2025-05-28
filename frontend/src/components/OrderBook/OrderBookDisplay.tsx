@@ -123,9 +123,9 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     return amount.toFixed(8).replace(/\.?0+$/, '');
   };
 
-  // Get sliced bids and asks based on display depth
-  const displayBids = currentOrderBook?.bids.slice(0, displayDepth) || [];
-  const displayAsks = currentOrderBook?.asks.slice(0, displayDepth) || [];
+  // Get sliced bids and asks based on display depth with proper null safety
+  const displayBids = currentOrderBook?.bids ? currentOrderBook.bids.slice(0, displayDepth) : [];
+  const displayAsks = currentOrderBook?.asks ? currentOrderBook.asks.slice(0, displayDepth) : [];
 
   // Render loading state
   if (isLoading && !currentOrderBook) {

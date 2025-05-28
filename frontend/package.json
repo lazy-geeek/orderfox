@@ -50,5 +50,10 @@
     },
     "devDependencies": {
         "concurrently": "^9.1.2"
+    },
+    "jest": {
+        "transformIgnorePatterns": [
+            "node_modules/(?!(axios)/)"
+        ]
     }
 }

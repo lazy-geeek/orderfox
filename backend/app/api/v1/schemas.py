@@ -83,8 +83,9 @@ class OrderBook(BaseModel):
     asks: List[OrderBookLevel] = Field(
         ..., description="List of ask levels (sell orders)"
     )
-    timestamp: datetime = Field(
-        ..., description="Timestamp when the order book was captured"
+    timestamp: int = Field(
+        ...,
+        description="Unix timestamp in milliseconds when the order book was captured",
     )
 
     model_config = ConfigDict(
@@ -99,7 +100,7 @@ class OrderBook(BaseModel):
                     {"price": 43251.00, "amount": 0.50},
                     {"price": 43251.50, "amount": 2.00},
                 ],
-                "timestamp": "2024-01-01T12:00:00Z",
+                "timestamp": 1704110400000,  # Unix timestamp in milliseconds
             }
         }
     )
@@ -113,7 +114,9 @@ class Candle(BaseModel):
     and volume for a specific time period.
     """
 
-    timestamp: datetime = Field(..., description="Timestamp for the candle period")
+    timestamp: int = Field(
+        ..., description="Unix timestamp in milliseconds for the candle period"
+    )
     open: float = Field(..., description="Opening price", gt=0)
     high: float = Field(..., description="Highest price during the period", gt=0)
     low: float = Field(..., description="Lowest price during the period", gt=0)
@@ -123,7 +126,7 @@ class Candle(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "timestamp": "2024-01-01T12:00:00Z",
+                "timestamp": 1704110400000,  # Unix timestamp in milliseconds
                 "open": 43200.00,
                 "high": 43300.00,
                 "low": 43150.00,

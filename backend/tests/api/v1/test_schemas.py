@@ -21,6 +21,7 @@ class TestSymbolInfo:
             "symbol": "BTCUSDT",
             "base_asset": "BTC",
             "quote_asset": "USDT",
+            "ui_name": "BTC/USDT",
         }
 
         symbol_info = SymbolInfo(**symbol_data)
@@ -37,6 +38,7 @@ class TestSymbolInfo:
             "symbol": "VERYLONGCRYPTOCURRENCYNAMEUSDT",
             "base_asset": "VERYLONGCRYPTOCURRENCYNAME",
             "quote_asset": "USDT",
+            "ui_name": "VERYLONGCRYPTOCURRENCYNAME/USDT",
         }
 
         symbol_info = SymbolInfo(**symbol_data)
@@ -50,13 +52,14 @@ class TestSymbolInfo:
             "id": "BTCUSDT",
             "symbol": "BTCUSDT",
             "base_asset": "BTC",
+            "ui_name": "BTC/USDT",
             # Missing quote_asset
         }
 
         with pytest.raises(ValidationError) as exc_info:
             SymbolInfo(**symbol_data)
 
-        assert "quote_asset" in str(exc_info.value)
+        assert "quoteAsset" in str(exc_info.value)
 
 
 class TestOrderBookLevel:
@@ -236,13 +239,19 @@ class TestSchemasSerialization:
             "symbol": "BTCUSDT",
             "base_asset": "BTC",
             "quote_asset": "USDT",
+            "ui_name": "BTC/USDT",
         }
 
         symbol_info = SymbolInfo(**symbol_data)
-        json_data = symbol_info.model_dump()
+        json_data = symbol_info.model_dump(by_alias=True)
 
         # Verify JSON structure
-        assert json_data == symbol_data
+        assert json_data["id"] == symbol_data["id"]
+        assert json_data["symbol"] == symbol_data["symbol"]
+        assert json_data["baseAsset"] == symbol_data["base_asset"]
+        assert json_data["quoteAsset"] == symbol_data["quote_asset"]
+        assert json_data["uiName"] == symbol_data["ui_name"]
+        assert json_data["volume24h"] is None  # Check optional field
 
         # Verify round-trip
         symbol_info_restored = SymbolInfo(**json_data)

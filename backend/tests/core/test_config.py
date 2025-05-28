@@ -52,19 +52,29 @@ class TestSettingsClass:
             test_settings.FIREBASE_CONFIG_JSON, str
         )
 
+    @patch("app.core.config.os.getenv")  # Patch os.getenv within the config module
     @patch("builtins.print")
-    def test_settings_initialization_warnings(self, mock_print):
+    def test_settings_initialization_warnings(self, mock_print, mock_getenv):
         """Test that warnings are printed when required environment variables are missing."""
-        # Create a new Settings instance to trigger __init__
-        Settings()
+        # Configure mock_getenv to simulate missing API keys
+        mock_getenv.side_effect = lambda key, default=None: {
+            "API_V1_STR": "/api/v1",
+            "PROJECT_NAME": "Trading Bot API",
+            "DEBUG": "False",
+            "FIREBASE_CONFIG_JSON": None,
+        }.get(key, default)
+
+        # Instantiate Settings after patching os.getenv
+        test_settings = Settings()
 
         # Check if any warning messages were printed
-        if mock_print.call_args_list:
-            print_calls = [call[0][0] for call in mock_print.call_args_list]
+        assert mock_print.call_args_list  # Ensure print was called at least once
 
-            # If warnings were printed, they should be about missing API keys
-            for call in print_calls:
-                assert "BINANCE_API_KEY" in call or "BINANCE_SECRET_KEY" in call
+        print_calls = [call[0][0] for call in mock_print.call_args_list]
+
+        # Assert that specific warning messages are present
+        assert any("BINANCE_API_KEY not found" in call for call in print_calls)
+        assert any("BINANCE_SECRET_KEY not found" in call for call in print_calls)
 
     def test_settings_class_can_be_instantiated_multiple_times(self):
         """Test that Settings class can be instantiated multiple times."""

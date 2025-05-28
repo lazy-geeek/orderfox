@@ -62,6 +62,104 @@ interface Candle {
 }
 
 /**
+ * Helper function to validate and filter candle data.
+ * Ensures all required numerical properties exist and are valid numbers.
+ */
+const validateAndFilterCandles = (candles: any[]): Candle[] => {
+  if (!Array.isArray(candles)) {
+    console.warn('Invalid candles data: not an array', candles);
+    return [];
+  }
+
+  return candles
+    .map((candle, index) => {
+      // Handle both timestamp formats: Unix timestamp (number) or ISO string
+      let timestamp: number;
+      if (typeof candle.timestamp === 'number') {
+        timestamp = candle.timestamp;
+      } else if (typeof candle.timestamp === 'string') {
+        // Try to parse as ISO date string first, then as number
+        const dateTimestamp = new Date(candle.timestamp).getTime();
+        if (!isNaN(dateTimestamp)) {
+          timestamp = dateTimestamp;
+        } else {
+          timestamp = parseInt(candle.timestamp, 10);
+        }
+      } else {
+        console.warn(`Invalid timestamp format at index ${index}:`, candle.timestamp);
+        return null;
+      }
+      
+      const parsedCandle = {
+        timestamp: timestamp,
+        open: parseFloat(candle.open as any),
+        high: parseFloat(candle.high as any),
+        low: parseFloat(candle.low as any),
+        close: parseFloat(candle.close as any),
+        volume: parseFloat(candle.volume as any),
+      };
+
+      const isValid =
+        typeof parsedCandle.timestamp === 'number' && !isNaN(parsedCandle.timestamp) && parsedCandle.timestamp > 0 &&
+        typeof parsedCandle.open === 'number' && !isNaN(parsedCandle.open) && parsedCandle.open > 0 &&
+        typeof parsedCandle.high === 'number' && !isNaN(parsedCandle.high) && parsedCandle.high > 0 &&
+        typeof parsedCandle.low === 'number' && !isNaN(parsedCandle.low) && parsedCandle.low > 0 &&
+        typeof parsedCandle.close === 'number' && !isNaN(parsedCandle.close) && parsedCandle.close > 0 &&
+        typeof parsedCandle.volume === 'number' && !isNaN(parsedCandle.volume) && parsedCandle.volume >= 0;
+
+      if (!isValid) {
+        console.warn(`Skipping invalid candle data at index ${index} after parsing:`, candle, 'Parsed:', parsedCandle);
+        return null; // Mark as null to be filtered out
+      }
+      return parsedCandle as Candle;
+    })
+    .filter(candle => candle !== null) as Candle[];
+};
+
+/**
+ * Helper function to validate and filter order book data.
+ * Ensures bids and asks arrays exist and contain valid data.
+ */
+const validateOrderBook = (orderBook: any): OrderBook | null => {
+  if (!orderBook || typeof orderBook !== 'object') {
+    console.warn('Invalid order book data: not an object', orderBook);
+    return null;
+  }
+
+  // Ensure bids and asks are arrays
+  const bids = Array.isArray(orderBook.bids) ? orderBook.bids : [];
+  const asks = Array.isArray(orderBook.asks) ? orderBook.asks : [];
+
+  // Validate timestamp
+  let timestamp: number;
+  if (typeof orderBook.timestamp === 'number') {
+    timestamp = orderBook.timestamp;
+  } else if (typeof orderBook.timestamp === 'string') {
+    const dateTimestamp = new Date(orderBook.timestamp).getTime();
+    if (!isNaN(dateTimestamp)) {
+      timestamp = dateTimestamp;
+    } else {
+      timestamp = Date.now(); // Fallback to current time
+    }
+  } else {
+    timestamp = Date.now(); // Fallback to current time
+  }
+
+  return {
+    symbol: orderBook.symbol || '',
+    bids: bids.filter((bid: any) =>
+      bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
+      bid.price > 0 && bid.amount > 0
+    ),
+    asks: asks.filter((ask: any) =>
+      ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
+      ask.price > 0 && ask.amount > 0
+    ),
+    timestamp
+  };
+};
+
+/**
  * Redux state for market data management
  */
 interface MarketDataState {
@@ -134,7 +232,8 @@ export const fetchCandles = createAsyncThunk(
       const response = await apiClient.get(`/candles/${symbol}`, {
         params: { timeframe, limit }
       });
-      return response.data;
+      // Validate and filter incoming candle data
+      return validateAndFilterCandles(response.data);
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.detail ||
@@ -155,12 +254,25 @@ const marketDataSlice = createSlice({
     clearSelectedSymbol: (state) => {
       state.selectedSymbol = null;
     },
-    updateOrderBookFromWebSocket: (state, action: PayloadAction<OrderBook>) => {
-      state.currentOrderBook = action.payload;
+    updateOrderBookFromWebSocket: (state, action: PayloadAction<any>) => {
+      const validatedOrderBook = validateOrderBook(action.payload);
+      if (validatedOrderBook) {
+        state.currentOrderBook = validatedOrderBook;
+      } else {
+        console.warn('Received invalid order book from WebSocket, skipping update:', action.payload);
+      }
     },
     updateCandlesFromWebSocket: (state, action: PayloadAction<Candle>) => {
-      // Update or append the latest candle data
-      const newCandle = action.payload;
+      const incomingCandle = action.payload;
+
+      // Validate the incoming candle before processing
+      const [newCandle] = validateAndFilterCandles([incomingCandle]);
+      
+      if (!newCandle) {
+        console.warn('Received invalid candle from WebSocket, skipping update:', incomingCandle);
+        return; // Skip update if the candle is invalid
+      }
+
       const existingIndex = state.currentCandles.findIndex(
         candle => candle.timestamp === newCandle.timestamp
       );
@@ -203,7 +315,12 @@ const marketDataSlice = createSlice({
       })
       .addCase(fetchOrderBook.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.currentOrderBook = action.payload;
+        const validatedOrderBook = validateOrderBook(action.payload);
+        if (validatedOrderBook) {
+          state.currentOrderBook = validatedOrderBook;
+        } else {
+          state.error = 'Received invalid order book data from server';
+        }
       })
       .addCase(fetchOrderBook.rejected, (state, action) => {
         state.isLoading = false;
@@ -216,6 +333,7 @@ const marketDataSlice = createSlice({
       })
       .addCase(fetchCandles.fulfilled, (state, action) => {
         state.isLoading = false;
+        // action.payload is already validated and filtered by the thunk
         state.currentCandles = action.payload;
       })
       .addCase(fetchCandles.rejected, (state, action) => {

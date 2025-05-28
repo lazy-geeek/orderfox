@@ -207,6 +207,27 @@ describe('marketDataSlice', () => {
         expect(state.error).toBe(errorMessage);
         expect(state.isLoading).toBe(false);
       });
+
+      test('should handle fetch with invalid candle data', async () => {
+        const mockInvalidCandles = [
+          { timestamp: Date.now(), open: 50000, high: 51000, low: 49000, close: 50500, volume: 100 },
+          { timestamp: null, open: 'invalid', high: undefined, low: 49000, close: 50500, volume: 100 },
+          { timestamp: Date.now(), open: 52000, high: 53000, low: 51000, close: 52500, volume: 200 }
+        ];
+        
+        mockGet.mockResolvedValueOnce({ data: mockInvalidCandles });
+
+        await store.dispatch(fetchCandles({ symbol: 'BTCUSDT' }));
+        
+        const state = store.getState().marketData;
+        // Expect only the valid candles to be present
+        expect(state.currentCandles).toEqual([
+          { timestamp: mockInvalidCandles[0].timestamp, open: 50000, high: 51000, low: 49000, close: 50500, volume: 100 },
+          { timestamp: mockInvalidCandles[2].timestamp, open: 52000, high: 53000, low: 51000, close: 52500, volume: 200 }
+        ]);
+        expect(state.isLoading).toBe(false);
+        expect(state.error).toBe(null);
+      });
     });
   });
 
