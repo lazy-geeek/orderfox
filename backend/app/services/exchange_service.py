@@ -33,7 +33,7 @@ class ExchangeService:
                 # Initialize exchange without API keys for demo/public endpoints
                 self.exchange = ccxt.binance(
                     {
-                        "sandbox": True,  # Always use sandbox for demo mode
+                        "sandbox": False,  # Explicitly use live net, even for demo/public endpoints
                         "enableRateLimit": True,
                         "options": {
                             "defaultType": "future",  # Use futures by default
@@ -45,7 +45,7 @@ class ExchangeService:
                     {
                         "apiKey": settings.BINANCE_API_KEY,
                         "secret": settings.BINANCE_SECRET_KEY,
-                        "sandbox": settings.DEBUG,  # Use sandbox in debug mode
+                        "sandbox": False,  # Explicitly use live net; settings.DEBUG no longer controls sandbox mode
                         "enableRateLimit": True,
                         "options": {
                             "defaultType": "future",  # Use futures by default
@@ -54,7 +54,7 @@ class ExchangeService:
                 )
 
             logger.info(
-                f"CCXT Binance exchange initialized successfully (sandbox: {settings.DEBUG})"
+                "CCXT Binance exchange initialized successfully (sandbox: False - explicitly live net)"
             )
             return self.exchange
 
@@ -94,7 +94,7 @@ class ExchangeService:
                 # Initialize exchange without API keys for demo/public endpoints
                 self.exchange_pro = ccxtpro.binance(
                     {
-                        "sandbox": True,  # Always use sandbox for demo mode
+                        "sandbox": False,  # Explicitly use live net, even for demo/public endpoints
                         "enableRateLimit": True,
                         "options": {
                             "defaultType": "future",  # Use futures by default
@@ -106,7 +106,7 @@ class ExchangeService:
                     {
                         "apiKey": settings.BINANCE_API_KEY,
                         "secret": settings.BINANCE_SECRET_KEY,
-                        "sandbox": settings.DEBUG,  # Use sandbox in debug mode
+                        "sandbox": False,  # Explicitly use live net; settings.DEBUG no longer controls sandbox mode
                         "enableRateLimit": True,
                         "options": {
                             "defaultType": "future",  # Use futures by default
@@ -115,7 +115,7 @@ class ExchangeService:
                 )
 
             logger.info(
-                f"CCXT Pro Binance exchange initialized successfully (sandbox: {settings.DEBUG})"
+                "CCXT Pro Binance exchange initialized successfully (sandbox: False - explicitly live net)"
             )
             return self.exchange_pro
 
