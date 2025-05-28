@@ -9,8 +9,12 @@ import asyncio
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
+from app.services.symbol_service import symbol_service
 from app.api.v1.endpoints.connection_manager import connection_manager
 from app.api.v1.endpoints.trading import trading_engine_service_instance
+from app.core.logging_config import get_logger
+
+logger = get_logger("market_data_ws")
 
 router = APIRouter()
 
@@ -39,17 +43,40 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str):
         "message": "Error description"
     }
     """
-    try:
-        # Validate symbol exists by checking if we can fetch its order book
-        exchange = exchange_service.get_exchange()
-        await exchange.load_markets()
+    logger.info(
+        f"WebSocket orderbook connection attempt for {symbol} from {websocket.client}"
+    )
 
-        if symbol not in exchange.markets:
-            await websocket.close(code=4000, reason=f"Symbol {symbol} not found")
+    try:
+        # Accept connection first
+        await websocket.accept()
+        logger.info(f"WebSocket orderbook connection accepted for {symbol}")
+
+        # Validate and convert symbol using symbol service
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        if not exchange_symbol:
+            # Get suggestions for invalid symbol
+            suggestions = symbol_service.get_symbol_suggestions(symbol)
+            error_msg = f"Symbol {symbol} not found"
+            if suggestions:
+                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+
+            logger.warning(f"WebSocket orderbook error: {error_msg}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": error_msg})
+            )
+            await websocket.close(code=4000, reason=error_msg)
             return
 
-        # Connect to the connection manager
-        await connection_manager.connect_orderbook(websocket, symbol)
+        logger.info(
+            f"Using exchange symbol: {exchange_symbol} for WebSocket symbol: {symbol}"
+        )
+
+        # Connect to the connection manager using the exchange symbol
+        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol)
+        logger.info(
+            f"WebSocket orderbook streaming started for {symbol} (exchange: {exchange_symbol})"
+        )
 
         try:
             # Keep the connection alive and handle client messages
@@ -66,15 +93,23 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str):
                     break
 
         except WebSocketDisconnect:
-            pass
+            logger.info(f"WebSocket orderbook client disconnected for {symbol}")
         finally:
-            connection_manager.disconnect_orderbook(websocket, symbol)
+            connection_manager.disconnect_orderbook(websocket, exchange_symbol)
+            logger.info(f"WebSocket orderbook connection cleaned up for {symbol}")
 
     except Exception as e:
+        logger.error(f"WebSocket orderbook error for {symbol}: {str(e)}", exc_info=True)
         try:
-            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
-        except Exception:
-            pass
+            if websocket.client_state.name != "DISCONNECTED":
+                await websocket.send_text(
+                    json.dumps(
+                        {"type": "error", "message": f"Connection error: {str(e)}"}
+                    )
+                )
+                await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except Exception as close_error:
+            logger.error(f"Error closing WebSocket for {symbol}: {str(close_error)}")
 
 
 @router.websocket("/ws/ticker/{symbol}")
@@ -110,17 +145,36 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
         "message": "Error description"
     }
     """
-    try:
-        # Validate symbol exists by checking if we can fetch its ticker
-        exchange = exchange_service.get_exchange()
-        await exchange.load_markets()
+    logger.info(
+        f"WebSocket ticker connection attempt for {symbol} from {websocket.client}"
+    )
 
-        if symbol not in exchange.markets:
-            await websocket.close(code=4000, reason=f"Symbol {symbol} not found")
+    try:
+        # Accept connection first
+        await websocket.accept()
+        logger.info(f"WebSocket ticker connection accepted for {symbol}")
+
+        # Validate and convert symbol using symbol service
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        if not exchange_symbol:
+            # Get suggestions for invalid symbol
+            suggestions = symbol_service.get_symbol_suggestions(symbol)
+            error_msg = f"Symbol {symbol} not found"
+            if suggestions:
+                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+
+            logger.warning(f"WebSocket ticker error: {error_msg}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": error_msg})
+            )
+            await websocket.close(code=4000, reason=error_msg)
             return
 
-        # Connect to the connection manager
-        await connection_manager.connect(websocket, symbol, "ticker")
+        # Connect to the connection manager using exchange symbol
+        await connection_manager.connect(websocket, exchange_symbol, "ticker", symbol)
+        logger.info(
+            f"WebSocket ticker streaming started for {symbol} (exchange: {exchange_symbol})"
+        )
 
         try:
             # Keep the connection alive and handle client messages
@@ -137,15 +191,23 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
                     break
 
         except WebSocketDisconnect:
-            pass
+            logger.info(f"WebSocket ticker client disconnected for {symbol}")
         finally:
-            connection_manager.disconnect(websocket, symbol)
+            connection_manager.disconnect(websocket, exchange_symbol)
+            logger.info(f"WebSocket ticker connection cleaned up for {symbol}")
 
     except Exception as e:
+        logger.error(f"WebSocket ticker error for {symbol}: {str(e)}", exc_info=True)
         try:
-            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
-        except Exception:
-            pass
+            if websocket.client_state.name != "DISCONNECTED":
+                await websocket.send_text(
+                    json.dumps(
+                        {"type": "error", "message": f"Connection error: {str(e)}"}
+                    )
+                )
+                await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except Exception as close_error:
+            logger.error(f"Error closing WebSocket for {symbol}: {str(close_error)}")
 
 
 @router.websocket("/ws/candles/{symbol}/{timeframe}")
@@ -196,26 +258,46 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
         "1M",
     ]
     if timeframe not in valid_timeframes:
-        await websocket.close(
-            code=4000,
-            reason=f"Invalid timeframe. Valid options: {', '.join(valid_timeframes)}",
-        )
+        logger.warning(f"WebSocket candles invalid timeframe: {timeframe}")
+        await websocket.accept()
+        error_msg = f"Invalid timeframe. Valid options: {', '.join(valid_timeframes)}"
+        await websocket.send_text(json.dumps({"type": "error", "message": error_msg}))
+        await websocket.close(code=4000, reason=error_msg)
         return
 
-    try:
-        # Validate symbol exists
-        exchange = exchange_service.get_exchange()
-        await exchange.load_markets()
+    logger.info(
+        f"WebSocket candles connection attempt for {symbol}/{timeframe} from {websocket.client}"
+    )
 
-        if symbol not in exchange.markets:
-            await websocket.close(code=4000, reason=f"Symbol {symbol} not found")
+    try:
+        # Accept connection first
+        await websocket.accept()
+        logger.info(f"WebSocket candles connection accepted for {symbol}/{timeframe}")
+
+        # Validate and convert symbol using symbol service
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        if not exchange_symbol:
+            # Get suggestions for invalid symbol
+            suggestions = symbol_service.get_symbol_suggestions(symbol)
+            error_msg = f"Symbol {symbol} not found"
+            if suggestions:
+                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+
+            logger.warning(f"WebSocket candles error: {error_msg}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": error_msg})
+            )
+            await websocket.close(code=4000, reason=error_msg)
             return
 
-        # Create stream key for this symbol:timeframe combination
-        stream_key = f"{symbol}:{timeframe}"
+        # Create stream key for this symbol:timeframe combination using exchange symbol
+        stream_key = f"{exchange_symbol}:{timeframe}"
 
         # Connect to the connection manager
-        await connection_manager.connect(websocket, stream_key, "candles")
+        await connection_manager.connect(websocket, stream_key, "candles", symbol)
+        logger.info(
+            f"WebSocket candles streaming started for {symbol}/{timeframe} (exchange: {exchange_symbol})"
+        )
 
         try:
             # Keep the connection alive and handle client messages
@@ -232,12 +314,28 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
                     break
 
         except WebSocketDisconnect:
-            pass
+            logger.info(
+                f"WebSocket candles client disconnected for {symbol}/{timeframe}"
+            )
         finally:
             connection_manager.disconnect(websocket, stream_key)
+            logger.info(
+                f"WebSocket candles connection cleaned up for {symbol}/{timeframe}"
+            )
 
     except Exception as e:
+        logger.error(
+            f"WebSocket candles error for {symbol}/{timeframe}: {str(e)}", exc_info=True
+        )
         try:
-            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
-        except Exception:
-            pass
+            if websocket.client_state.name != "DISCONNECTED":
+                await websocket.send_text(
+                    json.dumps(
+                        {"type": "error", "message": f"Connection error: {str(e)}"}
+                    )
+                )
+                await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except Exception as close_error:
+            logger.error(
+                f"Error closing WebSocket for {symbol}/{timeframe}: {str(close_error)}"
+            )

@@ -89,19 +89,12 @@ class ExchangeService:
 
             if not settings.BINANCE_API_KEY or not settings.BINANCE_SECRET_KEY:
                 logger.warning(
-                    "Binance API keys not found - initializing Pro exchange in demo mode"
+                    "Binance API keys not found - CCXT Pro requires credentials for WebSocket connections"
                 )
-                # Initialize exchange without API keys for demo/public endpoints
-                self.exchange_pro = ccxtpro.binance(
-                    {
-                        "sandbox": False,  # Explicitly use live net, even for demo/public endpoints
-                        "enableRateLimit": True,
-                        "options": {
-                            "defaultType": "future",  # Use futures by default
-                        },
-                    }
-                )
+                logger.info("WebSocket streaming will use mock data instead")
+                return None  # Signal to use mock streaming
             else:
+                logger.info("API keys found - initializing CCXT Pro with credentials")
                 self.exchange_pro = ccxtpro.binance(
                     {
                         "apiKey": settings.BINANCE_API_KEY,
@@ -123,18 +116,19 @@ class ExchangeService:
             raise
         except ccxt.NetworkError as e:
             logger.error(f"Network error initializing CCXT Pro exchange: {str(e)}")
-            raise HTTPException(status_code=503, detail="Exchange network error")
+            logger.info("Falling back to mock streaming mode")
+            return None  # Signal to use mock streaming
         except ccxt.ExchangeError as e:
             logger.error(f"Exchange error initializing CCXT Pro exchange: {str(e)}")
-            raise HTTPException(status_code=502, detail="Exchange API error")
+            logger.info("Falling back to mock streaming mode")
+            return None  # Signal to use mock streaming
         except Exception as e:
             logger.error(
                 f"Unexpected error initializing CCXT Pro exchange: {str(e)}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=500, detail="Exchange initialization failed"
-            )
+            logger.info("Falling back to mock streaming mode")
+            return None  # Signal to use mock streaming
 
     def get_exchange(self) -> ccxt.Exchange:
         """

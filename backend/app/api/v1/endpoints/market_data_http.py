@@ -11,6 +11,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from app.api.v1.schemas import SymbolInfo, OrderBook, OrderBookLevel, Candle
 from app.services.exchange_service import exchange_service
+from app.services.symbol_service import symbol_service
 
 router = APIRouter()
 
@@ -107,10 +108,20 @@ async def get_orderbook(symbol: str):
         HTTPException: If unable to fetch order book or symbol not found
     """
     try:
+        # Validate and convert symbol using symbol service
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        if not exchange_symbol:
+            # Get suggestions for invalid symbol
+            suggestions = symbol_service.get_symbol_suggestions(symbol)
+            error_msg = f"Symbol {symbol} not found"
+            if suggestions:
+                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+            raise HTTPException(status_code=404, detail=error_msg)
+
         exchange = exchange_service.get_exchange()
 
-        # Fetch order book data
-        order_book_data = exchange.fetch_order_book(symbol)
+        # Fetch order book data using exchange symbol
+        order_book_data = exchange.fetch_order_book(exchange_symbol)
 
         # Convert to our schema format
         bids = [
@@ -185,10 +196,20 @@ async def get_candles(
         )
 
     try:
+        # Validate and convert symbol using symbol service
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        if not exchange_symbol:
+            # Get suggestions for invalid symbol
+            suggestions = symbol_service.get_symbol_suggestions(symbol)
+            error_msg = f"Symbol {symbol} not found"
+            if suggestions:
+                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+            raise HTTPException(status_code=404, detail=error_msg)
+
         exchange = exchange_service.get_exchange()
 
-        # Fetch OHLCV data
-        ohlcv_data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+        # Fetch OHLCV data using exchange symbol
+        ohlcv_data = exchange.fetch_ohlcv(exchange_symbol, timeframe, limit=limit)
 
         # Convert to our schema format
         candles = []

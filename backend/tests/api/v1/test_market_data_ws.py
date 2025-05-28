@@ -22,17 +22,15 @@ class TestWebSocketOrderbook:
     """Test WebSocket orderbook endpoint functionality."""
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
     @patch("app.api.v1.endpoints.market_data_ws.connection_manager")
     async def test_websocket_orderbook_success(
-        self, mock_connection_manager, mock_exchange_service
+        self, mock_connection_manager, mock_symbol_service
     ):
         """Test successful WebSocket orderbook connection."""
         # Setup mocks
         mock_websocket = AsyncMock()
-        mock_exchange = AsyncMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-        mock_exchange.markets = {"BTCUSDT": {"symbol": "BTCUSDT"}}
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "BTC/USDT"
         mock_connection_manager.connect_orderbook = AsyncMock()
         mock_connection_manager.disconnect_orderbook = MagicMock()
 
@@ -46,12 +44,14 @@ class TestWebSocketOrderbook:
         await websocket_orderbook(mock_websocket, "BTCUSDT")
 
         # Assertions
-        mock_exchange.load_markets.assert_called_once()
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "BTCUSDT"
+        )
         mock_connection_manager.connect_orderbook.assert_called_once_with(
-            mock_websocket, "BTCUSDT"
+            mock_websocket, "BTC/USDT", "BTCUSDT"
         )
         mock_connection_manager.disconnect_orderbook.assert_called_once_with(
-            mock_websocket, "BTCUSDT"
+            mock_websocket, "BTC/USDT"
         )
 
     @pytest.mark.asyncio
@@ -100,12 +100,14 @@ class TestWebSocketOrderbook:
         mock_websocket.send_text.assert_called_once_with('{"type": "pong"}')
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
-    async def test_websocket_orderbook_connection_error(self, mock_exchange_service):
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
+    async def test_websocket_orderbook_connection_error(self, mock_symbol_service):
         """Test WebSocket orderbook connection error handling."""
         # Setup mocks
         mock_websocket = AsyncMock()
-        mock_exchange_service.get_exchange.side_effect = Exception("Exchange error")
+        mock_symbol_service.resolve_symbol_to_exchange_format.side_effect = Exception(
+            "Symbol service error"
+        )
 
         # Call function
         await websocket_orderbook(mock_websocket, "BTCUSDT")
@@ -146,17 +148,15 @@ class TestWebSocketTicker:
     """Test WebSocket ticker endpoint functionality."""
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
     @patch("app.api.v1.endpoints.market_data_ws.connection_manager")
     async def test_websocket_ticker_success(
-        self, mock_connection_manager, mock_exchange_service
+        self, mock_connection_manager, mock_symbol_service
     ):
         """Test successful WebSocket ticker connection."""
         # Setup mocks
         mock_websocket = AsyncMock()
-        mock_exchange = AsyncMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-        mock_exchange.markets = {"ETHUSDT": {"symbol": "ETHUSDT"}}
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "ETH/USDT"
         mock_connection_manager.connect = AsyncMock()
         mock_connection_manager.disconnect = MagicMock()
 
@@ -167,12 +167,14 @@ class TestWebSocketTicker:
         await websocket_ticker(mock_websocket, "ETHUSDT")
 
         # Assertions
-        mock_exchange.load_markets.assert_called_once()
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "ETHUSDT"
+        )
         mock_connection_manager.connect.assert_called_once_with(
-            mock_websocket, "ETHUSDT", "ticker"
+            mock_websocket, "ETH/USDT", "ticker", "ETHUSDT"
         )
         mock_connection_manager.disconnect.assert_called_once_with(
-            mock_websocket, "ETHUSDT"
+            mock_websocket, "ETH/USDT"
         )
 
     @pytest.mark.asyncio
@@ -225,17 +227,15 @@ class TestWebSocketCandles:
     """Test WebSocket candles endpoint functionality."""
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
     @patch("app.api.v1.endpoints.market_data_ws.connection_manager")
     async def test_websocket_candles_success(
-        self, mock_connection_manager, mock_exchange_service
+        self, mock_connection_manager, mock_symbol_service
     ):
         """Test successful WebSocket candles connection."""
         # Setup mocks
         mock_websocket = AsyncMock()
-        mock_exchange = AsyncMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-        mock_exchange.markets = {"BTCUSDT": {"symbol": "BTCUSDT"}}
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "BTC/USDT"
         mock_connection_manager.connect = AsyncMock()
         mock_connection_manager.disconnect = MagicMock()
 
@@ -246,12 +246,14 @@ class TestWebSocketCandles:
         await websocket_candles(mock_websocket, "BTCUSDT", "1m")
 
         # Assertions
-        mock_exchange.load_markets.assert_called_once()
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "BTCUSDT"
+        )
         mock_connection_manager.connect.assert_called_once_with(
-            mock_websocket, "BTCUSDT:1m", "candles"
+            mock_websocket, "BTC/USDT:1m", "candles", "BTCUSDT"
         )
         mock_connection_manager.disconnect.assert_called_once_with(
-            mock_websocket, "BTCUSDT:1m"
+            mock_websocket, "BTC/USDT:1m"
         )
 
     @pytest.mark.asyncio
@@ -362,14 +364,14 @@ class TestWebSocketErrorHandling:
     """Test WebSocket error handling scenarios."""
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
-    async def test_websocket_orderbook_exchange_load_error(self, mock_exchange_service):
-        """Test WebSocket orderbook when exchange load_markets fails."""
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
+    async def test_websocket_orderbook_exchange_load_error(self, mock_symbol_service):
+        """Test WebSocket orderbook when symbol service fails."""
         # Setup mocks
         mock_websocket = AsyncMock()
-        mock_exchange = AsyncMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-        mock_exchange.load_markets.side_effect = Exception("Load markets failed")
+        mock_symbol_service.resolve_symbol_to_exchange_format.side_effect = Exception(
+            "Symbol service failed"
+        )
 
         # Call function
         await websocket_orderbook(mock_websocket, "BTCUSDT")
@@ -455,19 +457,17 @@ class TestWebSocketIntegration:
         assert mock_websocket.send_text.call_count == 2
 
     @pytest.mark.asyncio
-    @patch("app.api.v1.endpoints.market_data_ws.exchange_service")
+    @patch("app.api.v1.endpoints.market_data_ws.symbol_service")
     @patch("app.api.v1.endpoints.market_data_ws.connection_manager")
     async def test_websocket_multiple_endpoints_different_symbols(
-        self, mock_connection_manager, mock_exchange_service
+        self, mock_connection_manager, mock_symbol_service
     ):
         """Test multiple WebSocket endpoints with different symbols."""
         # Setup mocks
-        mock_exchange = AsyncMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-        mock_exchange.markets = {
-            "BTCUSDT": {"symbol": "BTCUSDT"},
-            "ETHUSDT": {"symbol": "ETHUSDT"},
-        }
+        mock_symbol_service.resolve_symbol_to_exchange_format.side_effect = [
+            "BTC/USDT",
+            "ETH/USDT",
+        ]
         mock_connection_manager.connect_orderbook = AsyncMock()
         mock_connection_manager.connect = AsyncMock()
         mock_connection_manager.disconnect_orderbook = MagicMock()
@@ -486,8 +486,8 @@ class TestWebSocketIntegration:
 
         # Verify both connections were handled
         mock_connection_manager.connect_orderbook.assert_called_once_with(
-            mock_websocket1, "BTCUSDT"
+            mock_websocket1, "BTC/USDT", "BTCUSDT"
         )
         mock_connection_manager.connect.assert_called_once_with(
-            mock_websocket2, "ETHUSDT", "ticker"
+            mock_websocket2, "ETH/USDT", "ticker", "ETHUSDT"
         )

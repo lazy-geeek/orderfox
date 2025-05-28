@@ -44,7 +44,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       wsRef.current.close();
     }
 
-    const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
+    const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL;
     const wsUrl = `${wsBaseUrl}/ws/orderbook/${symbol}`;
     const ws = new WebSocket(wsUrl);
 

@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI, Request, HTTPException
+import json
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -92,10 +93,14 @@ async def shutdown_event():
     logger.info("Application shutdown completed")
 
 
-# Request logging middleware
+# Request logging middleware (excludes WebSocket connections)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log incoming requests."""
+    """Log incoming HTTP requests (excludes WebSocket connections)."""
+    # Skip logging for WebSocket upgrade requests
+    if request.headers.get("upgrade") == "websocket":
+        return await call_next(request)
+
     logger.info(f"Incoming request: {request.method} {request.url.path}")
     response = await call_next(request)
     logger.info(
@@ -117,6 +122,54 @@ app.add_middleware(
 app.include_router(market_data_http_router, prefix="/api/v1", tags=["market-data-http"])
 app.include_router(market_data_ws_router, prefix="/api/v1", tags=["market-data-ws"])
 app.include_router(trading_router.router, prefix="/api/v1", tags=["trading"])
+
+
+# Test WebSocket endpoint for debugging
+@app.websocket("/api/v1/ws/test")
+async def websocket_test(websocket: WebSocket):
+    """Test WebSocket endpoint for debugging connection issues."""
+    logger.info(f"WebSocket test connection attempt from {websocket.client}")
+    try:
+        await websocket.accept()
+        logger.info(f"WebSocket test connection established with {websocket.client}")
+
+        # Send welcome message
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "type": "connection_test",
+                    "status": "success",
+                    "message": "WebSocket connection established successfully",
+                }
+            )
+        )
+
+        # Keep connection alive and echo messages
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                logger.info(f"WebSocket test received: {message}")
+
+                # Echo the message back
+                await websocket.send_text(
+                    json.dumps(
+                        {"type": "echo", "original": message, "timestamp": "test"}
+                    )
+                )
+            except json.JSONDecodeError:
+                await websocket.send_text(
+                    json.dumps({"type": "error", "message": "Invalid JSON received"})
+                )
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket test disconnected: {websocket.client}")
+    except Exception as e:
+        logger.error(f"WebSocket test error: {str(e)}", exc_info=True)
+        try:
+            await websocket.close(code=1011, reason=f"Server error: {str(e)}")
+        except Exception:
+            pass
 
 
 # Root endpoint

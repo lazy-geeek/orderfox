@@ -32,31 +32,31 @@ class TestSymbolsEndpoint:
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
         mock_markets = {
-            "BTCUSDT": {
+            "BTC/USDT": {
                 "id": "BTCUSDT",
                 "symbol": "BTC/USDT",
                 "base": "BTC",
                 "quote": "USDT",
-                "type": "future",
+                "type": "swap",
                 "future": True,
                 "spot": False,
                 "contract": True,
                 "swap": True,  # Perpetual swap
                 "active": True,
             },
-            "ETHUSDT": {
+            "ETH/USDT": {
                 "id": "ETHUSDT",
                 "symbol": "ETH/USDT",
                 "base": "ETH",
                 "quote": "USDT",
-                "type": "future",
+                "type": "swap",
                 "future": True,
                 "spot": False,
                 "contract": True,
                 "swap": True,  # Perpetual swap
                 "active": True,
             },
-            "ADAUSDT": {
+            "ADA/USDT": {
                 "id": "ADAUSDT",
                 "symbol": "ADA/USDT",
                 "base": "ADA",
@@ -68,7 +68,7 @@ class TestSymbolsEndpoint:
                 "swap": False,
                 "active": True,
             },
-            "BTCUSDT_250627": {
+            "BTC/USDT:USDT-250627": {
                 "id": "BTCUSDT_250627",
                 "symbol": "BTC/USDT:USDT-250627",
                 "base": "BTC",
@@ -82,6 +82,15 @@ class TestSymbolsEndpoint:
             },
         }
         mock_exchange.load_markets.return_value = mock_markets
+
+        # Mock tickers data
+        mock_tickers = {
+            "BTC/USDT": {"info": {"quoteVolume": "1000000"}},
+            "ETH/USDT": {"info": {"quoteVolume": "500000"}},
+            "ADA/USDT": {"info": {"quoteVolume": "100000"}},
+            "BTC/USDT:USDT-250627": {"info": {"quoteVolume": "50000"}},
+        }
+        mock_exchange.fetch_tickers.return_value = mock_tickers
 
         # Make request
         response = client.get("/api/v1/symbols")
@@ -115,12 +124,14 @@ class TestSymbolsEndpoint:
 class TestOrderBookEndpoint:
     """Test cases for the /api/v1/orderbook/{symbol} endpoint."""
 
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_orderbook_success(self, mock_exchange_service):
+    def test_get_orderbook_success(self, mock_exchange_service, mock_symbol_service):
         """Test successful retrieval of order book."""
-        # Mock exchange and order book data
+        # Mock symbol service and exchange
         from unittest.mock import MagicMock
 
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "BTC/USDT"
         mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
@@ -145,9 +156,12 @@ class TestOrderBookEndpoint:
         assert data["asks"][0]["price"] == 43251.00
         assert data["asks"][0]["amount"] == 0.50
 
-        # Verify exchange service was called
+        # Verify services were called
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "BTCUSDT"
+        )
         mock_exchange_service.get_exchange.assert_called_once()
-        mock_exchange.fetch_order_book.assert_called_once_with("BTCUSDT")
+        mock_exchange.fetch_order_book.assert_called_once_with("BTC/USDT")
 
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
     def test_get_orderbook_exchange_error(self, mock_exchange_service):
@@ -167,12 +181,14 @@ class TestOrderBookEndpoint:
 class TestCandlesEndpoint:
     """Test cases for the /api/v1/candles/{symbol} endpoint."""
 
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_candles_success(self, mock_exchange_service):
+    def test_get_candles_success(self, mock_exchange_service, mock_symbol_service):
         """Test successful retrieval of candles."""
-        # Mock exchange and OHLCV data
+        # Mock symbol service and exchange
         from unittest.mock import MagicMock
 
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "BTC/USDT"
         mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
@@ -209,15 +225,22 @@ class TestCandlesEndpoint:
         assert data[0]["close"] == 43250.0
         assert data[0]["volume"] == 125.75
 
-        # Verify exchange service was called
+        # Verify services were called
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "BTCUSDT"
+        )
         mock_exchange_service.get_exchange.assert_called_once()
-        mock_exchange.fetch_ohlcv.assert_called_once_with("BTCUSDT", "1m", limit=2)
+        mock_exchange.fetch_ohlcv.assert_called_once_with("BTC/USDT", "1m", limit=2)
 
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
     @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_candles_default_parameters(self, mock_exchange_service):
+    def test_get_candles_default_parameters(
+        self, mock_exchange_service, mock_symbol_service
+    ):
         """Test candles endpoint with default parameters."""
         from unittest.mock import MagicMock
 
+        mock_symbol_service.resolve_symbol_to_exchange_format.return_value = "BTC/USDT"
         mock_exchange = MagicMock()
         mock_exchange_service.get_exchange.return_value = mock_exchange
         mock_exchange.fetch_ohlcv.return_value = []
@@ -225,7 +248,10 @@ class TestCandlesEndpoint:
         response = client.get("/api/v1/candles/BTCUSDT")
 
         assert response.status_code == 200
-        mock_exchange.fetch_ohlcv.assert_called_once_with("BTCUSDT", "1m", limit=100)
+        mock_symbol_service.resolve_symbol_to_exchange_format.assert_called_once_with(
+            "BTCUSDT"
+        )
+        mock_exchange.fetch_ohlcv.assert_called_once_with("BTC/USDT", "1m", limit=100)
 
     def test_get_candles_invalid_timeframe(self):
         """Test error handling for invalid timeframe."""
