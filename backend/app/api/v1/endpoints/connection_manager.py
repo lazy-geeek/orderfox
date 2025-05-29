@@ -22,6 +22,8 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self.streaming_tasks: Dict[str, asyncio.Task] = {}
+        # Tracks active stream types per symbol (e.g., {"BTCUSDT": {"orderbook", "candles:1m"}})
+        self.symbol_active_streams: Dict[str, set[str]] = {}
 
     async def connect(
         self,
@@ -50,6 +52,16 @@ class ConnectionManager:
             f"WebSocket connected to stream {stream_key}. Total connections: {len(self.active_connections[stream_key])}"
         )
 
+        # Extract base symbol from stream_key for symbol_active_streams tracking
+        base_symbol = self._get_base_symbol_from_stream_key(stream_key, stream_type)
+        if base_symbol:
+            if base_symbol not in self.symbol_active_streams:
+                self.symbol_active_streams[base_symbol] = set()
+            self.symbol_active_streams[base_symbol].add(stream_key)
+            logger.debug(
+                f"Active streams for {base_symbol}: {self.symbol_active_streams[base_symbol]}"
+            )
+
         # Start streaming task if this is the first connection for this stream
         if len(self.active_connections[stream_key]) == 1:
             logger.info(f"Starting streaming task for {stream_key}")
@@ -64,17 +76,64 @@ class ConnectionManager:
                     f"WebSocket disconnected from stream {stream_key}. Remaining connections: {len(self.active_connections[stream_key])}"
                 )
 
-            # Stop streaming if no more connections for this stream
+            # Check if there are any remaining connections for this specific stream_key
             if not self.active_connections[stream_key]:
-                logger.info(
-                    f"Stopping streaming task for {stream_key} (no more connections)"
-                )
-                self._stop_streaming(stream_key)
+                logger.info(f"No more connections for stream_key: {stream_key}")
                 del self.active_connections[stream_key]
+
+                # Determine the base symbol for this stream_key
+                stream_type = (
+                    stream_key.split(":")[0] if ":" in stream_key else stream_key
+                )  # Simplified for now
+                base_symbol = self._get_base_symbol_from_stream_key(
+                    stream_key, stream_type
+                )
+
+                if base_symbol and base_symbol in self.symbol_active_streams:
+                    self.symbol_active_streams[base_symbol].discard(stream_key)
+                    logger.debug(
+                        f"Updated active streams for {base_symbol}: {self.symbol_active_streams[base_symbol]}"
+                    )
+
+                    # Stop streaming task only if no more active streams for this base symbol
+                    if not self.symbol_active_streams[base_symbol]:
+                        logger.info(
+                            f"Stopping all streaming tasks for symbol {base_symbol} (no more active streams)"
+                        )
+                        # Iterate and stop all tasks associated with this base symbol
+                        tasks_to_stop = [
+                            key
+                            for key in self.streaming_tasks
+                            if self._get_base_symbol_from_stream_key(
+                                key, key.split(":")[0] if ":" in key else key
+                            )
+                            == base_symbol
+                        ]
+                        for task_key in tasks_to_stop:
+                            self._stop_streaming(task_key)
+                        del self.symbol_active_streams[base_symbol]
+                else:
+                    logger.warning(
+                        f"Could not determine base symbol or symbol not tracked for stream_key: {stream_key}"
+                    )
+            else:
+                logger.debug(f"Stream {stream_key} still has active connections.")
         else:
             logger.warning(
                 f"Attempted to disconnect from non-existent stream: {stream_key}"
             )
+
+    def _get_base_symbol_from_stream_key(
+        self, stream_key: str, stream_type: str
+    ) -> str | None:
+        """Helper to extract the base symbol from a stream_key."""
+        if stream_type == "candles":
+            parts = stream_key.split(":")
+            if len(parts) >= 2:
+                return ":".join(parts[:-1])
+        elif stream_type == "orderbook" or stream_type == "ticker":
+            return stream_key  # For orderbook/ticker, symbol is the stream_key
+        return None
 
     async def broadcast_to_stream(self, stream_key: str, data: dict):
         """Broadcast data to all connections for a specific stream."""
@@ -220,11 +279,8 @@ class ConnectionManager:
             }
             await self.broadcast_to_symbol(symbol, error_data)
         finally:
-            if exchange_pro:
-                try:
-                    await exchange_pro.close()
-                except Exception:
-                    pass
+            # Do NOT close exchange_pro here. It should be managed globally.
+            pass
 
     async def _stream_ticker(self, symbol: str):
         """Stream ticker updates using ccxtpro."""
@@ -339,11 +395,8 @@ class ConnectionManager:
             }
             await self.broadcast_to_stream(symbol, error_data)
         finally:
-            if exchange_pro:
-                try:
-                    await exchange_pro.close()
-                except Exception:
-                    pass
+            # Do NOT close exchange_pro here. It should be managed globally.
+            pass
 
     async def _stream_candles(self, symbol: str, timeframe: str, stream_key: str):
         """Stream candle/OHLCV updates using ccxtpro."""
@@ -423,11 +476,8 @@ class ConnectionManager:
             }
             await self.broadcast_to_stream(stream_key, error_data)
         finally:
-            if exchange_pro:
-                try:
-                    await exchange_pro.close()
-                except Exception:
-                    pass
+            # Do NOT close exchange_pro here. It should be managed globally.
+            pass
 
     async def _stream_mock_orderbook(self, symbol: str):
         """Stream mock order book data when CCXT Pro is not available."""

@@ -1,5 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import apiClient from '../../services/apiClient';
+import { connectWebSocketStream, disconnectWebSocketStream, disconnectAllWebSockets } from '../../services/websocketService';
+import { AppDispatch, RootState } from '../../store/store'; // Import AppDispatch and RootState
 
 /**
  * Trading symbol information
@@ -165,31 +167,46 @@ const validateOrderBook = (orderBook: any): OrderBook | null => {
 interface MarketDataState {
   /** Currently selected trading symbol */
   selectedSymbol: string | null;
+  /** Currently selected timeframe for candles */
+  selectedTimeframe: string;
   /** List of available trading symbols */
   symbolsList: Symbol[];
   /** Current order book data */
   currentOrderBook: OrderBook | null;
   /** Current candlestick data */
   currentCandles: Candle[];
-  /** Loading state for market data operations */
-  isLoading: boolean;
-  /** Error message for market data operations */
-  error: string | null;
+  /** Loading state for candles data */
+  candlesLoading: boolean;
+  /** Error message for candles data */
+  candlesError: string | null;
+  /** Loading state for order book data */
+  orderBookLoading: boolean;
+  /** Error message for order book data */
+  orderBookError: string | null;
   /** Loading state for symbols list */
   symbolsLoading: boolean;
   /** Error message for symbols loading */
   symbolsError: string | null;
+  /** WebSocket connection status for candles */
+  candlesWsConnected: boolean;
+  /** WebSocket connection status for order book */
+  orderBookWsConnected: boolean;
 }
 
 const initialState: MarketDataState = {
   selectedSymbol: null,
+  selectedTimeframe: '1m', // Default timeframe
   symbolsList: [],
   currentOrderBook: null,
   currentCandles: [],
-  isLoading: false,
-  error: null,
+  candlesLoading: false,
+  candlesError: null,
+  orderBookLoading: false,
+  orderBookError: null,
   symbolsLoading: false,
   symbolsError: null,
+  candlesWsConnected: false,
+  orderBookWsConnected: false,
 };
 
 // Async thunks
@@ -244,15 +261,82 @@ export const fetchCandles = createAsyncThunk(
   }
 );
 
+// Thunks for WebSocket management
+export const startCandlesWebSocket = createAsyncThunk<
+  void,
+  { symbol: string; timeframe: string },
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/startCandlesWebSocket',
+  async ({ symbol, timeframe }, { dispatch }) => {
+    connectWebSocketStream(dispatch, symbol, 'candles', timeframe);
+  }
+);
+
+export const stopCandlesWebSocket = createAsyncThunk<
+  void,
+  { symbol: string; timeframe: string },
+  { state: RootState }
+>(
+  'marketData/stopCandlesWebSocket',
+  async ({ symbol, timeframe }) => {
+    disconnectWebSocketStream('candles', symbol, timeframe);
+  }
+);
+
+export const startOrderBookWebSocket = createAsyncThunk<
+  void,
+  { symbol: string },
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/startOrderBookWebSocket',
+  async ({ symbol }, { dispatch }) => {
+    connectWebSocketStream(dispatch, symbol, 'orderbook');
+  }
+);
+
+export const stopOrderBookWebSocket = createAsyncThunk<
+  void,
+  { symbol: string },
+  { state: RootState }
+>(
+  'marketData/stopOrderBookWebSocket',
+  async ({ symbol }) => {
+    disconnectWebSocketStream('orderbook', symbol);
+  }
+);
+
+export const stopAllWebSockets = createAsyncThunk<
+  void,
+  void,
+  { state: RootState }
+>(
+  'marketData/stopAllWebSockets',
+  async () => {
+    disconnectAllWebSockets();
+  }
+);
+
+
 const marketDataSlice = createSlice({
   name: 'marketData',
   initialState,
   reducers: {
     setSelectedSymbol: (state, action: PayloadAction<string | null>) => {
       state.selectedSymbol = action.payload;
+      // When symbol changes, clear current data and stop all existing WS
+      state.currentOrderBook = null;
+      state.currentCandles = [];
+    },
+    setSelectedTimeframe: (state, action: PayloadAction<string>) => {
+      state.selectedTimeframe = action.payload;
+      // When timeframe changes, clear current candles
+      state.currentCandles = [];
     },
     clearSelectedSymbol: (state) => {
       state.selectedSymbol = null;
+      state.currentOrderBook = null;
+      state.currentCandles = [];
     },
     updateOrderBookFromWebSocket: (state, action: PayloadAction<any>) => {
       const validatedOrderBook = validateOrderBook(action.payload);
@@ -288,8 +372,15 @@ const marketDataSlice = createSlice({
         }
       }
     },
+    setCandlesWsConnected: (state, action: PayloadAction<boolean>) => {
+      state.candlesWsConnected = action.payload;
+    },
+    setOrderBookWsConnected: (state, action: PayloadAction<boolean>) => {
+      state.orderBookWsConnected = action.payload;
+    },
     clearError: (state) => {
-      state.error = null;
+      state.candlesError = null;
+      state.orderBookError = null;
       state.symbolsError = null;
     },
   },
@@ -310,44 +401,101 @@ const marketDataSlice = createSlice({
       })
       // Fetch order book
       .addCase(fetchOrderBook.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
+        state.orderBookLoading = true;
+        state.orderBookError = null;
       })
       .addCase(fetchOrderBook.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.orderBookLoading = false;
         const validatedOrderBook = validateOrderBook(action.payload);
         if (validatedOrderBook) {
           state.currentOrderBook = validatedOrderBook;
         } else {
-          state.error = 'Received invalid order book data from server';
+          state.orderBookError = 'Received invalid order book data from server';
         }
       })
       .addCase(fetchOrderBook.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
+        state.orderBookLoading = false;
+        state.orderBookError = action.payload as string;
       })
       // Fetch candles
       .addCase(fetchCandles.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
+        state.candlesLoading = true;
+        state.candlesError = null;
       })
       .addCase(fetchCandles.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.candlesLoading = false;
         // action.payload is already validated and filtered by the thunk
         state.currentCandles = action.payload;
       })
       .addCase(fetchCandles.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
+        state.candlesLoading = false;
+        state.candlesError = action.payload as string;
       });
   },
 });
 
+// Thunks for managing WebSocket connections based on state changes
+export const initializeMarketDataStreams = createAsyncThunk<
+  void,
+  void,
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/initializeMarketDataStreams',
+  async (_, { dispatch, getState }) => {
+    const { selectedSymbol, selectedTimeframe } = getState().marketData;
+
+    if (selectedSymbol) {
+      // Start order book WebSocket
+      dispatch(startOrderBookWebSocket({ symbol: selectedSymbol }));
+      // Start candles WebSocket
+      dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
+    }
+  }
+);
+
+export const updateCandlesStream = createAsyncThunk<
+  void,
+  void,
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/updateCandlesStream',
+  async (_, { dispatch, getState }) => {
+    const { selectedSymbol, selectedTimeframe } = getState().marketData;
+
+    if (selectedSymbol) {
+      // Stop existing candles WebSocket
+      dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: getState().marketData.selectedTimeframe }));
+      // Start new candles WebSocket with updated timeframe
+      dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
+    }
+  }
+);
+
+export const cleanupMarketDataStreams = createAsyncThunk<
+  void,
+  void,
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/cleanupMarketDataStreams',
+  async (_, { dispatch, getState }) => {
+    const { selectedSymbol, selectedTimeframe } = getState().marketData;
+    if (selectedSymbol) {
+      dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
+      dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
+    }
+    dispatch(stopAllWebSockets()); // Ensure all are closed
+  }
+);
+
+
 export const {
   setSelectedSymbol,
+  setSelectedTimeframe,
   clearSelectedSymbol,
   updateOrderBookFromWebSocket,
   updateCandlesFromWebSocket,
+  setCandlesWsConnected,
+  setOrderBookWsConnected,
   clearError,
 } = marketDataSlice.actions;
 

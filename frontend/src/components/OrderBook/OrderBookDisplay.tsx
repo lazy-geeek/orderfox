@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { fetchOrderBook, updateOrderBookFromWebSocket } from '../../features/marketData/marketDataSlice';
+import {
+  fetchOrderBook,
+  updateOrderBookFromWebSocket,
+  setOrderBookWsConnected, // Import new action
+} from '../../features/marketData/marketDataSlice';
 import './OrderBookDisplay.css';
 
 /**
@@ -20,13 +24,17 @@ interface OrderBookDisplayProps {
  */
 const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   const dispatch = useAppDispatch();
-  const { selectedSymbol, currentOrderBook, isLoading, error } = useAppSelector(
-    (state) => state.marketData
-  );
+  const {
+    selectedSymbol,
+    currentOrderBook,
+    orderBookLoading,
+    orderBookError,
+    orderBookWsConnected, // Use from Redux state
+  } = useAppSelector((state) => state.marketData);
 
   // Local state for WebSocket and display configuration
-  const [wsConnected, setWsConnected] = useState(false);
-  const [wsError, setWsError] = useState<string | null>(null);
+  // const [wsConnected, setWsConnected] = useState(false); // Remove local state
+  const [wsError, setWsError] = useState<string | null>(null); // Keep local for now
   const [displayDepth, setDisplayDepth] = useState(10);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -50,7 +58,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
 
     ws.onopen = () => {
       console.log(`WebSocket connected for ${symbol}`);
-      setWsConnected(true);
+      dispatch(setOrderBookWsConnected(true)); // Update Redux state
       setWsError(null);
     };
 
@@ -67,12 +75,12 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       setWsError('WebSocket connection error');
-      setWsConnected(false);
+      dispatch(setOrderBookWsConnected(false)); // Update Redux state
     };
 
     ws.onclose = (event) => {
       console.log('WebSocket closed:', event.code, event.reason);
-      setWsConnected(false);
+      dispatch(setOrderBookWsConnected(false)); // Update Redux state
       
       // Attempt to reconnect if it wasn't a clean close and we still have a selected symbol
       if (event.code !== 1000 && selectedSymbol) {
@@ -101,7 +109,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
         wsRef.current.close();
         wsRef.current = null;
       }
-      setWsConnected(false);
+      dispatch(setOrderBookWsConnected(false)); // Update Redux state
       setWsError(null);
     }
 
@@ -128,7 +136,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   const displayAsks = currentOrderBook?.asks ? currentOrderBook.asks.slice(0, displayDepth) : [];
 
   // Render loading state
-  if (isLoading && !currentOrderBook) {
+  if (orderBookLoading && !currentOrderBook) {
     return (
       <div className={`order-book-display ${className || ''}`}>
         <div className="order-book-header">
@@ -146,7 +154,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   }
 
   // Render error state
-  if (error || wsError) {
+  if (orderBookError || wsError) {
     return (
       <div className={`order-book-display ${className || ''}`}>
         <div className="order-book-header">
@@ -157,10 +165,10 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
         </div>
         <div className="error-state">
           <p className="error-message">
-            {error || wsError || 'Failed to load order book'}
+            {orderBookError || wsError || 'Failed to load order book'}
           </p>
           {selectedSymbol && (
-            <button 
+            <button
               onClick={() => dispatch(fetchOrderBook(selectedSymbol))}
               className="retry-button"
             >
@@ -193,11 +201,11 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
         <div className="header-controls">
           <span className="symbol-label">{selectedSymbol}</span>
           <div className="connection-status">
-            <span className={`status-indicator ${wsConnected ? 'connected' : 'disconnected'}`}>
-              {wsConnected ? '●' : '○'}
+            <span className={`status-indicator ${orderBookWsConnected ? 'connected' : 'disconnected'}`}>
+              {orderBookWsConnected ? '●' : '○'}
             </span>
             <span className="status-text">
-              {wsConnected ? 'Live' : 'Disconnected'}
+              {orderBookWsConnected ? 'Live' : 'Disconnected'}
             </span>
           </div>
         </div>

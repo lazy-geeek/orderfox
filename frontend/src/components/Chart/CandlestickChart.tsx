@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import ReactECharts from 'echarts-for-react';
 import { RootState, AppDispatch } from '../../store/store';
-import { 
-  fetchCandles, 
-  updateCandlesFromWebSocket 
+import {
+  fetchCandles,
+  updateCandlesFromWebSocket,
+  setSelectedTimeframe, // Import new action
+  setCandlesWsConnected, // Import new action
 } from '../../features/marketData/marketDataSlice';
 
 interface CandlestickChartProps {
@@ -22,13 +24,19 @@ const TIMEFRAMES = [
 
 const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { selectedSymbol, currentCandles, isLoading, error } = useSelector(
-    (state: RootState) => state.marketData
-  );
+  const {
+    selectedSymbol,
+    selectedTimeframe, // Use from Redux state
+    currentCandles,
+    candlesLoading,
+    candlesError,
+    candlesWsConnected, // Use from Redux state
+  } = useSelector((state: RootState) => state.marketData);
 
-  const [timeframe, setTimeframe] = useState<string>('1m');
-  const [wsConnected, setWsConnected] = useState<boolean>(false);
-  const [wsError, setWsError] = useState<string | null>(null);
+  // Remove local state for timeframe and wsConnected
+  // const [timeframe, setTimeframe] = useState<string>('1m');
+  // const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [wsError, setWsError] = useState<string | null>(null); // Keep local for now
   
   const wsRef = useRef<WebSocket | null>(null);
   const chartRef = useRef<ReactECharts | null>(null);
@@ -75,7 +83,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
 
     return {
       title: {
-        text: selectedSymbol ? `${selectedSymbol} - ${timeframe}` : 'Select a Symbol',
+        text: selectedSymbol ? `${selectedSymbol} - ${selectedTimeframe}` : 'Select a Symbol',
         left: 'center',
         textStyle: {
           color: '#333',
@@ -155,13 +163,13 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
         }
       ]
     };
-  }, [selectedSymbol, timeframe, formatCandleData]);
+  }, [selectedSymbol, selectedTimeframe, formatCandleData]);
 
   /**
    * Establish WebSocket connection
    */
   const connectWebSocket = useCallback(() => {
-    if (!selectedSymbol || !timeframe) return;
+    if (!selectedSymbol || !selectedTimeframe) return;
 
     // Close existing connection
     if (wsRef.current && wsRef.current.close) {
@@ -169,7 +177,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
     }
 
     const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
-    const wsUrl = `${wsBaseUrl}/ws/candles/${selectedSymbol}/${timeframe}`;
+    const wsUrl = `${wsBaseUrl}/ws/candles/${selectedSymbol}/${selectedTimeframe}`;
     
     try {
       const ws = new WebSocket(wsUrl);
@@ -177,7 +185,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
 
       ws.onopen = () => {
         console.log(`WebSocket connected: ${wsUrl}`);
-        setWsConnected(true);
+        dispatch(setCandlesWsConnected(true));
         setWsError(null);
       };
 
@@ -194,17 +202,17 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         setWsError('WebSocket connection error');
-        setWsConnected(false);
+        dispatch(setCandlesWsConnected(false));
       };
 
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
-        setWsConnected(false);
+        dispatch(setCandlesWsConnected(false));
         
         // Attempt to reconnect after 3 seconds if not manually closed
         if (event.code !== 1000 && selectedSymbol) {
           setTimeout(() => {
-            if (selectedSymbol && timeframe) {
+            if (selectedSymbol && selectedTimeframe) {
               connectWebSocket();
             }
           }, 3000);
@@ -214,20 +222,20 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
       console.error('Error creating WebSocket connection:', error);
       setWsError('Failed to create WebSocket connection');
     }
-  }, [selectedSymbol, timeframe, dispatch]);
+  }, [selectedSymbol, selectedTimeframe, dispatch]);
 
   /**
    * Handle timeframe change
    */
   const handleTimeframeChange = useCallback((newTimeframe: string) => {
-    setTimeframe(newTimeframe);
+    dispatch(setSelectedTimeframe(newTimeframe)); // Update Redux state
     
     // Fetch new historical data
     if (selectedSymbol) {
-      dispatch(fetchCandles({ 
-        symbol: selectedSymbol, 
-        timeframe: newTimeframe, 
-        limit: 100 
+      dispatch(fetchCandles({
+        symbol: selectedSymbol,
+        timeframe: newTimeframe,
+        limit: 100
       }));
     }
   }, [selectedSymbol, dispatch]);
@@ -237,40 +245,41 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
    */
   useEffect(() => {
     if (selectedSymbol) {
-      dispatch(fetchCandles({ 
-        symbol: selectedSymbol, 
-        timeframe, 
-        limit: 100 
+      dispatch(fetchCandles({
+        symbol: selectedSymbol,
+        timeframe: selectedTimeframe, // Use from Redux state
+        limit: 100
       }));
     }
-  }, [selectedSymbol, dispatch, timeframe]);
+  }, [selectedSymbol, dispatch, selectedTimeframe]);
 
   /**
    * Effect: Establish WebSocket connection when symbol or timeframe changes
    */
   useEffect(() => {
-    if (selectedSymbol && timeframe) {
+    if (selectedSymbol && selectedTimeframe) {
       connectWebSocket();
     }
 
     // Cleanup on unmount or dependency change
     return () => {
-      if (wsRef.current && wsRef.current.close) {
+      if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null; // Clear ref on close
       }
     };
-  }, [selectedSymbol, timeframe, connectWebSocket]);
+  }, [selectedSymbol, selectedTimeframe, connectWebSocket]);
 
   /**
    * Render loading state
    */
-  if (isLoading) {
+  if (candlesLoading) {
     return (
       <div className={`candlestick-chart ${className || ''}`}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           height: '400px',
           fontSize: '16px',
           color: '#666'
@@ -284,21 +293,21 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
   /**
    * Render error state
    */
-  if (error || wsError) {
+  if (candlesError || wsError) {
     return (
       <div className={`candlestick-chart ${className || ''}`}>
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
+          justifyContent: 'center',
+          alignItems: 'center',
           height: '400px',
           color: '#d32f2f'
         }}>
           <div style={{ fontSize: '16px', marginBottom: '10px' }}>
             Error loading chart data
           </div>
-          {error && <div style={{ fontSize: '14px' }}>API Error: {error}</div>}
+          {candlesError && <div style={{ fontSize: '14px' }}>API Error: {candlesError}</div>}
           {wsError && <div style={{ fontSize: '14px' }}>WebSocket Error: {wsError}</div>}
         </div>
       </div>
@@ -344,19 +353,19 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
               padding: '8px 16px',
               border: '1px solid #ddd',
               borderRadius: '4px',
-              backgroundColor: timeframe === tf.value ? '#1976d2' : '#fff',
-              color: timeframe === tf.value ? '#fff' : '#333',
+              backgroundColor: selectedTimeframe === tf.value ? '#1976d2' : '#fff',
+              color: selectedTimeframe === tf.value ? '#fff' : '#333',
               cursor: 'pointer',
               fontSize: '14px',
               transition: 'all 0.2s'
             }}
             onMouseEnter={(e) => {
-              if (timeframe !== tf.value) {
+              if (selectedTimeframe !== tf.value) {
                 e.currentTarget.style.backgroundColor = '#f5f5f5';
               }
             }}
             onMouseLeave={(e) => {
-              if (timeframe !== tf.value) {
+              if (selectedTimeframe !== tf.value) {
                 e.currentTarget.style.backgroundColor = '#fff';
               }
             }}
@@ -366,10 +375,10 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
         ))}
         
         {/* WebSocket Status Indicator */}
-        <div style={{ 
-          marginLeft: 'auto', 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          marginLeft: 'auto',
+          display: 'flex',
+          alignItems: 'center',
           gap: '5px',
           fontSize: '12px'
         }}>
@@ -378,25 +387,25 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              backgroundColor: wsConnected ? '#4caf50' : '#f44336'
+              backgroundColor: candlesWsConnected ? '#4caf50' : '#f44336'
             }}
           />
-          <span style={{ color: wsConnected ? '#4caf50' : '#f44336' }}>
-            {wsConnected ? 'Live' : 'Disconnected'}
+          <span style={{ color: candlesWsConnected ? '#4caf50' : '#f44336' }}>
+            {candlesWsConnected ? 'Live' : 'Disconnected'}
           </span>
         </div>
       </div>
 
       {/* Chart */}
-      {!isLoading && currentCandles.length > 0 ? (
+      {!candlesLoading && currentCandles.length > 0 ? (
         <ReactECharts
-          key={`${selectedSymbol}-${timeframe}`} // Add key to force re-mount on symbol/timeframe change
+          key={`${selectedSymbol}-${selectedTimeframe}`} // Add key to force re-mount on symbol/timeframe change
           ref={chartRef}
           option={getChartOptions()}
           style={{ height: '500px', width: '100%' }}
           theme="default"
         />
-      ) : !isLoading && currentCandles.length === 0 ? (
+      ) : !candlesLoading && currentCandles.length === 0 ? (
         <div style={{
           display: 'flex',
           justifyContent: 'center',

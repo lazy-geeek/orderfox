@@ -4,37 +4,18 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import OrderBookDisplay from './OrderBookDisplay';
 import marketDataReducer from '../../features/marketData/marketDataSlice';
+import { connectWebSocketStream, disconnectWebSocketStream, disconnectAllWebSockets } from '../../services/websocketService'; // Import mocked functions
 
 // Mock apiClient to prevent actual API calls
 jest.mock('../../services/apiClient', () => ({
   get: jest.fn().mockResolvedValue({ data: {} })
 }));
 
-// Mock WebSocket completely to prevent connection attempts
-const mockWebSocket = {
-  close: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  onopen: null,
-  onmessage: null,
-  onerror: null,
-  onclose: null,
-  readyState: 1,
-};
-
-(global as any).WebSocket = jest.fn().mockImplementation(() => mockWebSocket);
-
-// Mock React hooks to prevent side effects during testing
-const mockUseEffect = jest.fn();
-jest.mock('react', () => ({
-  ...jest.requireActual('react'),
-  useEffect: (fn: any, deps: any) => {
-    // Only run effects that don't have selectedSymbol dependency to avoid async actions
-    if (!deps || !deps.some((dep: any) => typeof dep === 'string')) {
-      return jest.requireActual('react').useEffect(fn, deps);
-    }
-    return mockUseEffect(fn, deps);
-  },
+// Mock websocketService to prevent actual WebSocket connections
+jest.mock('../../services/websocketService', () => ({
+  connectWebSocketStream: jest.fn(),
+  disconnectWebSocketStream: jest.fn(),
+  disconnectAllWebSockets: jest.fn(),
 }));
 
 const createMockStore = (initialState = {}) => {
@@ -45,13 +26,18 @@ const createMockStore = (initialState = {}) => {
     preloadedState: {
       marketData: {
         selectedSymbol: null,
+        selectedTimeframe: '1m',
         symbolsList: [],
         currentOrderBook: null,
         currentCandles: [],
-        isLoading: false,
-        error: null,
+        candlesLoading: false,
+        candlesError: null,
+        orderBookLoading: false,
+        orderBookError: null,
         symbolsLoading: false,
         symbolsError: null,
+        candlesWsConnected: false,
+        orderBookWsConnected: false,
         ...initialState,
       },
     },
@@ -61,6 +47,10 @@ const createMockStore = (initialState = {}) => {
 describe('OrderBookDisplay', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Clear mocks for websocketService as well
+    (connectWebSocketStream as jest.Mock).mockClear();
+    (disconnectWebSocketStream as jest.Mock).mockClear();
+    (disconnectAllWebSockets as jest.Mock).mockClear();
   });
 
   it('renders no symbol selected state when no symbol is selected', () => {
@@ -93,7 +83,7 @@ describe('OrderBookDisplay', () => {
     const store = createMockStore({
       selectedSymbol: 'BTCUSDT',
       currentOrderBook: mockOrderBook,
-      isLoading: false,
+      orderBookLoading: false,
     });
     
     render(
@@ -120,7 +110,7 @@ describe('OrderBookDisplay', () => {
     const store = createMockStore({
       selectedSymbol: 'BTCUSDT',
       currentOrderBook: mockOrderBook,
-      isLoading: false,
+      orderBookLoading: false,
     });
     
     render(
@@ -142,7 +132,7 @@ describe('OrderBookDisplay', () => {
         asks: [{ price: 50001, amount: 1.2 }],
         timestamp: Date.now(),
       },
-      isLoading: false,
+      orderBookLoading: false,
     });
     
     render(
