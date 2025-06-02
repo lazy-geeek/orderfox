@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import ReactECharts from 'echarts-for-react';
 import { RootState, AppDispatch } from '../../store/store';
 import {
   fetchCandles,
-  updateCandlesFromWebSocket,
-  setSelectedTimeframe, // Import new action
-  setCandlesWsConnected, // Import new action
+  setSelectedTimeframe,
+  startCandlesWebSocket,
+  stopCandlesWebSocket
 } from '../../features/marketData/marketDataSlice';
 
 interface CandlestickChartProps {
@@ -26,19 +26,13 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
   const dispatch = useDispatch<AppDispatch>();
   const {
     selectedSymbol,
-    selectedTimeframe, // Use from Redux state
+    selectedTimeframe,
     currentCandles,
     candlesLoading,
     candlesError,
-    candlesWsConnected, // Use from Redux state
+    candlesWsConnected,
   } = useSelector((state: RootState) => state.marketData);
 
-  // Remove local state for timeframe and wsConnected
-  // const [timeframe, setTimeframe] = useState<string>('1m');
-  // const [wsConnected, setWsConnected] = useState<boolean>(false);
-  const [wsError, setWsError] = useState<string | null>(null); // Keep local for now
-  
-  const wsRef = useRef<WebSocket | null>(null);
   const chartRef = useRef<ReactECharts | null>(null);
 
   /**
@@ -46,13 +40,12 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
    * ECharts expects: [timestamp, open, close, low, high, volume]
    */
   const formatCandleData = useCallback(() => {
-    console.log('Formatting candle data. currentCandles:', currentCandles);
+    // console.log('Formatting candle data. currentCandles:', currentCandles); // Keep for debugging if needed
     if (!currentCandles || !Array.isArray(currentCandles) || currentCandles.length === 0) {
       return [];
     }
 
     return currentCandles.filter(candle => {
-      // Ensure all required properties exist and are valid numbers
       const isValid =
         typeof candle.timestamp === 'number' &&
         typeof candle.open === 'number' &&
@@ -96,7 +89,6 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
           type: 'cross'
         },
         formatter: function (params: any) {
-          // Ensure params[0] and params[0].data exist before accessing
           const data = params && params.length > 0 ? params[0] : null;
           if (!data || !data.data) return '';
 
@@ -153,7 +145,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
         {
           name: 'Candlestick',
           type: 'candlestick',
-          data: candleData.length > 0 ? candleData : [], // Ensure data is not empty
+          data: candleData.length > 0 ? candleData : [],
           itemStyle: {
             color: '#00da3c',
             color0: '#ec0000',
@@ -166,112 +158,40 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
   }, [selectedSymbol, selectedTimeframe, formatCandleData]);
 
   /**
-   * Establish WebSocket connection
-   */
-  const connectWebSocket = useCallback(() => {
-    if (!selectedSymbol || !selectedTimeframe) return;
-
-    // Close existing connection
-    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
-      console.log(`connectWebSocket: Closing existing WebSocket for ${selectedSymbol}/${selectedTimeframe} with code 1000 before creating new one`);
-      wsRef.current.close(1000, 'New connection requested');
-      wsRef.current = null; // Clear ref immediately
-    }
-
-    const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
-    const wsUrl = `${wsBaseUrl}/ws/candles/${selectedSymbol}/${selectedTimeframe}`;
-    
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log(`WebSocket connected: ${wsUrl}`);
-        dispatch(setCandlesWsConnected(true));
-        setWsError(null);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const candleData = JSON.parse(event.data);
-          dispatch(updateCandlesFromWebSocket(candleData));
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-          setWsError('Error parsing WebSocket data');
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setWsError('WebSocket connection error');
-        dispatch(setCandlesWsConnected(false));
-      };
-
-      ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
-        dispatch(setCandlesWsConnected(false));
-        
-        // Attempt to reconnect after 3 seconds if not manually closed
-        if (event.code !== 1000 && selectedSymbol) {
-          setTimeout(() => {
-            if (selectedSymbol && selectedTimeframe) {
-              connectWebSocket();
-            }
-          }, 3000);
-        }
-      };
-    } catch (error) {
-      console.error('Error creating WebSocket connection:', error);
-      setWsError('Failed to create WebSocket connection');
-    }
-  }, [selectedSymbol, selectedTimeframe, dispatch]);
-
-  /**
    * Handle timeframe change
    */
-  const handleTimeframeChange = useCallback((newTimeframe: string) => {
-    dispatch(setSelectedTimeframe(newTimeframe)); // Update Redux state
+  const handleTimeframeChange = useCallback(async (newTimeframe: string) => {
+    dispatch(setSelectedTimeframe(newTimeframe));
     
-    // Fetch new historical data
     if (selectedSymbol) {
       dispatch(fetchCandles({
         symbol: selectedSymbol,
         timeframe: newTimeframe,
         limit: 100
       }));
+      // Restart WebSocket with new timeframe
+      await dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
+      await dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: newTimeframe }));
     }
-  }, [selectedSymbol, dispatch]);
+  }, [selectedSymbol, selectedTimeframe, dispatch]);
 
   /**
-   * Effect: Fetch initial data when selectedSymbol changes
-   */
-  useEffect(() => {
-    if (selectedSymbol) {
-      dispatch(fetchCandles({
-        symbol: selectedSymbol,
-        timeframe: selectedTimeframe, // Use from Redux state
-        limit: 100
-      }));
-    }
-  }, [selectedSymbol, dispatch, selectedTimeframe]);
-
-  /**
-   * Effect: Establish WebSocket connection when symbol or timeframe changes
+   * Effect: Fetch initial historical data when selectedSymbol or selectedTimeframe changes
    */
   useEffect(() => {
     if (selectedSymbol && selectedTimeframe) {
-      connectWebSocket();
+      dispatch(fetchCandles({
+        symbol: selectedSymbol,
+        timeframe: selectedTimeframe,
+        limit: 100
+      }));
     }
+  }, [selectedSymbol, selectedTimeframe, dispatch]);
 
-    // Cleanup on unmount or dependency change
-    return () => {
-      if (wsRef.current) {
-        console.log(`useEffect cleanup: Closing WebSocket for previous state with code 1000`);
-        wsRef.current.close(1000, 'Component re-rendering or unmounting');
-        wsRef.current = null;
-      }
-    };
-  }, [selectedSymbol, selectedTimeframe, connectWebSocket]);
+  // WebSocket connections are now managed centrally by the Redux slice
+  
+  // Note: WebSocket errors are logged by websocketService.
+  // For specific UI feedback, websocketService could dispatch error actions to Redux.
 
   /**
    * Render loading state
@@ -296,7 +216,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
   /**
    * Render error state
    */
-  if (candlesError || wsError) {
+  if (candlesError) { // Removed wsError from condition
     return (
       <div className={`candlestick-chart ${className || ''}`}>
         <div style={{
@@ -311,7 +231,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
             Error loading chart data
           </div>
           {candlesError && <div style={{ fontSize: '14px' }}>API Error: {candlesError}</div>}
-          {wsError && <div style={{ fontSize: '14px' }}>WebSocket Error: {wsError}</div>}
+          {/* Removed wsError display */}
         </div>
       </div>
     );

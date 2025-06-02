@@ -1,9 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import {
   fetchOrderBook,
-  updateOrderBookFromWebSocket,
-  setOrderBookWsConnected, // Import new action
 } from '../../features/marketData/marketDataSlice';
 import './OrderBookDisplay.css';
 
@@ -29,98 +27,20 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     currentOrderBook,
     orderBookLoading,
     orderBookError,
-    orderBookWsConnected, // Use from Redux state
+    orderBookWsConnected,
   } = useAppSelector((state) => state.marketData);
 
-  // Local state for WebSocket and display configuration
-  // const [wsConnected, setWsConnected] = useState(false); // Remove local state
-  const [wsError, setWsError] = useState<string | null>(null); // Keep local for now
   const [displayDepth, setDisplayDepth] = useState(10);
-  const wsRef = useRef<WebSocket | null>(null);
 
-  /**
-   * Establish WebSocket connection for real-time order book updates.
-   *
-   * Closes any existing connection before creating a new one to prevent
-   * multiple connections for the same symbol.
-   *
-   * @param symbol - Trading symbol to subscribe to (e.g., 'BTCUSDT')
-   */
-  const connectWebSocket = useCallback((symbol: string) => {
-    // Close existing connection if any to prevent memory leaks
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL;
-    const wsUrl = `${wsBaseUrl}/ws/orderbook/${symbol}`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log(`WebSocket connected for ${symbol}`);
-      dispatch(setOrderBookWsConnected(true)); // Update Redux state
-      setWsError(null);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const orderBookData = JSON.parse(event.data);
-        dispatch(updateOrderBookFromWebSocket(orderBookData));
-      } catch (err) {
-        console.error('Failed to parse WebSocket message:', err);
-        setWsError('Failed to parse order book data');
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setWsError('WebSocket connection error');
-      dispatch(setOrderBookWsConnected(false)); // Update Redux state
-    };
-
-    ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
-      dispatch(setOrderBookWsConnected(false)); // Update Redux state
-      
-      // Attempt to reconnect if it wasn't a clean close and we still have a selected symbol
-      if (event.code !== 1000 && selectedSymbol) {
-        setTimeout(() => {
-          if (selectedSymbol) {
-            connectWebSocket(selectedSymbol);
-          }
-        }, 3000);
-      }
-    };
-
-    wsRef.current = ws;
-  }, [dispatch, selectedSymbol]);
-
-  // Effect to handle symbol changes and WebSocket connections
+  // Fetch initial order book data when symbol changes
   useEffect(() => {
     if (selectedSymbol) {
-      // Fetch initial order book data
       dispatch(fetchOrderBook(selectedSymbol));
-      
-      // Establish WebSocket connection
-      connectWebSocket(selectedSymbol);
-    } else {
-      // Close WebSocket if no symbol selected
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      dispatch(setOrderBookWsConnected(false)); // Update Redux state
-      setWsError(null);
     }
+  }, [selectedSymbol, dispatch]);
 
-    // Cleanup on unmount or symbol change
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, [selectedSymbol, dispatch, connectWebSocket]);
+  // Note: wsError state is not currently being set by websocketService.
+  // If specific UI feedback for WS errors is needed here, websocketService would need to propagate errors.
 
   // Format price and amount for display
   const formatPrice = (price: number): string => {
@@ -158,7 +78,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   }
 
   // Render error state
-  if (orderBookError || wsError) {
+  if (orderBookError) { // Removed wsError from condition
     return (
       <div className={`order-book-display ${className || ''}`}>
         <div className="order-book-header">
@@ -169,7 +89,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
         </div>
         <div className="error-state">
           <p className="error-message">
-            {orderBookError || wsError || 'Failed to load order book'}
+            {orderBookError || 'Failed to load order book'} {/* Removed wsError */}
           </p>
           {selectedSymbol && (
             <button
@@ -268,7 +188,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
                 {formatPrice(displayAsks[displayAsks.length - 1].price - displayBids[0].price)}
               </span>
               <span className="spread-percentage">
-                ({(((displayAsks[0].price - displayBids[0].price) / displayBids[0].price) * 100).toFixed(4)}%)
+                ({(((displayAsks[displayAsks.length - 1].price - displayBids[0].price) / displayBids[0].price) * 100).toFixed(4)}%)
               </span>
             </div>
           </div>

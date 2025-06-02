@@ -19,16 +19,16 @@ const activeWebSockets: WebSocketManager = {};
  * @param streamType - The type of stream ('candles' or 'orderbook').
  * @param timeframe - Optional, for 'candles' stream (e.g., '1m', '5m').
  */
-export const connectWebSocketStream = (
-  dispatch: AppDispatch, 
-  symbol: string, 
-  streamType: 'candles' | 'orderbook', 
+export const connectWebSocketStream = async (
+  dispatch: AppDispatch,
+  symbol: string,
+  streamType: 'candles' | 'orderbook',
   timeframe?: string
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
-  const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
-  const wsUrl = timeframe 
-    ? `${wsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}` 
+  const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000/api/v1';
+  const wsUrl = timeframe
+    ? `${wsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`
     : `${wsBaseUrl}/ws/${streamType}/${symbol}`;
 
   // Close existing connection for this stream type if it exists
@@ -36,6 +36,9 @@ export const connectWebSocketStream = (
     console.log(`Closing existing WebSocket for ${streamKey} before reconnecting.`);
     activeWebSockets[streamKey].close(1000, 'Client replacing connection'); // Use code 1000 for intentional closure
     delete activeWebSockets[streamKey];
+    
+    // Add a small delay to ensure the connection is properly closed
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   try {

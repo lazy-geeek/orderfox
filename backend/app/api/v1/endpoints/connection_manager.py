@@ -85,28 +85,23 @@ class ConnectionManager:
                 )
                 self._stop_streaming(
                     stream_key
-                )  # Stop task for this specific stream_key
+                )  # Cancels task and removes from self.streaming_tasks
 
-                # Retrieve stream_type BEFORE deleting from stream_key_types
                 retrieved_stream_type = self.stream_key_types.get(stream_key)
-
                 del self.active_connections[stream_key]
-                if stream_key in self.stream_key_types:
-                    del self.stream_key_types[stream_key]  # Clean up stored stream type
+                # Do NOT delete from self.stream_key_types[stream_key] here yet.
+                # It's needed for the "stop all tasks for base_symbol" logic below.
 
-                # Determine the base symbol for this stream_key
+                base_symbol = None
                 if retrieved_stream_type:
                     base_symbol = self._get_base_symbol_from_stream_key(
                         stream_key, retrieved_stream_type
                     )
                 else:
-                    # This case implies the stream_key might not have been properly registered with a type,
-                    # or was already cleaned up. Log a warning.
                     logger.warning(
-                        f"Could not retrieve stored stream_type for stream_key: {stream_key}. "
-                        f"This may lead to improper stream cleanup if it wasn't already handled."
+                        f"Could not retrieve stored stream_type for stream_key: {stream_key} upon disconnect. "
+                        f"This might affect comprehensive cleanup if it's the last stream for its base symbol."
                     )
-                    base_symbol = None  # Fallback to None if type is unknown
 
                 if base_symbol and base_symbol in self.symbol_active_streams:
                     self.symbol_active_streams[base_symbol].discard(stream_key)
@@ -114,91 +109,185 @@ class ConnectionManager:
                         f"Updated active streams for {base_symbol}: {self.symbol_active_streams[base_symbol]}"
                     )
 
-                    # Stop streaming task only if no more active streams for this base symbol
                     if not self.symbol_active_streams[base_symbol]:
                         logger.info(
-                            f"Stopping all streaming tasks for symbol {base_symbol} (no more active streams)"
+                            f"No more active specific streams for base_symbol {base_symbol}. "
+                            f"Ensuring all related streaming tasks are stopped and cleaning up types."
                         )
-                        # Iterate and stop all tasks associated with this base symbol
-                        tasks_to_stop = [
-                            task_stream_key
-                            for task_stream_key in self.streaming_tasks
-                            if self._get_base_symbol_from_stream_key(
-                                task_stream_key,
-                                self.stream_key_types.get(task_stream_key),
-                            )
+                        # Iterate over a copy of streaming_tasks keys, as _stop_streaming modifies the dict
+                        tasks_to_check_for_stop = list(self.streaming_tasks.keys())
+                        stopped_task_keys_for_base_symbol = []
+
+                        for task_key_iter in tasks_to_check_for_stop:
+                            # We need the type of task_key_iter to determine its base_symbol
+                            iter_task_type = self.stream_key_types.get(task_key_iter)
+                            if iter_task_type:
+                                iter_base_symbol = (
+                                    self._get_base_symbol_from_stream_key(
+                                        task_key_iter, iter_task_type
+                                    )
+                                )
+                                if iter_base_symbol == base_symbol:
+                                    logger.debug(
+                                        f"Stopping task {task_key_iter} as part of {base_symbol} cleanup."
+                                    )
+                                    self._stop_streaming(
+                                        task_key_iter
+                                    )  # Ensures it's cancelled and removed from streaming_tasks
+                                    stopped_task_keys_for_base_symbol.append(
+                                        task_key_iter
+                                    )
+                            else:
+                                logger.warning(
+                                    f"No type found for active task {task_key_iter} during {base_symbol} cleanup. Skipping."
+                                )
+
+                        # Now, clean up stream_key_types for all stream_keys associated with this base_symbol.
+                        # This includes the original stream_key and any others that were part of its group.
+                        logger.debug(
+                            f"Cleaning up stream_key_types for base_symbol: {base_symbol}"
+                        )
+                        related_stream_keys_for_type_cleanup = [
+                            s_key
+                            for s_key, s_type in list(
+                                self.stream_key_types.items()
+                            )  # Iterate over a copy
+                            if self._get_base_symbol_from_stream_key(s_key, s_type)
                             == base_symbol
                         ]
-                        for task_key in tasks_to_stop:
-                            self._stop_streaming(task_key)
-                        del self.symbol_active_streams[base_symbol]
-                else:
+                        for key_to_delete_type in related_stream_keys_for_type_cleanup:
+                            if key_to_delete_type in self.stream_key_types:
+                                logger.debug(
+                                    f"Deleting {key_to_delete_type} from stream_key_types."
+                                )
+                                del self.stream_key_types[key_to_delete_type]
+
+                        if (
+                            base_symbol in self.symbol_active_streams
+                        ):  # Check before deleting
+                            del self.symbol_active_streams[base_symbol]
+                        else:  # Should not happen if logic is correct, but good to log
+                            logger.warning(
+                                f"Attempted to delete {base_symbol} from symbol_active_streams, but it was already removed or not found."
+                            )
+                elif (
+                    base_symbol
+                ):  # base_symbol was determined, but not in symbol_active_streams
                     logger.warning(
-                        f"Could not determine base symbol or symbol not tracked for stream_key: {stream_key}"
+                        f"Base symbol {base_symbol} (from stream_key {stream_key}) not found in symbol_active_streams for cleanup."
                     )
-            else:
-                logger.debug(f"Stream {stream_key} still has active connections.")
-        else:
+                # else: base_symbol could not be determined, already logged.
+
+            else:  # Still active connections for this specific stream_key
+                logger.debug(
+                    f"Stream {stream_key} still has {len(self.active_connections[stream_key])} active connections."
+                )
+        else:  # stream_key not in self.active_connections
             logger.warning(
-                f"Attempted to disconnect from non-existent stream: {stream_key}"
+                f"Attempted to disconnect from non-existent or already cleaned stream: {stream_key}"
             )
 
     def _get_base_symbol_from_stream_key(
-        self, stream_key: str, stream_type: str
+        self, stream_key: str, stream_type: str | None  # Added | None
     ) -> str | None:
         """Helper to extract the base symbol from a stream_key."""
+        if not stream_type:  # Handle if stream_type is None
+            logger.debug(
+                f"Cannot determine base symbol for {stream_key} without stream_type."
+            )
+            return None
         if stream_type == "candles":
             parts = stream_key.split(":")
             if len(parts) >= 2:
                 return ":".join(parts[:-1])
         elif stream_type == "orderbook" or stream_type == "ticker":
-            return stream_key  # For orderbook/ticker, symbol is the stream_key
-        return None
+            return stream_key
+        logger.warning(
+            f"Unknown stream_type '{stream_type}' for stream_key '{stream_key}' in _get_base_symbol_from_stream_key."
+        )
+        return None  # Default for unknown types or if logic above fails
 
     async def broadcast_to_stream(self, stream_key: str, data: dict):
         """Broadcast data to all connections for a specific stream."""
         if stream_key in self.active_connections:
             disconnected = []
-            for connection in self.active_connections[stream_key]:
+            # Iterate over a copy of the list of connections, as self.disconnect can modify it
+            for connection in list(self.active_connections[stream_key]):
                 try:
                     await connection.send_text(json.dumps(data))
-                except Exception:
-                    # Connection is broken, mark for removal
+                except WebSocketDisconnect:
+                    logger.info(
+                        f"WebSocketDisconnect detected for a connection on stream {stream_key}. Marking for removal."
+                    )
+                    disconnected.append(connection)
+                except Exception as e:
+                    logger.error(
+                        f"Error sending to a connection on stream {stream_key}: {e}. Marking for removal."
+                    )
                     disconnected.append(connection)
 
             # Remove disconnected connections
             for connection in disconnected:
-                self.disconnect(connection, stream_key)
+                # Check if connection is still in the list before attempting to remove,
+                # as multiple errors or rapid disconnects could lead to it being already handled.
+                if (
+                    stream_key in self.active_connections
+                    and connection in self.active_connections[stream_key]
+                ):
+                    self.disconnect(connection, stream_key)
+                else:
+                    logger.debug(
+                        f"Connection for stream {stream_key} already removed, skipping redundant disconnect call."
+                    )
 
     async def _start_streaming(self, stream_key: str, stream_type: str):
         """Start streaming data for a stream key."""
+        if stream_key in self.streaming_tasks:  # Prevent duplicate tasks
+            logger.warning(
+                f"Streaming task for {stream_key} already exists. Not starting a new one."
+            )
+            return
+
         if stream_type == "orderbook":
             task = asyncio.create_task(self._stream_orderbook(stream_key))
         elif stream_type == "ticker":
             task = asyncio.create_task(self._stream_ticker(stream_key))
         elif stream_type == "candles":
-            # Extract symbol and timeframe from stream_key (format: "symbol:timeframe")
-            # Handle exchange symbols that may contain "/" (e.g., "BTC/USDT:1m")
             parts = stream_key.split(":")
             if len(parts) >= 2:
-                # Join all parts except the last one as symbol (handles "BTC/USDT:1m")
                 symbol = ":".join(parts[:-1])
                 timeframe = parts[-1]
             else:
-                raise ValueError(f"Invalid stream key format: {stream_key}")
+                logger.error(f"Invalid stream key format for candles: {stream_key}")
+                return  # Do not create task for invalid format
             task = asyncio.create_task(
                 self._stream_candles(symbol, timeframe, stream_key)
             )
         else:
-            raise ValueError(f"Unknown stream type: {stream_type}")
+            logger.error(
+                f"Unknown stream type: {stream_type} for stream_key: {stream_key}"
+            )
+            return  # Do not create task for unknown type
 
         self.streaming_tasks[stream_key] = task
+        logger.info(
+            f"Successfully started streaming task for {stream_key} (type: {stream_type})"
+        )
 
     def _stop_streaming(self, stream_key: str):
-        """Stop streaming data for a stream key."""
+        """Stop streaming data for a stream key. Cancels the task and removes it from tracking."""
         if stream_key in self.streaming_tasks:
-            self.streaming_tasks[stream_key].cancel()
+            logger.info(f"Cancelling and removing streaming task for {stream_key}")
+            try:
+                self.streaming_tasks[stream_key].cancel()
+            except Exception as e:  # Catch potential errors during cancellation
+                logger.error(f"Error cancelling task for {stream_key}: {e}")
             del self.streaming_tasks[stream_key]
+        else:
+            # This might be normal if a task was already stopped by another path (e.g. base_symbol cleanup)
+            logger.debug(
+                f"Attempted to stop streaming task for {stream_key}, but it was not found in streaming_tasks (possibly already stopped)."
+            )
 
     # Keep backward compatibility for existing orderbook methods
     async def connect_orderbook(

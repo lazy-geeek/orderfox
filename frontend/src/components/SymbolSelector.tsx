@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store/store';
-import { fetchSymbols, setSelectedSymbol } from '../features/marketData/marketDataSlice';
+import { fetchSymbols, changeSelectedSymbol } from '../features/marketData/marketDataSlice';
 
 interface SymbolSelectorProps {
   className?: string;
@@ -24,8 +24,8 @@ const SymbolSelector: React.FC<SymbolSelectorProps> = ({ className }) => {
   const handleSymbolChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedValue = event.target.value;
     
-    // Dispatch action to update selected symbol in Redux state
-    dispatch(setSelectedSymbol(selectedValue));
+    // Use the new centralized symbol change function that handles WebSocket cleanup
+    dispatch(changeSelectedSymbol(selectedValue || null));
     
     // Log the selected symbol to console as requested
     const selectedSymbolData = symbolsList.find(symbol => symbol.id === selectedValue);

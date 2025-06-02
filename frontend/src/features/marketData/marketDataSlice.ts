@@ -269,7 +269,7 @@ export const startCandlesWebSocket = createAsyncThunk<
 >(
   'marketData/startCandlesWebSocket',
   async ({ symbol, timeframe }, { dispatch }) => {
-    connectWebSocketStream(dispatch, symbol, 'candles', timeframe);
+    await connectWebSocketStream(dispatch, symbol, 'candles', timeframe);
   }
 );
 
@@ -291,7 +291,7 @@ export const startOrderBookWebSocket = createAsyncThunk<
 >(
   'marketData/startOrderBookWebSocket',
   async ({ symbol }, { dispatch }) => {
-    connectWebSocketStream(dispatch, symbol, 'orderbook');
+    await connectWebSocketStream(dispatch, symbol, 'orderbook');
   }
 );
 
@@ -323,10 +323,16 @@ const marketDataSlice = createSlice({
   initialState,
   reducers: {
     setSelectedSymbol: (state, action: PayloadAction<string | null>) => {
+      const previousSymbol = state.selectedSymbol;
       state.selectedSymbol = action.payload;
-      // When symbol changes, clear current data and stop all existing WS
-      state.currentOrderBook = null;
-      state.currentCandles = [];
+      
+      // When symbol changes, clear current data
+      if (previousSymbol !== action.payload) {
+        state.currentOrderBook = null;
+        state.currentCandles = [];
+        state.candlesWsConnected = false;
+        state.orderBookWsConnected = false;
+      }
     },
     setSelectedTimeframe: (state, action: PayloadAction<string>) => {
       state.selectedTimeframe = action.payload;
@@ -341,19 +347,30 @@ const marketDataSlice = createSlice({
     updateOrderBookFromWebSocket: (state, action: PayloadAction<any>) => {
       const validatedOrderBook = validateOrderBook(action.payload);
       if (validatedOrderBook) {
-        state.currentOrderBook = validatedOrderBook;
+        // Only update if the symbol matches the currently selected symbol
+        if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
+          state.currentOrderBook = validatedOrderBook;
+        } else {
+          console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
+        }
       } else {
         console.warn('Received invalid order book from WebSocket, skipping update:', action.payload);
       }
     },
-    updateCandlesFromWebSocket: (state, action: PayloadAction<Candle>) => {
-      const incomingCandle = action.payload;
+    updateCandlesFromWebSocket: (state, action: PayloadAction<any>) => {
+      const incomingData = action.payload;
+
+      // Check if the candle data is for the currently selected symbol
+      if (state.selectedSymbol && incomingData.symbol && incomingData.symbol !== state.selectedSymbol) {
+        console.warn('Received candle for different symbol, skipping update:', incomingData.symbol, 'vs', state.selectedSymbol);
+        return;
+      }
 
       // Validate the incoming candle before processing
-      const [newCandle] = validateAndFilterCandles([incomingCandle]);
+      const [newCandle] = validateAndFilterCandles([incomingData]);
       
       if (!newCandle) {
-        console.warn('Received invalid candle from WebSocket, skipping update:', incomingCandle);
+        console.warn('Received invalid candle from WebSocket, skipping update:', incomingData);
         return; // Skip update if the candle is invalid
       }
 
@@ -486,6 +503,50 @@ export const cleanupMarketDataStreams = createAsyncThunk<
       dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
     }
     dispatch(stopAllWebSockets()); // Ensure all are closed
+  }
+);
+
+// New thunk to handle symbol changes with proper cleanup
+export const changeSelectedSymbol = createAsyncThunk<
+  void,
+  string | null,
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/changeSelectedSymbol',
+  async (newSymbol, { dispatch, getState }) => {
+    const { selectedSymbol: currentSymbol, selectedTimeframe } = getState().marketData;
+    
+    // If switching to the same symbol, do nothing
+    if (currentSymbol === newSymbol) {
+      return;
+    }
+    
+    // Immediately clear old data to prevent mixing
+    dispatch(setSelectedSymbol(newSymbol));
+    
+    // First, cleanup existing connections
+    if (currentSymbol) {
+      console.log(`Cleaning up WebSocket connections for ${currentSymbol}`);
+      await dispatch(stopCandlesWebSocket({ symbol: currentSymbol, timeframe: selectedTimeframe }));
+      await dispatch(stopOrderBookWebSocket({ symbol: currentSymbol }));
+      
+      // Wait a bit to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    // If new symbol is selected, start new connections and fetch data
+    if (newSymbol) {
+      console.log(`Starting WebSocket connections for ${newSymbol}`);
+      
+      // Fetch initial data
+      dispatch(fetchCandles({ symbol: newSymbol, timeframe: selectedTimeframe, limit: 100 }));
+      dispatch(fetchOrderBook(newSymbol));
+      
+      // Start WebSocket connections with a small delay to ensure data is fetched first
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await dispatch(startCandlesWebSocket({ symbol: newSymbol, timeframe: selectedTimeframe }));
+      await dispatch(startOrderBookWebSocket({ symbol: newSymbol }));
+    }
   }
 );
 
