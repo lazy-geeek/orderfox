@@ -133,7 +133,11 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
 
   // Get sliced bids and asks based on display depth with proper null safety
   const displayBids = currentOrderBook?.bids ? currentOrderBook.bids.slice(0, displayDepth) : [];
-  const displayAsks = currentOrderBook?.asks ? currentOrderBook.asks.slice(0, displayDepth) : [];
+  // Asks are typically sorted ascending by price, but displayed descending (highest price at top, lowest at bottom)
+  // To achieve "lowest value at the bottom" as per the task, we sort ascending and then reverse for display.
+  const displayAsks = currentOrderBook?.asks
+    ? [...currentOrderBook.asks].slice(0, displayDepth).reverse()
+    : [];
 
   // Render loading state
   if (orderBookLoading && !currentOrderBook) {
@@ -261,7 +265,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
             <div className="spread-info">
               <span className="spread-label">Spread:</span>
               <span className="spread-value">
-                {formatPrice(displayAsks[0].price - displayBids[0].price)}
+                {formatPrice(displayAsks[displayAsks.length - 1].price - displayBids[0].price)}
               </span>
               <span className="spread-percentage">
                 ({(((displayAsks[0].price - displayBids[0].price) / displayBids[0].price) * 100).toFixed(4)}%)
