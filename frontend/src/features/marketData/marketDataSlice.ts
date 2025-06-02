@@ -370,6 +370,8 @@ const marketDataSlice = createSlice({
         if (state.currentCandles.length > 100) {
           state.currentCandles = state.currentCandles.slice(-100);
         }
+        // Ensure candles are always sorted by timestamp
+        state.currentCandles.sort((a, b) => a.timestamp - b.timestamp);
       }
     },
     setCandlesWsConnected: (state, action: PayloadAction<boolean>) => {

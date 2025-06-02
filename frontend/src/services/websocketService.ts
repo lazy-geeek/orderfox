@@ -33,8 +33,8 @@ export const connectWebSocketStream = (
 
   // Close existing connection for this stream type if it exists
   if (activeWebSockets[streamKey]) {
-    console.log(`Closing existing WebSocket for ${streamKey}`);
-    activeWebSockets[streamKey].close();
+    console.log(`Closing existing WebSocket for ${streamKey} before reconnecting.`);
+    activeWebSockets[streamKey].close(1000, 'Client replacing connection'); // Use code 1000 for intentional closure
     delete activeWebSockets[streamKey];
   }
 

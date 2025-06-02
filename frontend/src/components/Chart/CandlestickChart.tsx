@@ -172,8 +172,10 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
     if (!selectedSymbol || !selectedTimeframe) return;
 
     // Close existing connection
-    if (wsRef.current && wsRef.current.close) {
-      wsRef.current.close();
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      console.log(`connectWebSocket: Closing existing WebSocket for ${selectedSymbol}/${selectedTimeframe} with code 1000 before creating new one`);
+      wsRef.current.close(1000, 'New connection requested');
+      wsRef.current = null; // Clear ref immediately
     }
 
     const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000';
@@ -264,8 +266,9 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ className }) => {
     // Cleanup on unmount or dependency change
     return () => {
       if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null; // Clear ref on close
+        console.log(`useEffect cleanup: Closing WebSocket for previous state with code 1000`);
+        wsRef.current.close(1000, 'Component re-rendering or unmounting');
+        wsRef.current = null;
       }
     };
   }, [selectedSymbol, selectedTimeframe, connectWebSocket]);
