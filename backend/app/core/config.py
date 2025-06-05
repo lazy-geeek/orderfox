@@ -43,19 +43,12 @@ class Settings:
 
     def __init__(self):
         """Initialize settings and validate required environment variables."""
-        # Enhanced validation with better logging
+        self.BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+        self.BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
         if not self.BINANCE_API_KEY:
             print("Warning: BINANCE_API_KEY not found in environment variables")
-            print(
-                f"Available env vars: {[k for k in os.environ.keys() if 'BINANCE' in k]}"
-            )
-        else:
-            print(f"BINANCE_API_KEY loaded: {self.BINANCE_API_KEY[:8]}...")
-
         if not self.BINANCE_SECRET_KEY:
             print("Warning: BINANCE_SECRET_KEY not found in environment variables")
-        else:
-            print(f"BINANCE_SECRET_KEY loaded: {self.BINANCE_SECRET_KEY[:8]}...")
 
 
 # Create global settings instance

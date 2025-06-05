@@ -61,6 +61,8 @@ class TestSettingsClass:
             "API_V1_STR": "/api/v1",
             "PROJECT_NAME": "Trading Bot API",
             "DEBUG": "False",
+            "BINANCE_API_KEY": None,
+            "BINANCE_SECRET_KEY": None,
             "FIREBASE_CONFIG_JSON": None,
         }.get(key, default)
 
@@ -73,8 +75,14 @@ class TestSettingsClass:
         print_calls = [call[0][0] for call in mock_print.call_args_list]
 
         # Assert that specific warning messages are present
-        assert any("BINANCE_API_KEY not found" in call for call in print_calls)
-        assert any("BINANCE_SECRET_KEY not found" in call for call in print_calls)
+        assert any(
+            "Warning: BINANCE_API_KEY not found in environment variables" in call
+            for call in print_calls
+        )
+        assert any(
+            "Warning: BINANCE_SECRET_KEY not found in environment variables" in call
+            for call in print_calls
+        )
 
     def test_settings_class_can_be_instantiated_multiple_times(self):
         """Test that Settings class can be instantiated multiple times."""

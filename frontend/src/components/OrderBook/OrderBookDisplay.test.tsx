@@ -53,20 +53,20 @@ describe('OrderBookDisplay', () => {
     
     renderOrderBookDisplay(store);
     // Wait for the async action (fetchOrderBook) to complete
-    await screen.findByText('50000'); // Wait for a bid price to appear
+    await screen.findByText('50000.00'); // Wait for a bid price to appear
 
     expect(screen.getByText('BTCUSDT')).toBeInTheDocument();
-    expect(screen.getByText('50000')).toBeInTheDocument();
-    expect(screen.getByText('50001')).toBeInTheDocument();
+    expect(screen.getByText('50000.00')).toBeInTheDocument();
+    expect(screen.getByText('50001.00')).toBeInTheDocument();
     // Check for bids amounts and totals
     // Query for elements with class 'amount' and 'total' specifically
-    const bid50000Amount = screen.getByText('1.5', { selector: '.bid-level .amount' });
-    const bid50000Total = screen.getByText('1.5', { selector: '.bid-level .total' });
+    const bid50000Amount = screen.getByText('1.50', { selector: '.bid-level .amount' });
+    const bid50000Total = screen.getByText('1.50', { selector: '.bid-level .total' });
     expect(bid50000Amount).toBeInTheDocument();
     expect(bid50000Total).toBeInTheDocument();
 
-    const bid49999Amount = screen.getByText('2', { selector: '.bid-level .amount' });
-    const bid49999Total = screen.getByText('3.5', { selector: '.bid-level .total' }); // 1.5 + 2.0
+    const bid49999Amount = screen.getByText('2.00', { selector: '.bid-level .amount' });
+    const bid49999Total = screen.getByText('3.50', { selector: '.bid-level .total' }); // 1.5 + 2.0
     expect(bid49999Amount).toBeInTheDocument();
     expect(bid49999Total).toBeInTheDocument();
 
@@ -75,18 +75,18 @@ describe('OrderBookDisplay', () => {
     // The total for 50003 is 0.5
     // The total for 50002 is 0.5 + 1.8 = 2.3
     // The total for 50001 is 0.5 + 1.8 + 1.2 = 3.5
-    const ask50003Amount = screen.getByText('0.5', { selector: '.ask-level .amount' });
-    const ask50003Total = screen.getByText('0.5', { selector: '.ask-level .total' });
+    const ask50003Amount = screen.getByText('0.50', { selector: '.ask-level .amount' });
+    const ask50003Total = screen.getByText('0.50', { selector: '.ask-level .total' });
     expect(ask50003Amount).toBeInTheDocument();
     expect(ask50003Total).toBeInTheDocument();
 
-    const ask50002Amount = screen.getByText('1.8', { selector: '.ask-level .amount' });
-    const ask50002Total = screen.getByText('2.3', { selector: '.ask-level .total' });
+    const ask50002Amount = screen.getByText('1.80', { selector: '.ask-level .amount' });
+    const ask50002Total = screen.getByText('2.30', { selector: '.ask-level .total' });
     expect(ask50002Amount).toBeInTheDocument();
     expect(ask50002Total).toBeInTheDocument();
 
-    const ask50001Amount = screen.getByText('1.2', { selector: '.ask-level .amount' });
-    const ask50001Total = screen.getByText('3.5', { selector: '.ask-level .total' });
+    const ask50001Amount = screen.getByText('1.20', { selector: '.ask-level .amount' });
+    const ask50001Total = screen.getByText('3.50', { selector: '.ask-level .total' });
     expect(ask50001Amount).toBeInTheDocument();
     expect(ask50001Total).toBeInTheDocument();
   });
@@ -114,7 +114,7 @@ describe('OrderBookDisplay', () => {
     await screen.findByText('Spread:');
 
     expect(screen.getByText('Spread:')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument(); // spread value
+    expect(screen.getByText('1.00')).toBeInTheDocument(); // spread value
   });
 
   it('renders depth selector with default value', async () => {
@@ -180,7 +180,7 @@ describe('OrderBookDisplay', () => {
     
     renderOrderBookDisplay(store);
     // Wait for the async action (fetchOrderBook) to complete
-    await screen.findByText('50003'); // Wait for an ask price to appear
+    await screen.findByText('50003.00'); // Wait for an ask price to appear
 
     // Query for all elements that display an ask price
     // Query for all elements that display an ask price using text content and then filter by class
@@ -192,7 +192,7 @@ describe('OrderBookDisplay', () => {
     // Expect the displayed asks to be in descending order of price (highest at top, lowest at bottom)
     // The original asks array is [50001, 50002, 50003] (lowest to highest)
     // After reverse and slice, it should be [50003, 50002, 50001] for display
-    expect(displayedAskPrices).toEqual([50003, 50002, 50001]);
+    expect(displayedAskPrices).toEqual([50003.00, 50002.00, 50001.00]);
   });
 
   describe('Order Book Aggregation Logic', () => {
@@ -235,11 +235,11 @@ describe('OrderBookDisplay', () => {
 
       // Should aggregate amounts: 1.0 + 2.0 = 3.0 for bids at 100.1
       expect(screen.getByText('100.1')).toBeInTheDocument();
-      expect(screen.getByText('3', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('3.00', { selector: '.bid-level .amount' })).toBeInTheDocument();
       
       // Should aggregate amounts: 1.0 + 2.0 = 3.0 for asks at 101.1
       expect(screen.getByText('101.1')).toBeInTheDocument();
-      expect(screen.getByText('3', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('3.00', { selector: '.ask-level .amount' })).toBeInTheDocument();
     });
     it('returns raw data when selectedRounding is null', async () => {
       const mockOrderBook = {
@@ -267,13 +267,13 @@ describe('OrderBookDisplay', () => {
       });
       
       renderOrderBookDisplay(store);
-      await screen.findByText('50000.123'); // Wait for raw price to appear
+      await screen.findByText('50000.12', { selector: '.bid-price' }); // Wait for formatted price to appear
 
-      // Should display raw prices without aggregation
-      expect(screen.getByText('50000.123')).toBeInTheDocument();
-      expect(screen.getByText('49999.456')).toBeInTheDocument();
-      expect(screen.getByText('50001.789')).toBeInTheDocument();
-      expect(screen.getByText('50002.012')).toBeInTheDocument();
+      // Should display raw prices formatted to 2 decimal places
+      expect(screen.getByText('50000.12', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('49999.46', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('50001.79', { selector: '.ask-price' })).toBeInTheDocument();
+      expect(screen.getByText('50002.01', { selector: '.ask-price' })).toBeInTheDocument();
     });
 
     it('returns empty structure when currentOrderBook is null', async () => {
@@ -338,15 +338,15 @@ describe('OrderBookDisplay', () => {
       // Should aggregate amounts for same rounded price levels
       // 50000.15 and 50000.19 both round down to 50000.1, so amounts should be 1.0 + 2.0 = 3.0
       expect(screen.getByText('50000.1')).toBeInTheDocument();
-      expect(screen.getByText('3', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('3.00', { selector: '.bid-level .amount' })).toBeInTheDocument();
       
       // 50000.05 rounds down to 50000.0
-      expect(screen.getByText('50000')).toBeInTheDocument();
-      expect(screen.getByText('1.5', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('50000.0', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('1.50', { selector: '.bid-level .amount' })).toBeInTheDocument();
       
       // 49999.95 rounds down to 49999.9
       expect(screen.getByText('49999.9')).toBeInTheDocument();
-      expect(screen.getByText('0.5', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('0.50', { selector: '.bid-level .amount' })).toBeInTheDocument();
     });
 
     it('aggregates asks correctly by rounding up', async () => {
@@ -387,15 +387,15 @@ describe('OrderBookDisplay', () => {
       // Should aggregate amounts for same rounded price levels
       // 50001.05 and 50001.01 both round up to 50001.1, so amounts should be 1.0 + 2.0 = 3.0
       expect(screen.getByText('50001.1')).toBeInTheDocument();
-      expect(screen.getByText('3', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('3.00', { selector: '.ask-level .amount' })).toBeInTheDocument();
       
       // 50001.15 rounds up to 50001.2
       expect(screen.getByText('50001.2')).toBeInTheDocument();
-      expect(screen.getByText('1.5', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('1.50', { selector: '.ask-level .amount' })).toBeInTheDocument();
       
       // 50002.05 rounds up to 50002.1
       expect(screen.getByText('50002.1')).toBeInTheDocument();
-      expect(screen.getByText('0.5', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('0.50', { selector: '.ask-level .amount' })).toBeInTheDocument();
     });
 
     it('sorts aggregated bids by price descending', async () => {
@@ -521,12 +521,12 @@ describe('OrderBookDisplay', () => {
       await screen.findByText('50000'); // Wait for aggregated price to appear
 
       // All bids should aggregate to 50000 (rounded down)
-      expect(screen.getByText('50000')).toBeInTheDocument();
-      expect(screen.getByText('4.5', { selector: '.bid-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0 + 1.5
+      expect(screen.getByText('50000', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('4.50', { selector: '.bid-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0 + 1.5
 
       // All asks should aggregate to 50002 (rounded up)
-      expect(screen.getByText('50002')).toBeInTheDocument();
-      expect(screen.getByText('4.5', { selector: '.ask-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0 + 1.5
+      expect(screen.getByText('50002', { selector: '.ask-price' })).toBeInTheDocument();
+      expect(screen.getByText('4.50', { selector: '.ask-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0 + 1.5
     });
 
     it('handles prices that are exact multiples of rounding factor', async () => {
@@ -555,30 +555,43 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
+          tickSize: 0.1,
           pricePrecision: 1
         }],
-        currentOrderBook: mockOrderBook,
+        currentOrderBook: {
+          ...mockOrderBook,
+          bids: mockOrderBook.bids.map((bid: {price: number, amount: number}) => ({
+            price: parseFloat(bid.price.toFixed(6)),
+            amount: bid.amount
+          })),
+          asks: mockOrderBook.asks.map((ask: {price: number, amount: number}) => ({
+            price: parseFloat(ask.price.toFixed(6)),
+            amount: ask.amount
+          }))
+        },
         selectedRounding: 0.1,
         availableRoundingOptions: [0.1, 1, 10],
         orderBookLoading: false,
+        orderBookWsConnected: false,
+        shouldRestartWebSocketAfterFetch: false
       });
       
       renderOrderBookDisplay(store);
       await screen.findByText('50000.1'); // Wait for aggregated price to appear
 
       // Bids: 50000.0 (1.0 + 1.5 = 2.5), 50000.1 (2.0)
-      expect(screen.getByText('50000')).toBeInTheDocument();
-      expect(screen.getByText('2.5', { selector: '.bid-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('50000.1')).toBeInTheDocument();
-      expect(screen.getByText('2', { selector: '.bid-level .amount' })).toBeInTheDocument();
+     // Bids: 50000.0 (1.0 + 1.5 = 2.5), 50000.1 (2.0)
+     expect(screen.getByText('50000.0', { selector: '.bid-price' })).toBeInTheDocument();
+     expect(screen.getByText('2.50', { selector: '.bid-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('50000.1', { selector: '.bid-price' })).toBeInTheDocument();
+     expect(screen.getByText('2.00', { selector: '.bid-level .amount' })).toBeInTheDocument();
 
-      // Asks: 50001.0 (1.0), 50001.1 (2.0 + 1.5 = 3.5)
-      expect(screen.getByText('50001')).toBeInTheDocument();
-      expect(screen.getByText('1', { selector: '.ask-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('50001.1')).toBeInTheDocument();
-      expect(screen.getByText('3.5', { selector: '.ask-level .amount' })).toBeInTheDocument();
-    });
+     // Asks: 50001.0 (1.0), 50001.1 (2.0 + 1.5 = 3.5)
+     expect(screen.getByText('50001.0', { selector: '.ask-price' })).toBeInTheDocument();
+     expect(screen.getByText('1.00', { selector: '.ask-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('50001.1', { selector: '.ask-price' })).toBeInTheDocument();
+     expect(screen.getByText('3.50', { selector: '.ask-level .amount' })).toBeInTheDocument();
+   });
 
     it('handles empty bids and asks arrays', async () => {
       const mockOrderBook = {
@@ -598,13 +611,25 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
+          tickSize: 0.1,
           pricePrecision: 1
         }],
-        currentOrderBook: mockOrderBook,
+        currentOrderBook: {
+          ...mockOrderBook,
+          bids: mockOrderBook.bids.map((bid: {price: number, amount: number}) => ({
+            price: parseFloat(bid.price.toFixed(6)),
+            amount: bid.amount
+          })),
+          asks: mockOrderBook.asks.map((ask: {price: number, amount: number}) => ({
+            price: parseFloat(ask.price.toFixed(6)),
+            amount: ask.amount
+          }))
+        },
         selectedRounding: 0.1,
         availableRoundingOptions: [0.1, 1, 10],
         orderBookLoading: false,
+        orderBookWsConnected: false,
+        shouldRestartWebSocketAfterFetch: false
       });
       
       renderOrderBookDisplay(store);
@@ -661,23 +686,22 @@ describe('OrderBookDisplay', () => {
       await screen.findByText('50000.1'); // Wait for aggregated price to appear
 
       // Verify the aggregated bid prices and amounts (sorted descending)
-      expect(screen.getByText('50000.1')).toBeInTheDocument(); // aggregated from 50000.15 + 50000.19
-      expect(screen.getByText('3', { selector: '.bid-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0
-      expect(screen.getByText('49999.9')).toBeInTheDocument();
-      expect(screen.getByText('1.5', { selector: '.bid-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('49998.8')).toBeInTheDocument();
-      expect(screen.getByText('0.8', { selector: '.bid-level .amount' })).toBeInTheDocument();
-      
-      // Verify the aggregated ask prices and amounts (displayed in reverse order: highest first)
-      expect(screen.getByText('50004.4')).toBeInTheDocument(); // highest displayed ask
-      expect(screen.getByText('0.5', { selector: '.ask-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('50003.3')).toBeInTheDocument();
-      expect(screen.getByText('0.8', { selector: '.ask-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('50002.2')).toBeInTheDocument();
-      expect(screen.getByText('1.5', { selector: '.ask-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('50001.1')).toBeInTheDocument(); // aggregated from 50001.05 + 50001.01
-      expect(screen.getByText('3', { selector: '.ask-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0
-    });
+      expect(screen.getByText('3.00', { selector: '.bid-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0 aggregated
+     expect(screen.getByText('49999.9')).toBeInTheDocument();
+     expect(screen.getByText('1.50', { selector: '.bid-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('49998.8')).toBeInTheDocument();
+     expect(screen.getByText('0.80', { selector: '.bid-level .amount' })).toBeInTheDocument();
+     
+     // Verify the aggregated ask prices and amounts (displayed in reverse order: highest first)
+     expect(screen.getByText('50004.4')).toBeInTheDocument(); // highest displayed ask
+     expect(screen.getByText('0.50', { selector: '.ask-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('50003.3')).toBeInTheDocument();
+     expect(screen.getByText('0.80', { selector: '.ask-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('50002.2')).toBeInTheDocument();
+     expect(screen.getByText('1.50', { selector: '.ask-level .amount' })).toBeInTheDocument();
+     expect(screen.getByText('50001.1')).toBeInTheDocument(); // aggregated from 50001.05 + 50001.01
+     expect(screen.getByText('3.00', { selector: '.ask-level .amount' })).toBeInTheDocument(); // 1.0 + 2.0
+   });
 
     it('displays raw data when selectedRounding is null (no aggregation)', async () => {
       const mockOrderBook = {
@@ -708,23 +732,18 @@ describe('OrderBookDisplay', () => {
       
       renderOrderBookDisplay(store);
 
-      // Wait for raw price to appear using findBy which handles async
-      // Wait for any price to appear first as indicator of rendering completion
-      await screen.findByText(/\d+\.\d+/, { selector: '.price' });
-      // Then verify specific prices
-      expect(screen.getByText('50000.123')).toBeInTheDocument();
-
       // Verify that raw prices are displayed without aggregation
-      expect(screen.getByText('50000.123')).toBeInTheDocument();
-      expect(screen.getByText('49999.456')).toBeInTheDocument();
-      expect(screen.getByText('50001.234')).toBeInTheDocument();
-      expect(screen.getByText('50002.567')).toBeInTheDocument();
+      await screen.findByText('50000.12', { selector: '.bid-price' });
+      expect(screen.getByText('50000.12', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('49999.46', { selector: '.bid-price' })).toBeInTheDocument();
+      expect(screen.getByText('50001.23', { selector: '.ask-price' })).toBeInTheDocument();
+      expect(screen.getByText('50002.57', { selector: '.ask-price' })).toBeInTheDocument();
       
       // Verify that raw amounts are displayed
-      expect(screen.getByText('1.5', { selector: '.bid-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('2', { selector: '.bid-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('1.2', { selector: '.ask-level .amount' })).toBeInTheDocument();
-      expect(screen.getByText('1.8', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('1.50', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('2.00', { selector: '.bid-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('1.20', { selector: '.ask-level .amount' })).toBeInTheDocument();
+      expect(screen.getByText('1.80', { selector: '.ask-level .amount' })).toBeInTheDocument();
     });
 
     it('respects displayDepth setting when using aggregated data', async () => {
@@ -1362,7 +1381,7 @@ describe('OrderBookDisplay', () => {
       expect(screen.getByText('23.00', { selector: '.bid-level .total' })).toBeInTheDocument();
 
       // Verify single aggregated ask level
-      expect(screen.getByText('102')).toBeInTheDocument();
+      expect(screen.getByText('102', { selector: '.ask-price' })).toBeInTheDocument();
       expect(screen.getByText('23.00', { selector: '.ask-level .amount' })).toBeInTheDocument();
       expect(screen.getByText('23.00', { selector: '.ask-level .total' })).toBeInTheDocument();
     });
