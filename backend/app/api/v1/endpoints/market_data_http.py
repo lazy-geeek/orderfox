@@ -137,13 +137,14 @@ async def get_symbols():
 
             symbols.append(
                 SymbolInfo(
+                    id=market["id"],
                     symbol=market["symbol"],
-                    baseAsset=market["base"],
-                    quoteAsset=market["quote"],
-                    exchange="binance",
+                    base_asset=market["base"],
+                    quote_asset=market["quote"],
+                    ui_name=f"{market['base']}/{market['quote']}",
+                    volume24h=volume24h,
                     pricePrecision=price_precision,
                     tickSize=tick_size,
-                    volume24h=volume24h,
                 )
             )
 

@@ -26,10 +26,6 @@ const SymbolSelector: React.FC<SymbolSelectorProps> = ({ className }) => {
     
     // Use the new centralized symbol change function that handles WebSocket cleanup
     dispatch(changeSelectedSymbol(selectedValue || null));
-    
-    // Log the selected symbol to console as requested
-    const selectedSymbolData = symbolsList.find(symbol => symbol.id === selectedValue);
-    console.log('Selected symbol:', selectedSymbolData);
   };
 
   if (symbolsLoading) {

@@ -26,32 +26,37 @@ class SymbolInfo(BaseModel):
     available on the exchange.
     """
 
-    symbol: str = Field(..., description="Trading symbol, e.g., BTC/USDT")
-    baseAsset: str = Field(..., description="Base asset, e.g., BTC")
-    quoteAsset: str = Field(..., description="Quote asset, e.g., USDT")
-    exchange: str = Field(..., description="Exchange name, e.g., binance")
+    id: str = Field(..., description="Unique identifier for the symbol")
+    symbol: str = Field(..., description="Trading symbol (e.g., 'BTCUSDT')")
+    base_asset: str = Field(..., description="Base asset (e.g., 'BTC')")
+    quote_asset: str = Field(..., description="Quote asset (e.g., 'USDT')")
+    ui_name: str = Field(
+        ..., description="User-friendly display name (e.g., 'BTC/USDT')"
+    )
+    volume24h: Optional[float] = Field(
+        None, description="24-hour trading volume in quote currency"
+    )
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
     )
     tickSize: Optional[float] = Field(
         None, description="Smallest price increment for the symbol"
     )
-    volume24h: Optional[float] = Field(
-        None, description="24-hour trading volume in quote currency", ge=0
-    )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        populate_by_name=True,
+        alias_generator=to_camel,
+        json_schema_extra={
             "example": {
-                "symbol": "BTC/USDT",
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT:USDT",
                 "baseAsset": "BTC",
                 "quoteAsset": "USDT",
-                "exchange": "binance",
-                "pricePrecision": 8,
-                "tickSize": 0.00000001,
+                "uiName": "BTC/USDT",
                 "volume24h": 1234567.89,
             }
-        }
+        },
+    )
 
 
 class OrderBookLevel(BaseModel):
