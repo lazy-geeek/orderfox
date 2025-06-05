@@ -17,49 +17,96 @@ class TestSymbolInfo:
     def test_symbol_info_valid_creation(self):
         """Test expected use: creating a valid SymbolInfo instance."""
         symbol_data = {
-            "id": "BTCUSDT",
-            "symbol": "BTCUSDT",
-            "base_asset": "BTC",
-            "quote_asset": "USDT",
-            "ui_name": "BTC/USDT",
+            "symbol": "BTC/USDT",
+            "baseAsset": "BTC",
+            "quoteAsset": "USDT",
+            "exchange": "binance",
+            "pricePrecision": 8,
+            "tickSize": 0.00000001,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
 
-        assert symbol_info.id == "BTCUSDT"
-        assert symbol_info.symbol == "BTCUSDT"
-        assert symbol_info.base_asset == "BTC"
-        assert symbol_info.quote_asset == "USDT"
+        assert symbol_info.symbol == "BTC/USDT"
+        assert symbol_info.baseAsset == "BTC"
+        assert symbol_info.quoteAsset == "USDT"
+        assert symbol_info.exchange == "binance"
+        assert symbol_info.pricePrecision == 8
+        assert symbol_info.tickSize == 0.00000001
+        assert isinstance(symbol_info.pricePrecision, int)
+        assert isinstance(symbol_info.tickSize, float)
+
+    def test_symbol_info_with_optional_fields_none(self):
+        """Test valid creation when pricePrecision and tickSize are not provided."""
+        symbol_data = {
+            "symbol": "ETH/USDT",
+            "baseAsset": "ETH",
+            "quoteAsset": "USDT",
+            "exchange": "coinbase",
+        }
+        symbol_info = SymbolInfo(**symbol_data)
+        assert symbol_info.pricePrecision is None
+        assert symbol_info.tickSize is None
 
     def test_symbol_info_edge_case_long_names(self):
-        """Test edge case: symbols with very long names."""
+        """Test edge case: symbols with very long names and new fields."""
         symbol_data = {
-            "id": "VERYLONGCRYPTOCURRENCYNAMEUSDT",
-            "symbol": "VERYLONGCRYPTOCURRENCYNAMEUSDT",
-            "base_asset": "VERYLONGCRYPTOCURRENCYNAME",
-            "quote_asset": "USDT",
-            "ui_name": "VERYLONGCRYPTOCURRENCYNAME/USDT",
+            "symbol": "VERYLONGCRYPTOCURRENCYNAME/USDT",
+            "baseAsset": "VERYLONGCRYPTOCURRENCYNAME",
+            "quoteAsset": "USDT",
+            "exchange": "LONGCURRENCYEXCHANGE",
+            "pricePrecision": 2,
+            "tickSize": 0.1,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
 
-        assert symbol_info.id == "VERYLONGCRYPTOCURRENCYNAMEUSDT"
-        assert symbol_info.base_asset == "VERYLONGCRYPTOCURRENCYNAME"
+        assert symbol_info.symbol == "VERYLONGCRYPTOCURRENCYNAME/USDT"
+        assert symbol_info.baseAsset == "VERYLONGCRYPTOCURRENCYNAME"
+        assert symbol_info.pricePrecision == 2
+        assert symbol_info.tickSize == 0.1
 
     def test_symbol_info_missing_required_field(self):
         """Test failure case: missing required field."""
         symbol_data = {
-            "id": "BTCUSDT",
-            "symbol": "BTCUSDT",
-            "base_asset": "BTC",
-            "ui_name": "BTC/USDT",
-            # Missing quote_asset
+            "symbol": "BTC/USDT",
+            "baseAsset": "BTC",
+            "exchange": "binance",
+            # Missing quoteAsset
         }
 
         with pytest.raises(ValidationError) as exc_info:
             SymbolInfo(**symbol_data)
 
         assert "quoteAsset" in str(exc_info.value)
+
+    def test_symbol_info_invalid_price_precision_type(self):
+        """Test failure case: pricePrecision with incorrect type."""
+        symbol_data = {
+            "symbol": "LTC/USDT",
+            "baseAsset": "LTC",
+            "quoteAsset": "USDT",
+            "exchange": "binance",
+            "pricePrecision": "invalid",  # Incorrect type
+            "tickSize": 0.01,
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            SymbolInfo(**symbol_data)
+        assert "Input should be a valid integer" in str(exc_info.value)
+
+    def test_symbol_info_invalid_tick_size_type(self):
+        """Test failure case: tickSize with incorrect type."""
+        symbol_data = {
+            "symbol": "ADA/USDT",
+            "baseAsset": "ADA",
+            "quoteAsset": "USDT",
+            "exchange": "binance",
+            "pricePrecision": 8,
+            "tickSize": "invalid",  # Incorrect type
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            SymbolInfo(**symbol_data)
+        assert "Input should be a valid number" in str(exc_info.value)
 
 
 class TestOrderBookLevel:
@@ -117,7 +164,9 @@ class TestOrderBook:
                 {"price": 43251.00, "amount": 0.50},
                 {"price": 43251.50, "amount": 2.00},
             ],
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
         }
 
         order_book = OrderBook(**order_book_data)
@@ -134,7 +183,9 @@ class TestOrderBook:
             "symbol": "BTCUSDT",
             "bids": [],
             "asks": [{"price": 43251.00, "amount": 0.50}],
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
         }
 
         order_book = OrderBook(**order_book_data)
@@ -149,7 +200,9 @@ class TestOrderBook:
             # Missing symbol
             "bids": [{"price": 43250.50, "amount": 1.25}],
             "asks": [{"price": 43251.00, "amount": 0.50}],
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -164,7 +217,9 @@ class TestCandle:
     def test_candle_valid_creation(self):
         """Test expected use: creating a valid Candle instance."""
         candle_data = {
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
             "open": 43200.00,
             "high": 43300.00,
             "low": 43150.00,
@@ -183,7 +238,9 @@ class TestCandle:
     def test_candle_edge_case_zero_volume(self):
         """Test edge case: candle with zero volume (valid)."""
         candle_data = {
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
             "open": 43200.00,
             "high": 43200.00,
             "low": 43200.00,
@@ -199,7 +256,9 @@ class TestCandle:
     def test_candle_negative_price_failure(self):
         """Test failure case: negative price values should fail."""
         candle_data = {
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
             "open": -43200.00,  # Invalid negative price
             "high": 43300.00,
             "low": 43150.00,
@@ -215,7 +274,9 @@ class TestCandle:
     def test_candle_negative_volume_failure(self):
         """Test failure case: negative volume should fail."""
         candle_data = {
-            "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+            "timestamp": int(
+                datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000
+            ),  # Unix timestamp in milliseconds
             "open": 43200.00,
             "high": 43300.00,
             "low": 43150.00,
@@ -235,23 +296,24 @@ class TestSchemasSerialization:
     def test_symbol_info_json_serialization(self):
         """Test that SymbolInfo can be serialized to and from JSON."""
         symbol_data = {
-            "id": "BTCUSDT",
-            "symbol": "BTCUSDT",
-            "base_asset": "BTC",
-            "quote_asset": "USDT",
-            "ui_name": "BTC/USDT",
+            "symbol": "BTC/USDT",
+            "baseAsset": "BTC",
+            "quoteAsset": "USDT",
+            "exchange": "binance",
+            "pricePrecision": 8,
+            "tickSize": 0.00000001,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
         json_data = symbol_info.model_dump(by_alias=True)
 
         # Verify JSON structure
-        assert json_data["id"] == symbol_data["id"]
         assert json_data["symbol"] == symbol_data["symbol"]
-        assert json_data["baseAsset"] == symbol_data["base_asset"]
-        assert json_data["quoteAsset"] == symbol_data["quote_asset"]
-        assert json_data["uiName"] == symbol_data["ui_name"]
-        assert json_data["volume24h"] is None  # Check optional field
+        assert json_data["baseAsset"] == symbol_data["baseAsset"]
+        assert json_data["quoteAsset"] == symbol_data["quoteAsset"]
+        assert json_data["exchange"] == symbol_data["exchange"]
+        assert json_data["pricePrecision"] == symbol_data["pricePrecision"]
+        assert json_data["tickSize"] == symbol_data["tickSize"]
 
         # Verify round-trip
         symbol_info_restored = SymbolInfo(**json_data)
@@ -259,7 +321,7 @@ class TestSchemasSerialization:
 
     def test_order_book_json_serialization(self):
         """Test that OrderBook can be serialized to and from JSON."""
-        timestamp = datetime(2024, 1, 1, 12, 0, 0)
+        timestamp = int(datetime(2024, 1, 1, 12, 0, 0).timestamp() * 1000)
         order_book_data = {
             "symbol": "BTCUSDT",
             "bids": [{"price": 43250.50, "amount": 1.25}],

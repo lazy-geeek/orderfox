@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createListenerMiddleware } from '@reduxjs/toolkit';
 import apiClient from '../../services/apiClient';
 import { connectWebSocketStream, disconnectWebSocketStream, disconnectAllWebSockets } from '../../services/websocketService';
 import { AppDispatch, RootState } from '../../store/store'; // Import AppDispatch and RootState
@@ -19,6 +19,10 @@ interface Symbol {
   uiName: string;
   /** 24-hour trading volume in quote currency */
   volume24h?: number;
+  /** Price precision for the symbol */
+  pricePrecision?: number;
+  /** Minimum tick size for price movements */
+  tickSize?: number;
 }
 
 /**
@@ -191,6 +195,14 @@ interface MarketDataState {
   candlesWsConnected: boolean;
   /** WebSocket connection status for order book */
   orderBookWsConnected: boolean;
+  /** Currently selected rounding precision */
+  selectedRounding: number | null;
+  /** Available rounding options for the current symbol */
+  availableRoundingOptions: number[];
+  /** Flag to indicate if WebSocket should be restarted after fetchOrderBook.fulfilled */
+  shouldRestartWebSocketAfterFetch: boolean;
+  /** Number of order book levels to display */
+  displayDepth: number;
 }
 
 const initialState: MarketDataState = {
@@ -207,7 +219,16 @@ const initialState: MarketDataState = {
   symbolsError: null,
   candlesWsConnected: false,
   orderBookWsConnected: false,
+  selectedRounding: null,
+  availableRoundingOptions: [],
+  shouldRestartWebSocketAfterFetch: false,
+  displayDepth: 10, // Default display depth
 };
+
+// Constants for dynamic limit calculation
+const MIN_RAW_LIMIT = 200;
+const MAX_RAW_LIMIT = 1000;
+const AGGRESSIVENESS_FACTOR = 3;
 
 // Async thunks
 export const fetchSymbols = createAsyncThunk(
@@ -228,9 +249,10 @@ export const fetchSymbols = createAsyncThunk(
 
 export const fetchOrderBook = createAsyncThunk(
   'marketData/fetchOrderBook',
-  async (symbol: string, { rejectWithValue }) => {
+  async (args: { symbol: string, limit?: number }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get(`/orderbook/${symbol}`);
+      const params = args.limit ? { limit: args.limit } : {};
+      const response = await apiClient.get(`/orderbook/${args.symbol}`, { params });
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
@@ -402,6 +424,19 @@ const marketDataSlice = createSlice({
       state.orderBookError = null;
       state.symbolsError = null;
     },
+    setSelectedRounding: (state, action: PayloadAction<number | null>) => {
+      state.selectedRounding = action.payload;
+    },
+    setAvailableRoundingOptions: (state, action: PayloadAction<{ options: number[], defaultRounding: number | null }>) => {
+      state.availableRoundingOptions = action.payload.options;
+      state.selectedRounding = action.payload.defaultRounding;
+    },
+    setShouldRestartWebSocketAfterFetch: (state, action: PayloadAction<boolean>) => {
+      state.shouldRestartWebSocketAfterFetch = action.payload;
+    },
+    setDisplayDepth: (state, action: PayloadAction<number>) => {
+      state.displayDepth = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Fetch symbols
@@ -412,7 +447,12 @@ const marketDataSlice = createSlice({
       })
       .addCase(fetchSymbols.fulfilled, (state, action) => {
         state.symbolsLoading = false;
-        state.symbolsList = action.payload;
+        // Process the payload to ensure pricePrecision and tickSize are properly handled
+        state.symbolsList = action.payload.map((symbol: any) => ({
+          ...symbol,
+          pricePrecision: symbol.pricePrecision ?? undefined,
+          tickSize: symbol.tickSize ?? undefined,
+        }));
       })
       .addCase(fetchSymbols.rejected, (state, action) => {
         state.symbolsLoading = false;
@@ -453,6 +493,29 @@ const marketDataSlice = createSlice({
   },
 });
 
+// Create listener middleware for handling WebSocket restart after fetchOrderBook.fulfilled
+export const marketDataListenerMiddleware = createListenerMiddleware();
+
+// Add listener for fetchOrderBook.fulfilled to restart WebSocket if needed
+marketDataListenerMiddleware.startListening({
+  actionCreator: fetchOrderBook.fulfilled,
+  effect: async (action, listenerApi) => {
+    const state = listenerApi.getState() as RootState;
+    const { shouldRestartWebSocketAfterFetch, selectedSymbol } = state.marketData;
+    
+    // Only restart WebSocket if the flag is set and we have a selected symbol
+    if (shouldRestartWebSocketAfterFetch && selectedSymbol) {
+      // Reset the flag first
+      listenerApi.dispatch(marketDataSlice.actions.setShouldRestartWebSocketAfterFetch(false));
+      
+      // Start the WebSocket for the current symbol
+      // Cast dispatch to AppDispatch to handle thunk actions
+      const dispatch = listenerApi.dispatch as AppDispatch;
+      await dispatch(startOrderBookWebSocket({ symbol: selectedSymbol }));
+    }
+  },
+});
+
 // Thunks for managing WebSocket connections based on state changes
 export const initializeMarketDataStreams = createAsyncThunk<
   void,
@@ -474,16 +537,17 @@ export const initializeMarketDataStreams = createAsyncThunk<
 
 export const updateCandlesStream = createAsyncThunk<
   void,
-  void,
+  { oldTimeframe?: string },
   { dispatch: AppDispatch; state: RootState }
 >(
   'marketData/updateCandlesStream',
-  async (_, { dispatch, getState }) => {
+  async ({ oldTimeframe }, { dispatch, getState }) => {
     const { selectedSymbol, selectedTimeframe } = getState().marketData;
 
     if (selectedSymbol) {
-      // Stop existing candles WebSocket
-      dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: getState().marketData.selectedTimeframe }));
+      // Stop existing candles WebSocket with the old timeframe (or current if not provided)
+      const timeframeToStop = oldTimeframe || selectedTimeframe;
+      dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: timeframeToStop }));
       // Start new candles WebSocket with updated timeframe
       dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
     }
@@ -514,7 +578,7 @@ export const changeSelectedSymbol = createAsyncThunk<
 >(
   'marketData/changeSelectedSymbol',
   async (newSymbol, { dispatch, getState }) => {
-    const { selectedSymbol: currentSymbol, selectedTimeframe } = getState().marketData;
+    const { selectedSymbol: currentSymbol, selectedTimeframe, symbolsList, displayDepth } = getState().marketData;
     
     // If switching to the same symbol, do nothing
     if (currentSymbol === newSymbol) {
@@ -538,14 +602,32 @@ export const changeSelectedSymbol = createAsyncThunk<
     if (newSymbol) {
       console.log(`Starting WebSocket connections for ${newSymbol}`);
       
-      // Fetch initial data
-      dispatch(fetchCandles({ symbol: newSymbol, timeframe: selectedTimeframe, limit: 100 }));
-      dispatch(fetchOrderBook(newSymbol));
+      // Retrieve newSymbolData from symbolsList
+      const newSymbolData = symbolsList.find(symbol => symbol.symbol === newSymbol);
       
-      // Start WebSocket connections with a small delay to ensure data is fetched first
+      if (!newSymbolData) {
+        console.error(`Symbol data not found for ${newSymbol}, using default order book fetch`);
+        // Fetch initial data with default parameters
+        dispatch(fetchCandles({ symbol: newSymbol, timeframe: selectedTimeframe, limit: 100 }));
+        dispatch(fetchOrderBook({ symbol: newSymbol }));
+      } else {
+        // Calculate initialDynamicLimit
+        let calculatedLimit = Math.ceil(displayDepth * AGGRESSIVENESS_FACTOR);
+        const finalLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
+        
+        // Fetch initial data with calculated limit
+        dispatch(fetchCandles({ symbol: newSymbol, timeframe: selectedTimeframe, limit: 100 }));
+        dispatch(fetchOrderBook({ symbol: newSymbol, limit: finalLimit }));
+      }
+      
+      // Set flag to restart WebSocket after fetchOrderBook.fulfilled
+      dispatch(setShouldRestartWebSocketAfterFetch(true));
+      
+      // Start candles WebSocket immediately (not dependent on order book)
       await new Promise(resolve => setTimeout(resolve, 100));
       await dispatch(startCandlesWebSocket({ symbol: newSymbol, timeframe: selectedTimeframe }));
-      await dispatch(startOrderBookWebSocket({ symbol: newSymbol }));
+      
+      // Order book WebSocket will be started by the listener middleware after fetchOrderBook.fulfilled
     }
   }
 );
@@ -560,6 +642,10 @@ export const {
   setCandlesWsConnected,
   setOrderBookWsConnected,
   clearError,
+  setSelectedRounding,
+  setAvailableRoundingOptions,
+  setShouldRestartWebSocketAfterFetch,
+  setDisplayDepth,
 } = marketDataSlice.actions;
 
 export default marketDataSlice.reducer;

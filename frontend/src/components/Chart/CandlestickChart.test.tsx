@@ -54,6 +54,8 @@ describe('CandlestickChart', () => {
       currentOrderBook: null,
       symbolsLoading: false,
       symbolsError: null,
+      selectedRounding: null,
+      availableRoundingOptions: [],
     });
 
     render(
@@ -75,6 +77,8 @@ describe('CandlestickChart', () => {
       currentOrderBook: null,
       symbolsLoading: false,
       symbolsError: null,
+      selectedRounding: null,
+      availableRoundingOptions: [],
     });
 
     render(

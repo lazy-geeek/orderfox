@@ -6,12 +6,16 @@ symbols, order books, and candlestick data from the exchange.
 """
 
 import re
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from app.api.v1.schemas import SymbolInfo, OrderBook, OrderBookLevel, Candle
 from app.services.exchange_service import exchange_service
 from app.services.symbol_service import symbol_service
+from app.core.logging_config import get_logger
+from app.core.config import settings
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -65,13 +69,80 @@ async def get_symbols():
                         None  # Handle cases where it might not be a valid number
                     )
 
+            # Extract pricePrecision and tickSize
+            price_precision = None
+            tick_size = None
+
+            # Extract pricePrecision from market['precision']['price']
+            try:
+                if (
+                    market.get("precision")
+                    and market["precision"].get("price") is not None
+                ):
+                    precision_value = market["precision"]["price"]
+                    if isinstance(precision_value, (int, float)):
+                        # If it's already an integer, use it directly
+                        if isinstance(precision_value, int):
+                            price_precision = precision_value
+                        else:
+                            # If it's a float like 1e-8, calculate decimal places
+                            if precision_value > 0 and precision_value < 1:
+                                # Convert scientific notation to decimal places
+                                price_precision = abs(
+                                    int(
+                                        round(
+                                            float(
+                                                f"{precision_value:.10e}".split("e")[1]
+                                            )
+                                        )
+                                    )
+                                )
+                            else:
+                                # If it's a regular float, convert to int
+                                price_precision = int(precision_value)
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(
+                    f"Could not extract pricePrecision for {market['symbol']}: {e}"
+                )
+
+            # Extract tickSize from market['info']['tickSize'] or market['limits']['price']['min']
+            try:
+                # First try market['info']['tickSize']
+                if market.get("info") and market["info"].get("tickSize") is not None:
+                    tick_size = float(market["info"]["tickSize"])
+                # Fallback to market['limits']['price']['min']
+                elif (
+                    market.get("limits")
+                    and market["limits"].get("price")
+                    and market["limits"]["price"].get("min") is not None
+                ):
+                    tick_size = float(market["limits"]["price"]["min"])
+                # Calculate from pricePrecision as fallback
+                elif price_precision is not None:
+                    tick_size = 10**-price_precision
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(
+                    f"Could not extract tickSize for {market['symbol']}: {e}"
+                )
+
+            # Log warnings if values couldn't be determined
+            if price_precision is None:
+                logger.warning(
+                    f"pricePrecision could not be determined for {market['symbol']}"
+                )
+            if tick_size is None:
+                logger.warning(
+                    f"tickSize could not be determined for {market['symbol']}"
+                )
+
             symbols.append(
                 SymbolInfo(
-                    id=market["id"],
                     symbol=market["symbol"],
-                    base_asset=market["base"],
-                    quote_asset=market["quote"],
-                    ui_name=f"{market['base']}/{market['quote']}",
+                    baseAsset=market["base"],
+                    quoteAsset=market["quote"],
+                    exchange="binance",
+                    pricePrecision=price_precision,
+                    tickSize=tick_size,
                     volume24h=volume24h,
                 )
             )
@@ -94,12 +165,21 @@ async def get_symbols():
 
 
 @router.get("/orderbook/{symbol}", response_model=OrderBook)
-async def get_orderbook(symbol: str):
+async def get_orderbook(
+    symbol: str,
+    limit: Optional[int] = Query(
+        default=100,
+        ge=1,
+        le=settings.MAX_ORDERBOOK_LIMIT,
+        description="Number of order book levels to fetch per side",
+    ),
+):
     """
     Get the current order book for a given symbol.
 
     Args:
         symbol: Trading symbol (e.g., 'BTCUSDT')
+        limit: Number of order book levels to fetch per side (default: 100, max: configurable via settings)
 
     Returns:
         OrderBook: Current order book data
@@ -120,8 +200,8 @@ async def get_orderbook(symbol: str):
 
         exchange = exchange_service.get_exchange()
 
-        # Fetch order book data using exchange symbol
-        order_book_data = exchange.fetch_order_book(exchange_symbol)
+        # Fetch order book data using exchange symbol with limit
+        order_book_data = exchange.fetch_order_book(exchange_symbol, limit=limit)
 
         # Convert to our schema format
         bids = [

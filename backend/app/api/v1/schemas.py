@@ -26,30 +26,32 @@ class SymbolInfo(BaseModel):
     available on the exchange.
     """
 
-    id: str = Field(..., description="Unique identifier for the symbol")
-    symbol: str = Field(..., description="Trading symbol (e.g., 'BTCUSDT')")
-    base_asset: str = Field(..., description="Base asset (e.g., 'BTC')")
-    quote_asset: str = Field(..., description="Quote asset (e.g., 'USDT')")
-    ui_name: str = Field(
-        ..., description="User-friendly display name (e.g., 'BTC/USDT')"
+    symbol: str = Field(..., description="Trading symbol, e.g., BTC/USDT")
+    baseAsset: str = Field(..., description="Base asset, e.g., BTC")
+    quoteAsset: str = Field(..., description="Quote asset, e.g., USDT")
+    exchange: str = Field(..., description="Exchange name, e.g., binance")
+    pricePrecision: Optional[int] = Field(
+        None, description="Number of decimal places for price accuracy"
+    )
+    tickSize: Optional[float] = Field(
+        None, description="Smallest price increment for the symbol"
     )
     volume24h: Optional[float] = Field(
-        None, description="24-hour trading volume in quote currency"
+        None, description="24-hour trading volume in quote currency", ge=0
     )
 
-    model_config = ConfigDict(
-        populate_by_name=True,
-        alias_generator=to_camel,
-        json_schema_extra={
+    class Config:
+        json_schema_extra = {
             "example": {
-                "id": "BTCUSDT",
-                "symbol": "BTC/USDT:USDT",
-                "baseAsset": "BTC",  # Changed to camelCase in example
-                "quoteAsset": "USDT",  # Changed to camelCase in example
-                "uiName": "BTC/USDT",  # Changed to camelCase in example
+                "symbol": "BTC/USDT",
+                "baseAsset": "BTC",
+                "quoteAsset": "USDT",
+                "exchange": "binance",
+                "pricePrecision": 8,
+                "tickSize": 0.00000001,
+                "volume24h": 1234567.89,
             }
-        },
-    )
+        }
 
 
 class OrderBookLevel(BaseModel):

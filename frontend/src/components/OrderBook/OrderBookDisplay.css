@@ -72,6 +72,25 @@
   border-radius: 3px;
 }
 
+.rounding-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.rounding-selector-container label {
+  font-size: 11px;
+  color: #666;
+}
+
+.rounding-select {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
 .order-book-content {
   max-height: 400px;
   overflow-y: auto;
