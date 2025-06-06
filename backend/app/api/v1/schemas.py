@@ -39,9 +39,6 @@ class SymbolInfo(BaseModel):
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
     )
-    tickSize: Optional[float] = Field(
-        None, description="Smallest price increment for the symbol"
-    )
 
     model_config = ConfigDict(
         populate_by_name=True,

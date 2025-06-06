@@ -21,8 +21,6 @@ interface Symbol {
   volume24h?: number;
   /** Price precision for the symbol */
   pricePrecision?: number;
-  /** Minimum tick size for price movements */
-  tickSize?: number;
 }
 
 /**
@@ -226,9 +224,11 @@ const initialState: MarketDataState = {
 };
 
 // Constants for dynamic limit calculation
-const MIN_RAW_LIMIT = 200;
+// Binance futures only accepts specific limits: 5, 10, 20, 50, 100, 500, 1000
+const MIN_RAW_LIMIT = 100;  // Changed from 200 to 100 (valid Binance limit)
 const MAX_RAW_LIMIT = 1000;
 const AGGRESSIVENESS_FACTOR = 3;
+const VALID_LIMITS = [5, 10, 20, 50, 100, 500, 1000];
 
 // Async thunks
 export const fetchSymbols = createAsyncThunk(
@@ -354,6 +354,8 @@ const marketDataSlice = createSlice({
         state.currentCandles = [];
         state.candlesWsConnected = false;
         state.orderBookWsConnected = false;
+        state.selectedRounding = null;
+        state.availableRoundingOptions = [];
       }
     },
     setSelectedTimeframe: (state, action: PayloadAction<string>) => {
@@ -447,11 +449,10 @@ const marketDataSlice = createSlice({
       })
       .addCase(fetchSymbols.fulfilled, (state, action) => {
         state.symbolsLoading = false;
-        // Process the payload to ensure pricePrecision and tickSize are properly handled
+        // Process the payload to ensure pricePrecision is properly handled
         state.symbolsList = action.payload.map((symbol: any) => ({
           ...symbol,
           pricePrecision: symbol.pricePrecision ?? undefined,
-          tickSize: symbol.tickSize ?? undefined,
         }));
       })
       .addCase(fetchSymbols.rejected, (state, action) => {
@@ -602,8 +603,8 @@ export const changeSelectedSymbol = createAsyncThunk<
     if (newSymbol) {
       console.log(`Starting WebSocket connections for ${newSymbol}`);
       
-      // Retrieve newSymbolData from symbolsList
-      const newSymbolData = symbolsList.find(symbol => symbol.symbol === newSymbol);
+      // Retrieve newSymbolData from symbolsList (newSymbol is the id from the dropdown)
+      const newSymbolData = symbolsList.find(symbol => symbol.id === newSymbol);
       
       if (!newSymbolData) {
         console.error(`Symbol data not found for ${newSymbol}, using default order book fetch`);
@@ -613,7 +614,9 @@ export const changeSelectedSymbol = createAsyncThunk<
       } else {
         // Calculate initialDynamicLimit
         let calculatedLimit = Math.ceil(displayDepth * AGGRESSIVENESS_FACTOR);
-        const finalLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
+        const clampedLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
+        // Round to nearest valid Binance limit
+        const finalLimit = VALID_LIMITS.find(limit => limit >= clampedLimit) || MAX_RAW_LIMIT;
         
         // Fetch initial data with calculated limit
         dispatch(fetchCandles({ symbol: newSymbol, timeframe: selectedTimeframe, limit: 100 }));

@@ -221,11 +221,10 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Set tickSize to match our test rounding
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
-        selectedRounding: 0.1, // This should be kept since it matches tickSize
+        selectedRounding: 0.1, // This should be kept since it matches the base rounding from pricePrecision
         availableRoundingOptions: [0.1, 1, 10],
         orderBookLoading: false,
       });
@@ -285,7 +284,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
           pricePrecision: 1
         }],
         currentOrderBook: { bids: [], asks: [], symbol: 'BTCUSDT', timestamp: Date.now() }, // Empty order book instead of null
@@ -323,7 +321,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -372,7 +369,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -420,7 +416,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -462,7 +457,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1, // Match the selectedRounding value
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -508,7 +502,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 1, // Match the selectedRounding value
           pricePrecision: 0
         }],
         currentOrderBook: mockOrderBook,
@@ -555,7 +548,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: {
@@ -611,7 +603,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: {
@@ -672,7 +663,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -778,7 +768,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -843,7 +832,6 @@ describe('OrderBookDisplay', () => {
             baseAsset: 'BTC',
             quoteAsset: 'USDT',
             uiName: 'BTC/USDT',
-            tickSize: 0.01,
             pricePrecision: 2
           }],
           currentOrderBook: mockOrderBook,
@@ -900,7 +888,6 @@ describe('OrderBookDisplay', () => {
             baseAsset: 'BTC',
             quoteAsset: 'USDT',
             uiName: 'BTC/USDT',
-            tickSize: 0.01,
             pricePrecision: 8
           }],
           currentOrderBook: mockOrderBook,
@@ -938,7 +925,6 @@ describe('OrderBookDisplay', () => {
             baseAsset: 'BTC',
             quoteAsset: 'USDT',
             uiName: 'BTC/USDT',
-            tickSize: 0.01,
             pricePrecision: 8
           }],
           currentOrderBook: mockOrderBook,
@@ -976,7 +962,6 @@ describe('OrderBookDisplay', () => {
             baseAsset: 'BTC',
             quoteAsset: 'USDT',
             uiName: 'BTC/USDT',
-            tickSize: 0.01,
             pricePrecision: 8
           }],
           currentOrderBook: mockOrderBook,
@@ -1014,7 +999,6 @@ describe('OrderBookDisplay', () => {
             baseAsset: 'BTC',
             quoteAsset: 'USDT',
             uiName: 'BTC/USDT',
-            tickSize: 0.01,
             pricePrecision: 8
           }],
           currentOrderBook: mockOrderBook,
@@ -1117,7 +1101,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -1173,7 +1156,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -1236,7 +1218,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -1304,7 +1285,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }],
         currentOrderBook: mockOrderBook,
@@ -1357,7 +1337,6 @@ describe('OrderBookDisplay', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 1,
           pricePrecision: 0
         }],
         currentOrderBook: mockOrderBook,

@@ -491,7 +491,6 @@ describe('marketDataSlice', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.01,
           pricePrecision: 2
         },
         {
@@ -500,7 +499,6 @@ describe('marketDataSlice', () => {
           baseAsset: 'ETH',
           quoteAsset: 'USDT',
           uiName: 'ETH/USDT',
-          tickSize: 0.1,
           pricePrecision: 1
         }
       ];
@@ -681,7 +679,6 @@ describe('marketDataSlice', () => {
           baseAsset: 'BTC',
           quoteAsset: 'USDT',
           uiName: 'BTC/USDT',
-          tickSize: 0.01,
           pricePrecision: 2
         }
       ];

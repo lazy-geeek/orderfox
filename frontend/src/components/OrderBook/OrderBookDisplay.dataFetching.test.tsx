@@ -30,7 +30,6 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
       quoteAsset: 'USDT',
       uiName: 'BTC/USDT',
       pricePrecision: 2,
-      tickSize: 0.01,
     };
 
     let limitReceived: number | undefined;
@@ -83,8 +82,9 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
     // baseTickSize = 0.01, selectedRounding = 0.1, displayDepth = 10 (default), AGGRESSIVENESS_FACTOR = 3
     // Since selectedRounding (0.1) > baseTickSize (0.01):
     // calculatedLimit = Math.ceil((0.1 / 0.01) * 10 * 3) = Math.ceil(10 * 10 * 3) = Math.ceil(300) = 300
-    // finalLimit = Math.max(MIN_RAW_LIMIT=200, Math.min(300, MAX_RAW_LIMIT=1000)) = 300
-    expect(limitReceived).toBe(300);
+    // clampedLimit = Math.max(MIN_RAW_LIMIT=100, Math.min(300, MAX_RAW_LIMIT=1000)) = 300
+    // finalLimit = VALID_LIMITS.find(limit => limit >= 300) = 500 (next valid Binance limit)
+    expect(limitReceived).toBe(500);
   });
 
   it('should not trigger deeper data fetch when selectedSymbol is null', () => {
@@ -113,7 +113,6 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
       quoteAsset: 'USDT',
       uiName: 'BTC/USDT',
       pricePrecision: 2,
-      tickSize: 0.01,
     };
 
     const store = createMockStore({
@@ -168,7 +167,6 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
       quoteAsset: 'USDT',
       uiName: 'BTC/USDT',
       pricePrecision: 8,
-      tickSize: 0.00000001, // Very small tick size
     };
 
     let limitReceived: number | undefined;
@@ -192,7 +190,7 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
 
     const store = createMockStore({
       selectedSymbol: 'BTCUSDT',
-      selectedRounding: 1, // Much larger than tickSize
+      selectedRounding: 1, // Much larger than base rounding from pricePrecision
       symbolsList: [mockSymbolData],
       orderBookWsConnected: false,
       currentOrderBook: null,
@@ -211,11 +209,11 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
     // Let's check what we actually receive and adjust the test accordingly
     expect(limitReceived).toBeDefined();
     expect(typeof limitReceived).toBe('number');
-    // The limit should be either the calculated value (clamped to 1000) or the minimum (200)
-    expect([200, 1000]).toContain(limitReceived);
+    // The limit should be either the calculated value (clamped to 1000) or the minimum (100)
+    expect([100, 1000]).toContain(limitReceived);
   });
 
-  it('should use pricePrecision when tickSize is undefined', async () => {
+  it('should always use pricePrecision for calculations', async () => {
     const mockSymbolData = {
       id: 'btcusdt',
       symbol: 'BTCUSDT',
@@ -223,7 +221,6 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
       quoteAsset: 'USDT',
       uiName: 'BTC/USDT',
       pricePrecision: 2,
-      // tickSize is undefined
     };
 
     let limitReceived: number | undefined;
@@ -261,7 +258,7 @@ describe('OrderBookDisplay - useEffect for Fetching Deeper Data', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
     });
 
-    // Verify that the limit calculation works with pricePrecision when tickSize is undefined
+    // Verify that the limit calculation works with pricePrecision
     // baseTickSize = 1 / (10 ** 2) = 0.01, selectedRounding = 0.1, displayDepth = 10, AGGRESSIVENESS_FACTOR = 3
     // calculatedLimit = Math.ceil((0.1 / 0.01) * 10 * 3) = Math.ceil(300) = 300
     // finalLimit = Math.max(200, Math.min(300, 1000)) = 300

@@ -69,9 +69,8 @@ async def get_symbols():
                         None  # Handle cases where it might not be a valid number
                     )
 
-            # Extract pricePrecision and tickSize
+            # Extract pricePrecision
             price_precision = None
-            tick_size = None
 
             # Extract pricePrecision from market['precision']['price']
             try:
@@ -105,34 +104,10 @@ async def get_symbols():
                     f"Could not extract pricePrecision for {market['symbol']}: {e}"
                 )
 
-            # Extract tickSize from market['info']['tickSize'] or market['limits']['price']['min']
-            try:
-                # First try market['info']['tickSize']
-                if market.get("info") and market["info"].get("tickSize") is not None:
-                    tick_size = float(market["info"]["tickSize"])
-                # Fallback to market['limits']['price']['min']
-                elif (
-                    market.get("limits")
-                    and market["limits"].get("price")
-                    and market["limits"]["price"].get("min") is not None
-                ):
-                    tick_size = float(market["limits"]["price"]["min"])
-                # Calculate from pricePrecision as fallback
-                elif price_precision is not None:
-                    tick_size = 10**-price_precision
-            except (KeyError, TypeError, ValueError) as e:
-                logger.warning(
-                    f"Could not extract tickSize for {market['symbol']}: {e}"
-                )
-
-            # Log warnings if values couldn't be determined
+            # Log warning if pricePrecision couldn't be determined
             if price_precision is None:
                 logger.warning(
                     f"pricePrecision could not be determined for {market['symbol']}"
-                )
-            if tick_size is None:
-                logger.warning(
-                    f"tickSize could not be determined for {market['symbol']}"
                 )
 
             symbols.append(
@@ -144,7 +119,6 @@ async def get_symbols():
                     ui_name=f"{market['base']}/{market['quote']}",
                     volume24h=volume24h,
                     pricePrecision=price_precision,
-                    tickSize=tick_size,
                 )
             )
 

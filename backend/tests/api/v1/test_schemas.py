@@ -22,7 +22,6 @@ class TestSymbolInfo:
             "quoteAsset": "USDT",
             "exchange": "binance",
             "pricePrecision": 8,
-            "tickSize": 0.00000001,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
@@ -32,12 +31,10 @@ class TestSymbolInfo:
         assert symbol_info.quoteAsset == "USDT"
         assert symbol_info.exchange == "binance"
         assert symbol_info.pricePrecision == 8
-        assert symbol_info.tickSize == 0.00000001
         assert isinstance(symbol_info.pricePrecision, int)
-        assert isinstance(symbol_info.tickSize, float)
 
     def test_symbol_info_with_optional_fields_none(self):
-        """Test valid creation when pricePrecision and tickSize are not provided."""
+        """Test valid creation when pricePrecision is not provided."""
         symbol_data = {
             "symbol": "ETH/USDT",
             "baseAsset": "ETH",
@@ -46,7 +43,6 @@ class TestSymbolInfo:
         }
         symbol_info = SymbolInfo(**symbol_data)
         assert symbol_info.pricePrecision is None
-        assert symbol_info.tickSize is None
 
     def test_symbol_info_edge_case_long_names(self):
         """Test edge case: symbols with very long names and new fields."""
@@ -56,7 +52,6 @@ class TestSymbolInfo:
             "quoteAsset": "USDT",
             "exchange": "LONGCURRENCYEXCHANGE",
             "pricePrecision": 2,
-            "tickSize": 0.1,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
@@ -64,7 +59,6 @@ class TestSymbolInfo:
         assert symbol_info.symbol == "VERYLONGCRYPTOCURRENCYNAME/USDT"
         assert symbol_info.baseAsset == "VERYLONGCRYPTOCURRENCYNAME"
         assert symbol_info.pricePrecision == 2
-        assert symbol_info.tickSize == 0.1
 
     def test_symbol_info_missing_required_field(self):
         """Test failure case: missing required field."""
@@ -88,25 +82,10 @@ class TestSymbolInfo:
             "quoteAsset": "USDT",
             "exchange": "binance",
             "pricePrecision": "invalid",  # Incorrect type
-            "tickSize": 0.01,
         }
         with pytest.raises(ValidationError) as exc_info:
             SymbolInfo(**symbol_data)
         assert "Input should be a valid integer" in str(exc_info.value)
-
-    def test_symbol_info_invalid_tick_size_type(self):
-        """Test failure case: tickSize with incorrect type."""
-        symbol_data = {
-            "symbol": "ADA/USDT",
-            "baseAsset": "ADA",
-            "quoteAsset": "USDT",
-            "exchange": "binance",
-            "pricePrecision": 8,
-            "tickSize": "invalid",  # Incorrect type
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            SymbolInfo(**symbol_data)
-        assert "Input should be a valid number" in str(exc_info.value)
 
 
 class TestOrderBookLevel:

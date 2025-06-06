@@ -37,7 +37,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -82,7 +81,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -137,7 +135,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -176,7 +173,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -217,7 +213,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -261,7 +256,6 @@ describe('OrderBookDisplay - Rounding Dropdown UI', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({

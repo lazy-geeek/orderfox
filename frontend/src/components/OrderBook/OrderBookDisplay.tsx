@@ -60,9 +60,9 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
 
   const [displayDepth, setDisplayDepth] = useState(10);
 
-  // Get selected symbol data from symbolsList
+  // Get selected symbol data from symbolsList (selectedSymbol is the id from the dropdown)
   const selectedSymbolData = selectedSymbol
-    ? symbolsList.find(symbol => symbol.symbol === selectedSymbol)
+    ? symbolsList.find(symbol => symbol.id === selectedSymbol)
     : null;
 
   // Calculate price decimal places based on rounding selection
@@ -129,14 +129,8 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       return;
     }
 
-    // Skip auto-calculation if availableRoundingOptions are already set (e.g., in tests)
-    if (availableRoundingOptions.length > 0) {
-      return;
-    }
-
-    // Calculate baseRounding from tickSize or pricePrecision
-    const baseRounding = selectedSymbolData.tickSize ||
-      (1 / (10 ** (selectedSymbolData.pricePrecision || 2)));
+    // Calculate baseRounding from pricePrecision
+    const baseRounding = 1 / (10 ** (selectedSymbolData.pricePrecision || 2));
 
     // Generate options array starting with baseRounding
     const options = [baseRounding];
@@ -162,10 +156,10 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     }
 
     // Ensure we have at least 3-4 options if possible
-    if (options.length < 3 && !currentPrice) {
-      // If we don't have current price data, add a few more options
-      let tempOption = baseRounding;
-      while (options.length < 4 && tempOption * 10 <= 100) {
+    if (options.length < 3) {
+      // If we don't have current price data or need more options, add a few more
+      let tempOption = options[options.length - 1];
+      while (options.length < 4 && tempOption * 10 <= 1000) {
         tempOption = tempOption * 10;
         options.push(tempOption);
       }
@@ -185,18 +179,11 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   }, [
     selectedSymbol,
     selectedSymbolData,
-    currentOrderBook?.bids,
+    currentOrderBook,
+    dispatch,
     selectedRounding,
-    availableRoundingOptions.length,
-    dispatch
   ]);
 
-  // Fetch initial order book data when symbol changes
-  useEffect(() => {
-    if (selectedSymbol) {
-      dispatch(fetchOrderBook({ symbol: selectedSymbol }));
-    }
-  }, [selectedSymbol, dispatch]);
 
   // Handle rounding change effect - fetch deeper data when symbol or rounding changes
   useEffect(() => {
@@ -205,23 +192,29 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       return;
     }
 
-    // Get symbolDetails (for tickSize, pricePrecision) and displayDepth from state
+    // Get symbolDetails (for pricePrecision) and displayDepth from state
     const symbolDetails = selectedSymbolData;
     
-    // Calculate baseTickSize = symbolDetails.tickSize || (1 / (10 ** (symbolDetails.pricePrecision || 2)))
-    const baseTickSize = symbolDetails.tickSize ||
-      (1 / (10 ** (symbolDetails.pricePrecision || 2)));
+    // Calculate baseTickSize from pricePrecision
+    const baseTickSize = 1 / (10 ** (symbolDetails.pricePrecision || 2));
 
     // Calculate dynamicLimit for fetchOrderBook (as per task specification)
-    const MIN_RAW_LIMIT = 200;
+    // Binance futures only accepts specific limits: 5, 10, 20, 50, 100, 500, 1000
+    const MIN_RAW_LIMIT = 100;  // Changed from 200 to 100 (valid Binance limit)
     const MAX_RAW_LIMIT = 1000;
     const AGGRESSIVENESS_FACTOR = 3;
+    
+    // Valid Binance futures orderbook limits
+    const VALID_LIMITS = [5, 10, 20, 50, 100, 500, 1000];
     
     let calculatedLimit = MIN_RAW_LIMIT;
     if (selectedRounding > baseTickSize) {
       calculatedLimit = Math.ceil((selectedRounding / baseTickSize) * displayDepth * AGGRESSIVENESS_FACTOR);
     }
-    const finalLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
+    
+    // Round to nearest valid limit
+    const clampedLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
+    const finalLimit = VALID_LIMITS.find(limit => limit >= clampedLimit) || MAX_RAW_LIMIT;
 
     // Set flag to indicate WebSocket should be restarted after fetchOrderBook.fulfilled
     const wasWebSocketConnected = orderBookWsConnected;

@@ -17,7 +17,7 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
     cleanupOrderBookTests(testSetup);
   });
 
-  it('dispatches setAvailableRoundingOptions with correct options when selectedSymbolData has tickSize', () => {
+  it('dispatches setAvailableRoundingOptions with correct options based on pricePrecision', () => {
     const mockSymbolsList = [
       {
         id: 'btcusdt',
@@ -26,7 +26,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -42,31 +41,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
     expect(state.marketData.selectedRounding).toBe(0.01); // Should be set to baseRounding
   });
 
-  it('dispatches setAvailableRoundingOptions with options based on pricePrecision when tickSize is undefined', () => {
-    const mockSymbolsList = [
-      {
-        id: 'btcusdt',
-        symbol: 'BTCUSDT',
-        baseAsset: 'BTC',
-        quoteAsset: 'USDT',
-        uiName: 'BTC/USDT',
-        pricePrecision: 2,
-        // tickSize is undefined
-      },
-    ];
-    const store = createMockStore({
-      selectedSymbol: 'BTCUSDT',
-      symbolsList: mockSymbolsList,
-    });
-    
-    renderOrderBookDisplay(store);
-
-    // Check that the store state has been updated with the expected rounding options
-    // baseRounding = 1 / (10 ** 2) = 0.01
-    const state = store.getState();
-    expect(state.marketData.availableRoundingOptions).toEqual([0.01, 0.1, 1, 10, 100, 1000]);
-    expect(state.marketData.selectedRounding).toBe(0.01); // Should be set to baseRounding
-  });
 
   it('dispatches setAvailableRoundingOptions with empty options when selectedSymbolData is not available', () => {
     const store = createMockStore({
@@ -112,7 +86,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -140,7 +113,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -168,7 +140,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -194,7 +165,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 2,
-        tickSize: 0.01,
       },
     ];
     const store = createMockStore({
@@ -220,7 +190,6 @@ describe('OrderBookDisplay - Dynamic Rounding Options useEffect', () => {
         quoteAsset: 'USDT',
         uiName: 'BTC/USDT',
         pricePrecision: 8,
-        tickSize: 0.00000001, // Very small tick size to test absolute value limit
       },
     ];
     const store = createMockStore({
