@@ -34,10 +34,10 @@ class TestWebSocketOrderbook:
         mock_connection_manager.connect_orderbook = AsyncMock()
         mock_connection_manager.disconnect_orderbook = MagicMock()
 
-        # Mock receive_text to simulate ping message then disconnect
-        mock_websocket.receive_text.side_effect = [
-            '{"type": "ping"}',
-            WebSocketDisconnect(),
+        # Mock receive to simulate ping message then disconnect
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function
@@ -88,9 +88,9 @@ class TestWebSocketOrderbook:
         mock_connection_manager.disconnect_orderbook = MagicMock()
 
         # Mock ping message
-        mock_websocket.receive_text.side_effect = [
-            '{"type": "ping"}',
-            Exception("Disconnect"),  # Simulate disconnect
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function
@@ -131,9 +131,9 @@ class TestWebSocketOrderbook:
         mock_connection_manager.disconnect_orderbook = MagicMock()
 
         # Mock invalid JSON message
-        mock_websocket.receive_text.side_effect = [
-            "invalid json",
-            Exception("Disconnect"),
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": "invalid json"},
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function - should handle gracefully
@@ -160,8 +160,8 @@ class TestWebSocketTicker:
         mock_connection_manager.connect = AsyncMock()
         mock_connection_manager.disconnect = MagicMock()
 
-        # Mock receive_text to simulate disconnect
-        mock_websocket.receive_text.side_effect = [WebSocketDisconnect()]
+        # Mock receive to simulate disconnect
+        mock_websocket.receive.side_effect = [{"type": "websocket.disconnect"}]
 
         # Call function
         await websocket_ticker(mock_websocket, "ETHUSDT")
@@ -211,9 +211,9 @@ class TestWebSocketTicker:
         mock_connection_manager.disconnect = MagicMock()
 
         # Mock ping message
-        mock_websocket.receive_text.side_effect = [
-            '{"type": "ping"}',
-            Exception("Disconnect"),
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function
@@ -239,8 +239,8 @@ class TestWebSocketCandles:
         mock_connection_manager.connect = AsyncMock()
         mock_connection_manager.disconnect = MagicMock()
 
-        # Mock receive_text to simulate disconnect
-        mock_websocket.receive_text.side_effect = [WebSocketDisconnect()]
+        # Mock receive to simulate disconnect
+        mock_websocket.receive.side_effect = [{"type": "websocket.disconnect"}]
 
         # Call function
         await websocket_candles(mock_websocket, "BTCUSDT", "1m")
@@ -323,8 +323,8 @@ class TestWebSocketCandles:
             mock_connection_manager.connect = AsyncMock()
             mock_connection_manager.disconnect = MagicMock()
 
-            # Mock receive_text to simulate disconnect
-            mock_websocket.receive_text.side_effect = [WebSocketDisconnect()]
+            # Mock receive to simulate disconnect
+            mock_websocket.receive.side_effect = [{"type": "websocket.disconnect"}]
 
             # Call function
             await websocket_candles(mock_websocket, "BTCUSDT", timeframe)
@@ -348,9 +348,9 @@ class TestWebSocketCandles:
         mock_connection_manager.disconnect = MagicMock()
 
         # Mock ping message
-        mock_websocket.receive_text.side_effect = [
-            '{"type": "ping"}',
-            Exception("Disconnect"),
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function
@@ -439,11 +439,14 @@ class TestWebSocketIntegration:
         mock_connection_manager.disconnect_orderbook = MagicMock()
 
         # Simulate multiple messages
-        mock_websocket.receive_text.side_effect = [
-            '{"type": "ping"}',
-            '{"type": "ping"}',
-            '{"type": "unknown"}',  # Should be handled gracefully
-            WebSocketDisconnect(),
+        mock_websocket.receive.side_effect = [
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {"type": "websocket.receive", "text": '{"type": "ping"}'},
+            {
+                "type": "websocket.receive",
+                "text": '{"type": "unknown"}',
+            },  # Should be handled gracefully
+            {"type": "websocket.disconnect"},
         ]
 
         # Call function
@@ -475,10 +478,10 @@ class TestWebSocketIntegration:
 
         # Test orderbook and ticker with different symbols
         mock_websocket1 = AsyncMock()
-        mock_websocket1.receive_text.side_effect = [WebSocketDisconnect()]
+        mock_websocket1.receive.side_effect = [{"type": "websocket.disconnect"}]
 
         mock_websocket2 = AsyncMock()
-        mock_websocket2.receive_text.side_effect = [WebSocketDisconnect()]
+        mock_websocket2.receive.side_effect = [{"type": "websocket.disconnect"}]
 
         # Call both endpoints
         await websocket_orderbook(mock_websocket1, "BTCUSDT")

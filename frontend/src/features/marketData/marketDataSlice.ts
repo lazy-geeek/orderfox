@@ -320,11 +320,13 @@ export const startOrderBookWebSocket = createAsyncThunk<
 export const stopOrderBookWebSocket = createAsyncThunk<
   void,
   { symbol: string },
-  { state: RootState }
+  { dispatch: AppDispatch; state: RootState }
 >(
   'marketData/stopOrderBookWebSocket',
-  async ({ symbol }) => {
+  async ({ symbol }, { dispatch }) => {
     disconnectWebSocketStream('orderbook', symbol);
+    // Clear the orderbook data immediately to prevent stale data
+    dispatch(marketDataSlice.actions.clearOrderBook());
   }
 );
 
@@ -438,6 +440,10 @@ const marketDataSlice = createSlice({
     },
     setDisplayDepth: (state, action: PayloadAction<number>) => {
       state.displayDepth = action.payload;
+    },
+    clearOrderBook: (state) => {
+      state.currentOrderBook = null;
+      state.orderBookWsConnected = false;
     },
   },
   extraReducers: (builder) => {

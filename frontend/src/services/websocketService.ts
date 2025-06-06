@@ -30,9 +30,13 @@ export const connectWebSocketStream = async (
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
   const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000/api/v1';
+  
+  // Ensure the base URL doesn't have a trailing slash
+  const cleanWsBaseUrl = wsBaseUrl.replace(/\/$/, '');
+  
   const wsUrl = timeframe
-    ? `${wsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`
-    : `${wsBaseUrl}/ws/${streamType}/${symbol}`;
+    ? `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`
+    : `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
 
   // Prevent multiple simultaneous connection attempts for the same stream
   if (connectionInProgress[streamKey]) {
@@ -60,9 +64,12 @@ export const connectWebSocketStream = async (
     const lastAttempt = lastConnectionAttempt[streamKey] || 0;
     const timeSinceLastAttempt = now - lastAttempt;
     
-    if (timeSinceLastAttempt < 1500) { // Wait at least 1.5 seconds between attempts
-      const waitTime = 1500 - timeSinceLastAttempt;
-      console.log(`Rate limiting WebSocket connection for ${streamKey}, waiting ${waitTime}ms`);
+    // Increase wait time based on number of attempts
+    const minWaitTime = Math.min(1500 * Math.pow(1.5, connectionAttempts[streamKey] - 1), 10000);
+    
+    if (timeSinceLastAttempt < minWaitTime) {
+      const waitTime = minWaitTime - timeSinceLastAttempt;
+      console.log(`Rate limiting WebSocket connection for ${streamKey}, waiting ${waitTime}ms (attempt ${connectionAttempts[streamKey]})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
     
@@ -147,15 +154,19 @@ export const connectWebSocketStream = async (
         - WebSocket URL: ${wsUrl}
         - Environment WS Base URL: ${process.env.REACT_APP_WS_BASE_URL || 'not set'}
         - Connection Attempts: ${attemptCount}
+        - WebSocket State: ${ws.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)
         - Browser: ${navigator.userAgent}`);
       
       clearTimeout(connectionTimeout);
       connectionInProgress[streamKey] = false;
       
-      if (streamType === 'candles') {
-        dispatch(setCandlesWsConnected(false));
-      } else if (streamType === 'orderbook') {
-        dispatch(setOrderBookWsConnected(false));
+      // Only update state if this is still the active WebSocket
+      if (activeWebSockets[streamKey] === ws) {
+        if (streamType === 'candles') {
+          dispatch(setCandlesWsConnected(false));
+        } else if (streamType === 'orderbook') {
+          dispatch(setOrderBookWsConnected(false));
+        }
       }
     };
 
@@ -164,20 +175,33 @@ export const connectWebSocketStream = async (
       clearTimeout(connectionTimeout);
       connectionInProgress[streamKey] = false;
       
-      if (streamType === 'candles') {
-        dispatch(setCandlesWsConnected(false));
-      } else if (streamType === 'orderbook') {
-        dispatch(setOrderBookWsConnected(false));
-      }
-      delete activeWebSockets[streamKey];
+      // Check if this WebSocket is still the active one for this stream
+      // If not, it means it was replaced and we shouldn't dispatch state updates
+      if (activeWebSockets[streamKey] === ws) {
+        if (streamType === 'candles') {
+          dispatch(setCandlesWsConnected(false));
+        } else if (streamType === 'orderbook') {
+          dispatch(setOrderBookWsConnected(false));
+        }
+        delete activeWebSockets[streamKey];
 
-      // Attempt to reconnect if not a clean close (code 1000) and attempts are reasonable
-      if (event.code !== 1000 && connectionAttempts[streamKey] < 5) {
-        const reconnectDelay = Math.min(5000 * connectionAttempts[streamKey], 30000);
-        console.log(`Attempting to reconnect WebSocket for ${streamKey} in ${reconnectDelay}ms...`);
-        setTimeout(() => {
-          connectWebSocketStream(dispatch, symbol, streamType, timeframe);
-        }, reconnectDelay);
+        // Attempt to reconnect if not a clean close (code 1000) and attempts are reasonable
+        // Also check for code 1006 which is an abnormal closure
+        if ((event.code !== 1000 && event.code !== 1006) ||
+            (event.code === 1006 && connectionAttempts[streamKey] < 3)) {
+          const reconnectDelay = Math.min(5000 * connectionAttempts[streamKey], 30000);
+          console.log(`Attempting to reconnect WebSocket for ${streamKey} in ${reconnectDelay}ms...`);
+          setTimeout(() => {
+            // Only reconnect if this stream key is not already connected
+            if (!activeWebSockets[streamKey]) {
+              connectWebSocketStream(dispatch, symbol, streamType, timeframe);
+            }
+          }, reconnectDelay);
+        } else if (event.code === 1006) {
+          console.error(`WebSocket for ${streamKey} closed abnormally after ${connectionAttempts[streamKey]} attempts. Not reconnecting.`);
+        }
+      } else {
+        console.log(`WebSocket close event for ${streamKey} ignored - not the active connection`);
       }
     };
 
@@ -200,14 +224,22 @@ export const connectWebSocketStream = async (
  * @param timeframe - Optional, for 'candles' stream.
  */
 export const disconnectWebSocketStream = (
-  streamType: 'candles' | 'orderbook', 
-  symbol: string, 
+  streamType: 'candles' | 'orderbook',
+  symbol: string,
   timeframe?: string
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
   if (activeWebSockets[streamKey]) {
     console.log(`Manually closing WebSocket for ${streamKey}`);
-    activeWebSockets[streamKey].close(1000, 'Client initiated close');
+    // Remove all event handlers first to prevent any further updates
+    const ws = activeWebSockets[streamKey];
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onerror = null;
+    ws.onclose = null;
+    
+    // Close the connection
+    ws.close(1000, 'Client initiated close');
     delete activeWebSockets[streamKey];
   }
   

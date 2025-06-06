@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import {
   fetchOrderBook,
@@ -59,6 +59,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   } = useAppSelector((state) => state.marketData);
 
   const [displayDepth, setDisplayDepth] = useState(10);
+  const isInitialRenderForSymbol = useRef(true);
 
   // Get selected symbol data from symbolsList (selectedSymbol is the id from the dropdown)
   const selectedSymbolData = selectedSymbol
@@ -120,6 +121,19 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       timestamp: currentOrderBook.timestamp,
     };
   }, [currentOrderBook, selectedRounding]);
+
+  // Cleanup WebSocket when component unmounts or symbol changes
+  useEffect(() => {
+    // When symbol changes, reset the ref to allow the rounding effect to be skipped on initial load
+    isInitialRenderForSymbol.current = true;
+    return () => {
+      // Cleanup function - disconnect WebSocket when component unmounts
+      if (selectedSymbol) {
+        console.log(`OrderBookDisplay cleanup: disconnecting WebSocket for ${selectedSymbol}`);
+        dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
+      }
+    };
+  }, [selectedSymbol, dispatch]);
 
   // Calculate and set available rounding options when symbol data becomes available
   useEffect(() => {
@@ -192,6 +206,14 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       return;
     }
 
+    // Don't run this logic on the very first render for a symbol,
+    // as the `changeSelectedSymbol` thunk handles the initial fetch and WS connection.
+    // This effect should only run when rounding or depth are changed by the user.
+    if (isInitialRenderForSymbol.current) {
+      isInitialRenderForSymbol.current = false;
+      return;
+    }
+
     // Get symbolDetails (for pricePrecision) and displayDepth from state
     const symbolDetails = selectedSymbolData;
     
@@ -216,21 +238,15 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     const clampedLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
     const finalLimit = VALID_LIMITS.find(limit => limit >= clampedLimit) || MAX_RAW_LIMIT;
 
-    // Only stop and restart WebSocket if we have orderbook data already
-    // This prevents stopping a freshly connected WebSocket on initial load
-    const hasExistingOrderBookData = currentOrderBook && currentOrderBook.bids.length > 0;
-    const wasWebSocketConnected = orderBookWsConnected;
-    
-    if (wasWebSocketConnected && hasExistingOrderBookData) {
-      dispatch(setShouldRestartWebSocketAfterFetch(true));
-      dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
-    }
+    // When rounding or depth changes, we always want to stop the stream, fetch a new snapshot,
+    // and have the listener middleware restart the stream.
+    dispatch(setShouldRestartWebSocketAfterFetch(true));
+    dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
 
     // Dispatch fetchOrderBook with calculated limit
     // The startOrderBookWebSocket will be triggered after fetchOrderBook.fulfilled via listener middleware
-    // (only if shouldRestartWebSocketAfterFetch flag was set above)
     dispatch(fetchOrderBook({ symbol: selectedSymbol, limit: finalLimit }));
-  }, [selectedSymbol, selectedRounding, selectedSymbolData, displayDepth, orderBookWsConnected, currentOrderBook, dispatch]);
+  }, [selectedSymbol, selectedRounding, selectedSymbolData, displayDepth, dispatch]);
 
   // Note: wsError state is not currently being set by websocketService.
   // If specific UI feedback for WS errors is needed here, websocketService would need to propagate errors.

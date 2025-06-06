@@ -79,17 +79,40 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str):
         )
 
         try:
-            # Keep the connection alive and handle client messages
+            # Keep the connection alive
             while True:
-                # Wait for client messages (ping/pong, etc.)
                 try:
-                    data = await websocket.receive_text()
-                    # Handle client messages if needed (e.g., ping/pong)
-                    message = json.loads(data)
-                    if message.get("type") == "ping":
-                        await websocket.send_text(json.dumps({"type": "pong"}))
-                except Exception:
-                    # Client disconnected or sent invalid data
+                    # Use receive() instead of receive_text() to handle all message types
+                    message = await websocket.receive()
+
+                    # Check if it's a disconnect message
+                    if message["type"] == "websocket.disconnect":
+                        logger.info(
+                            f"WebSocket orderbook client disconnected for {symbol}"
+                        )
+                        break
+
+                    # Handle text messages
+                    elif message["type"] == "websocket.receive":
+                        if "text" in message:
+                            try:
+                                data = json.loads(message["text"])
+                                if data.get("type") == "ping":
+                                    await websocket.send_text(
+                                        json.dumps({"type": "pong"})
+                                    )
+                            except json.JSONDecodeError:
+                                logger.warning(
+                                    f"Invalid JSON received from client for {symbol}"
+                                )
+
+                except WebSocketDisconnect:
+                    logger.info(f"WebSocket orderbook client disconnected for {symbol}")
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Error in WebSocket receive loop for {symbol}: {str(e)}"
+                    )
                     break
 
         except WebSocketDisconnect:
@@ -177,17 +200,40 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
         )
 
         try:
-            # Keep the connection alive and handle client messages
+            # Keep the connection alive
             while True:
-                # Wait for client messages (ping/pong, etc.)
                 try:
-                    data = await websocket.receive_text()
-                    # Handle client messages if needed (e.g., ping/pong)
-                    message = json.loads(data)
-                    if message.get("type") == "ping":
-                        await websocket.send_text(json.dumps({"type": "pong"}))
-                except Exception:
-                    # Client disconnected or sent invalid data
+                    # Use receive() instead of receive_text() to handle all message types
+                    message = await websocket.receive()
+
+                    # Check if it's a disconnect message
+                    if message["type"] == "websocket.disconnect":
+                        logger.info(
+                            f"WebSocket ticker client disconnected for {symbol}"
+                        )
+                        break
+
+                    # Handle text messages
+                    elif message["type"] == "websocket.receive":
+                        if "text" in message:
+                            try:
+                                data = json.loads(message["text"])
+                                if data.get("type") == "ping":
+                                    await websocket.send_text(
+                                        json.dumps({"type": "pong"})
+                                    )
+                            except json.JSONDecodeError:
+                                logger.warning(
+                                    f"Invalid JSON received from client for {symbol}"
+                                )
+
+                except WebSocketDisconnect:
+                    logger.info(f"WebSocket ticker client disconnected for {symbol}")
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Error in WebSocket receive loop for {symbol}: {str(e)}"
+                    )
                     break
 
         except WebSocketDisconnect:
@@ -300,17 +346,42 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
         )
 
         try:
-            # Keep the connection alive and handle client messages
+            # Keep the connection alive
             while True:
-                # Wait for client messages (ping/pong, etc.)
                 try:
-                    data = await websocket.receive_text()
-                    # Handle client messages if needed (e.g., ping/pong)
-                    message = json.loads(data)
-                    if message.get("type") == "ping":
-                        await websocket.send_text(json.dumps({"type": "pong"}))
-                except Exception:
-                    # Client disconnected or sent invalid data
+                    # Use receive() instead of receive_text() to handle all message types
+                    message = await websocket.receive()
+
+                    # Check if it's a disconnect message
+                    if message["type"] == "websocket.disconnect":
+                        logger.info(
+                            f"WebSocket candles client disconnected for {symbol}/{timeframe}"
+                        )
+                        break
+
+                    # Handle text messages
+                    elif message["type"] == "websocket.receive":
+                        if "text" in message:
+                            try:
+                                data = json.loads(message["text"])
+                                if data.get("type") == "ping":
+                                    await websocket.send_text(
+                                        json.dumps({"type": "pong"})
+                                    )
+                            except json.JSONDecodeError:
+                                logger.warning(
+                                    f"Invalid JSON received from client for {symbol}/{timeframe}"
+                                )
+
+                except WebSocketDisconnect:
+                    logger.info(
+                        f"WebSocket candles client disconnected for {symbol}/{timeframe}"
+                    )
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Error in WebSocket receive loop for {symbol}/{timeframe}: {str(e)}"
+                    )
                     break
 
         except WebSocketDisconnect:
