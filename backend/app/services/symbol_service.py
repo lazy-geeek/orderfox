@@ -22,6 +22,40 @@ class SymbolService:
         self._markets_cache: Optional[Dict[str, Any]] = None
         self._cache_initialized = False
 
+        # Fallback symbols for development/demo mode when exchange is not available
+        self._fallback_symbols = {
+            # Common USDT pairs
+            "BTCUSDT": "BTC/USDT",
+            "ETHUSDT": "ETH/USDT",
+            "ADAUSDT": "ADA/USDT",
+            "SOLUSDT": "SOL/USDT",
+            "DOTUSDT": "DOT/USDT",
+            "LINKUSDT": "LINK/USDT",
+            "LTCUSDT": "LTC/USDT",
+            "XRPUSDT": "XRP/USDT",
+            "BCHUSDT": "BCH/USDT",
+            "EOSUSDT": "EOS/USDT",
+            "TRXUSDT": "TRX/USDT",
+            "AVAXUSDT": "AVAX/USDT",
+            "MATICUSDT": "MATIC/USDT",
+            "ATOMUSDT": "ATOM/USDT",
+            "FTMUSDT": "FTM/USDT",
+            "NEARUSDT": "NEAR/USDT",
+            "ALGOUSDT": "ALGO/USDT",
+            "VETUSDT": "VET/USDT",
+            "ICPUSDT": "ICP/USDT",
+            "FILUSDT": "FIL/USDT",
+            "AXSUSDT": "AXS/USDT",
+            "SANDUSDT": "SAND/USDT",
+            "MANAUSDT": "MANA/USDT",
+            # Common BTC pairs
+            "ETHBTC": "ETH/BTC",
+            "ADABTC": "ADA/BTC",
+            "SOLBTC": "SOL/BTC",
+            "LINKBTC": "LINK/BTC",
+            "LTCBTC": "LTC/BTC",
+        }
+
     def _initialize_cache(self) -> None:
         """Initialize symbol caches from exchange markets."""
         if self._cache_initialized:
@@ -43,15 +77,22 @@ class SymbolService:
 
             self._cache_initialized = True
             logger.info(
-                f"Symbol cache initialized with {len(self._symbol_cache)} symbols"
+                f"Symbol cache initialized with {len(self._symbol_cache)} symbols from exchange"
             )
 
         except Exception as e:
-            logger.error(f"Failed to initialize symbol cache: {str(e)}")
-            # Initialize empty caches to prevent repeated failures
-            self._symbol_cache = {}
-            self._exchange_to_id_cache = {}
+            logger.warning(f"Failed to initialize symbol cache from exchange: {str(e)}")
+            logger.info("Falling back to demo symbols for development mode")
+
+            # Use fallback symbols for development/demo mode
+            for symbol_id, exchange_symbol in self._fallback_symbols.items():
+                self._symbol_cache[symbol_id] = exchange_symbol
+                self._exchange_to_id_cache[exchange_symbol] = symbol_id
+
             self._cache_initialized = True
+            logger.info(
+                f"Symbol cache initialized with {len(self._symbol_cache)} fallback symbols for demo mode"
+            )
 
     def resolve_symbol_to_exchange_format(self, symbol_id: str) -> Optional[str]:
         """
@@ -163,20 +204,23 @@ class SymbolService:
         """
         self._initialize_cache()
 
-        if not self._symbol_cache:
-            return []
+        # Use symbol cache (which includes fallback symbols if exchange failed)
+        available_symbols = list(self._symbol_cache.keys())
+        if not available_symbols:
+            # If still empty, provide some basic suggestions
+            available_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
 
         suggestions = []
         invalid_upper = invalid_symbol.upper()
 
         # Exact match (case insensitive)
-        for symbol_id in self._symbol_cache.keys():
+        for symbol_id in available_symbols:
             if symbol_id.upper() == invalid_upper:
                 suggestions.append(symbol_id)
 
         # Partial matches
         if len(suggestions) < max_suggestions:
-            for symbol_id in self._symbol_cache.keys():
+            for symbol_id in available_symbols:
                 if (
                     invalid_upper in symbol_id.upper()
                     or symbol_id.upper().startswith(invalid_upper)
@@ -191,7 +235,7 @@ class SymbolService:
             pattern_match = re.search(r"(USDT|BUSD|BTC|ETH)$", invalid_upper)
             if pattern_match:
                 quote_pattern = pattern_match.group(1)
-                for symbol_id in self._symbol_cache.keys():
+                for symbol_id in available_symbols:
                     if (
                         symbol_id.upper().endswith(quote_pattern)
                         and symbol_id not in suggestions

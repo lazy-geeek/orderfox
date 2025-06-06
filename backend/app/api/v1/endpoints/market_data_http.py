@@ -290,3 +290,46 @@ async def get_candles(
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch candles for {symbol}: {str(e)}"
         )
+
+
+@router.post("/refresh-symbols")
+async def refresh_symbols():
+    """
+    Refresh the symbol cache. Useful for development when symbols are updated.
+
+    Returns:
+        Dict with refresh status and cache statistics.
+    """
+    try:
+        logger.info("Manual symbol cache refresh requested")
+        symbol_service.refresh_cache()
+        stats = symbol_service.get_cache_stats()
+        logger.info(f"Symbol cache refreshed successfully: {stats}")
+        return {
+            "status": "success",
+            "message": "Symbol cache refreshed successfully",
+            "cache_stats": stats,
+        }
+    except Exception as e:
+        logger.error(f"Failed to refresh symbol cache: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to refresh symbol cache: {str(e)}"
+        )
+
+
+@router.get("/symbol-cache-stats")
+async def get_symbol_cache_stats():
+    """
+    Get symbol cache statistics for debugging.
+
+    Returns:
+        Dict with cache statistics.
+    """
+    try:
+        stats = symbol_service.get_cache_stats()
+        return {"status": "success", "cache_stats": stats}
+    except Exception as e:
+        logger.error(f"Failed to get symbol cache stats: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get symbol cache stats: {str(e)}"
+        )

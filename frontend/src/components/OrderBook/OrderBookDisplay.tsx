@@ -216,21 +216,21 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     const clampedLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
     const finalLimit = VALID_LIMITS.find(limit => limit >= clampedLimit) || MAX_RAW_LIMIT;
 
-    // Set flag to indicate WebSocket should be restarted after fetchOrderBook.fulfilled
+    // Only stop and restart WebSocket if we have orderbook data already
+    // This prevents stopping a freshly connected WebSocket on initial load
+    const hasExistingOrderBookData = currentOrderBook && currentOrderBook.bids.length > 0;
     const wasWebSocketConnected = orderBookWsConnected;
-    if (wasWebSocketConnected) {
+    
+    if (wasWebSocketConnected && hasExistingOrderBookData) {
       dispatch(setShouldRestartWebSocketAfterFetch(true));
-    }
-
-    // Stop WebSocket if currently connected for this symbol
-    if (wasWebSocketConnected) {
       dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
     }
 
     // Dispatch fetchOrderBook with calculated limit
     // The startOrderBookWebSocket will be triggered after fetchOrderBook.fulfilled via listener middleware
+    // (only if shouldRestartWebSocketAfterFetch flag was set above)
     dispatch(fetchOrderBook({ symbol: selectedSymbol, limit: finalLimit }));
-  }, [selectedSymbol, selectedRounding, selectedSymbolData, displayDepth, orderBookWsConnected, dispatch]);
+  }, [selectedSymbol, selectedRounding, selectedSymbolData, displayDepth, orderBookWsConnected, currentOrderBook, dispatch]);
 
   // Note: wsError state is not currently being set by websocketService.
   // If specific UI feedback for WS errors is needed here, websocketService would need to propagate errors.

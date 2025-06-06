@@ -595,8 +595,8 @@ export const changeSelectedSymbol = createAsyncThunk<
       await dispatch(stopCandlesWebSocket({ symbol: currentSymbol, timeframe: selectedTimeframe }));
       await dispatch(stopOrderBookWebSocket({ symbol: currentSymbol }));
       
-      // Wait a bit to ensure cleanup is complete
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait longer to ensure cleanup is complete and connections are fully closed
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
     
     // If new symbol is selected, start new connections and fetch data
@@ -626,9 +626,16 @@ export const changeSelectedSymbol = createAsyncThunk<
       // Set flag to restart WebSocket after fetchOrderBook.fulfilled
       dispatch(setShouldRestartWebSocketAfterFetch(true));
       
-      // Start candles WebSocket immediately (not dependent on order book)
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for HTTP requests to complete before starting WebSocket connections
+      // This prevents race conditions and ensures stable initial data
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Start candles WebSocket first (not dependent on order book)
+      console.log(`Starting candles WebSocket for ${newSymbol}`);
       await dispatch(startCandlesWebSocket({ symbol: newSymbol, timeframe: selectedTimeframe }));
+      
+      // Wait a bit before starting orderbook WebSocket to prevent connection conflicts
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Order book WebSocket will be started by the listener middleware after fetchOrderBook.fulfilled
     }
