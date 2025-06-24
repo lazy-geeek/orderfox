@@ -291,9 +291,13 @@ class ConnectionManager:
 
     # Keep backward compatibility for existing orderbook methods
     async def connect_orderbook(
-        self, websocket: WebSocket, symbol: str, display_symbol: str = None
+        self, websocket: WebSocket, symbol: str, display_symbol: str = None, limit: int = 20
     ):
         """Accept a new WebSocket connection for orderbook (backward compatibility)."""
+        # Store the limit for this symbol stream
+        if not hasattr(self, '_stream_limits'):
+            self._stream_limits = {}
+        self._stream_limits[symbol] = limit
         await self.connect(websocket, symbol, "orderbook", display_symbol)
 
     def disconnect_orderbook(self, websocket: WebSocket, symbol: str):
@@ -311,6 +315,10 @@ class ConnectionManager:
             logger.info(f"Initializing orderbook stream for {symbol}")
             exchange_pro = exchange_service.get_exchange_pro()
 
+            # Get the dynamic limit for this symbol, default to 20
+            limit = getattr(self, '_stream_limits', {}).get(symbol, 20)
+            logger.info(f"Using limit {limit} for orderbook stream {symbol}")
+
             # Test connection before starting stream
             if exchange_pro is None:
                 logger.warning(f"CCXT Pro not available for {symbol}, using mock data")
@@ -318,7 +326,7 @@ class ConnectionManager:
                 return
 
             try:
-                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=20)
+                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=limit)
                 logger.info(f"Exchange connection test successful for {symbol}")
             except Exception as e:
                 logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")
@@ -331,15 +339,15 @@ class ConnectionManager:
                     # Watch order book updates
                     order_book_data = await exchange_pro.watch_order_book(symbol)
 
-                    # Convert to our schema format
+                    # Convert to our schema format using dynamic limit
                     bids = [
                         {"price": float(bid[0]), "amount": float(bid[1])}
-                        for bid in order_book_data["bids"][:20]  # Top 20 levels
+                        for bid in order_book_data["bids"][:limit]  # Use dynamic limit
                     ]
 
                     asks = [
                         {"price": float(ask[0]), "amount": float(ask[1])}
-                        for ask in order_book_data["asks"][:20]  # Top 20 levels
+                        for ask in order_book_data["asks"][:limit]  # Use dynamic limit
                     ]
 
                     # Use display symbol if available, otherwise use the stream symbol

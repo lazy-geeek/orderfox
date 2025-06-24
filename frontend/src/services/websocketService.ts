@@ -21,12 +21,14 @@ const connectionInProgress: { [key: string]: boolean } = {};
  * @param symbol - The trading symbol (e.g., 'ETHUSDT').
  * @param streamType - The type of stream ('candles' or 'orderbook').
  * @param timeframe - Optional, for 'candles' stream (e.g., '1m', '5m').
+ * @param limit - Optional, for 'orderbook' stream, number of levels to fetch.
  */
 export const connectWebSocketStream = async (
   dispatch: AppDispatch,
   symbol: string,
   streamType: 'candles' | 'orderbook',
-  timeframe?: string
+  timeframe?: string,
+  limit?: number
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
   const wsBaseUrl = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:8000/api/v1';
@@ -34,9 +36,16 @@ export const connectWebSocketStream = async (
   // Ensure the base URL doesn't have a trailing slash
   const cleanWsBaseUrl = wsBaseUrl.replace(/\/$/, '');
   
-  const wsUrl = timeframe
-    ? `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`
-    : `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
+  let wsUrl: string;
+  if (timeframe) {
+    wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
+  } else {
+    wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
+    // Add limit parameter for orderbook streams
+    if (streamType === 'orderbook' && limit) {
+      wsUrl += `?limit=${limit}`;
+    }
+  }
 
   // Prevent multiple simultaneous connection attempts for the same stream
   if (connectionInProgress[streamKey]) {

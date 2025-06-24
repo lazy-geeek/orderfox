@@ -308,12 +308,12 @@ export const stopCandlesWebSocket = createAsyncThunk<
 
 export const startOrderBookWebSocket = createAsyncThunk<
   void,
-  { symbol: string },
+  { symbol: string; limit?: number },
   { dispatch: AppDispatch; state: RootState }
 >(
   'marketData/startOrderBookWebSocket',
-  async ({ symbol }, { dispatch }) => {
-    await connectWebSocketStream(dispatch, symbol, 'orderbook');
+  async ({ symbol, limit }, { dispatch }) => {
+    await connectWebSocketStream(dispatch, symbol, 'orderbook', undefined, limit);
   }
 );
 
@@ -515,10 +515,13 @@ marketDataListenerMiddleware.startListening({
       // Reset the flag first
       listenerApi.dispatch(marketDataSlice.actions.setShouldRestartWebSocketAfterFetch(false));
       
-      // Start the WebSocket for the current symbol
+      // Get the limit that was used in the fetchOrderBook request
+      const requestLimit = action.meta.arg.limit || 20;
+      
+      // Start the WebSocket for the current symbol with the same limit
       // Cast dispatch to AppDispatch to handle thunk actions
       const dispatch = listenerApi.dispatch as AppDispatch;
-      await dispatch(startOrderBookWebSocket({ symbol: selectedSymbol }));
+      await dispatch(startOrderBookWebSocket({ symbol: selectedSymbol, limit: requestLimit }));
     }
   },
 });
@@ -534,8 +537,8 @@ export const initializeMarketDataStreams = createAsyncThunk<
     const { selectedSymbol, selectedTimeframe } = getState().marketData;
 
     if (selectedSymbol) {
-      // Start order book WebSocket
-      dispatch(startOrderBookWebSocket({ symbol: selectedSymbol }));
+      // Start order book WebSocket with default limit
+      dispatch(startOrderBookWebSocket({ symbol: selectedSymbol, limit: MIN_RAW_LIMIT }));
       // Start candles WebSocket
       dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
     }

@@ -20,13 +20,14 @@ router = APIRouter()
 
 
 @router.websocket("/ws/orderbook/{symbol}")
-async def websocket_orderbook(websocket: WebSocket, symbol: str):
+async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = 20):
     """
     WebSocket endpoint for real-time order book updates.
 
     Args:
         websocket: WebSocket connection
         symbol: Trading symbol (e.g., 'BTCUSDT')
+        limit: Number of order book levels to stream (default: 20, max: 1000)
 
     The WebSocket will send JSON messages with the following format:
     {
@@ -72,8 +73,11 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str):
             f"Using exchange symbol: {exchange_symbol} for WebSocket symbol: {symbol}"
         )
 
-        # Connect to the connection manager using the exchange symbol
-        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol)
+        # Validate and clamp limit parameter
+        limit = max(5, min(limit, 1000))  # Ensure limit is between 5 and 1000
+        
+        # Connect to the connection manager using the exchange symbol and limit
+        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol, limit)
         logger.info(
             f"WebSocket orderbook streaming started for {symbol} (exchange: {exchange_symbol})"
         )

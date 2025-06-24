@@ -97,7 +97,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     });
 
     // Convert bids map to array and sort by price descending
-    const aggregatedBids = Array.from(bidsMap.entries())
+    let aggregatedBids = Array.from(bidsMap.entries())
       .map(([price, amount]) => ({ price, amount }))
       .sort((a, b) => b.price - a.price);
 
@@ -110,9 +110,10 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     });
 
     // Convert asks map to array and sort by price ascending
-    const aggregatedAsks = Array.from(asksMap.entries())
+    let aggregatedAsks = Array.from(asksMap.entries())
       .map(([price, amount]) => ({ price, amount }))
       .sort((a, b) => a.price - b.price);
+
 
     return {
       symbol: currentOrderBook.symbol,
@@ -199,7 +200,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
   ]);
 
 
-  // Handle rounding change effect - fetch deeper data when symbol or rounding changes
+  // Handle rounding/depth change effect - fetch deeper data when symbol, rounding, or display depth changes
   useEffect(() => {
     // Early return if required data is not available
     if (!selectedSymbol || selectedRounding === null || !selectedSymbolData) {
@@ -224,17 +225,24 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     // Binance futures only accepts specific limits: 5, 10, 20, 50, 100, 500, 1000
     const MIN_RAW_LIMIT = 100;  // Changed from 200 to 100 (valid Binance limit)
     const MAX_RAW_LIMIT = 1000;
-    const AGGRESSIVENESS_FACTOR = 3;
+    const AGGRESSIVENESS_FACTOR = 50; // Increased to 50 for much better coverage with high rounding
     
     // Valid Binance futures orderbook limits
     const VALID_LIMITS = [5, 10, 20, 50, 100, 500, 1000];
     
     let calculatedLimit = MIN_RAW_LIMIT;
     if (selectedRounding > baseTickSize) {
-      calculatedLimit = Math.ceil((selectedRounding / baseTickSize) * displayDepth * AGGRESSIVENESS_FACTOR);
+      // Calculate how many raw levels we need to ensure we have enough data after aggregation
+      const roundingMultiplier = selectedRounding / baseTickSize;
+      calculatedLimit = Math.ceil(roundingMultiplier * displayDepth * AGGRESSIVENESS_FACTOR);
+      
+      // For very high rounding values, always use maximum limit
+      if (roundingMultiplier > 100) {
+        calculatedLimit = MAX_RAW_LIMIT;
+      }
     }
     
-    // Round to nearest valid limit
+    // Round to nearest valid limit, always prefer higher limit for better coverage
     const clampedLimit = Math.max(MIN_RAW_LIMIT, Math.min(calculatedLimit, MAX_RAW_LIMIT));
     const finalLimit = VALID_LIMITS.find(limit => limit >= clampedLimit) || MAX_RAW_LIMIT;
 
