@@ -188,3 +188,5 @@ TASK.md
 paper_trading_test_report.json
 paper_trading_test_report.md
 prompt.txt
+
+.claude/

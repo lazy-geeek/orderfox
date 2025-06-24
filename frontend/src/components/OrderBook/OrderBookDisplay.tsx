@@ -88,32 +88,59 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       return currentOrderBook || { bids: [], asks: [], symbol: '', timestamp: 0 };
     }
 
-    // Aggregate bids (round down)
+    // Get current market price (best bid) to determine static price levels
+    const currentPrice = currentOrderBook.bids[0]?.price;
+    if (!currentPrice) {
+      return currentOrderBook;
+    }
+
+    // Create static price levels for bids (round down from current price)
+    const staticBidLevels: number[] = [];
+    for (let i = 0; i < displayDepth; i++) {
+      const priceLevel = roundDown(currentPrice - (i * selectedRounding), selectedRounding);
+      staticBidLevels.push(priceLevel);
+    }
+
+    // Create static price levels for asks (round up from current price)
+    const staticAskLevels: number[] = [];
+    for (let i = 0; i < displayDepth; i++) {
+      const priceLevel = roundUp(currentPrice + (i * selectedRounding), selectedRounding);
+      staticAskLevels.push(priceLevel);
+    }
+
+    // Aggregate bids into static levels
     const bidsMap = new Map<number, number>();
+    staticBidLevels.forEach(level => bidsMap.set(level, 0));
+    
     currentOrderBook.bids.forEach((bid) => {
       const roundedPrice = roundDown(bid.price, selectedRounding);
-      const existingAmount = bidsMap.get(roundedPrice) || 0;
-      bidsMap.set(roundedPrice, existingAmount + bid.amount);
+      if (bidsMap.has(roundedPrice)) {
+        const existingAmount = bidsMap.get(roundedPrice) || 0;
+        bidsMap.set(roundedPrice, existingAmount + bid.amount);
+      }
     });
 
     // Convert bids map to array and sort by price descending
-    let aggregatedBids = Array.from(bidsMap.entries())
-      .map(([price, amount]) => ({ price, amount }))
+    let aggregatedBids = staticBidLevels
+      .map(price => ({ price, amount: bidsMap.get(price) || 0 }))
       .sort((a, b) => b.price - a.price);
 
-    // Aggregate asks (round up)
+    // Aggregate asks into static levels
     const asksMap = new Map<number, number>();
+    staticAskLevels.forEach(level => asksMap.set(level, 0));
+    
     currentOrderBook.asks.forEach((ask) => {
       const roundedPrice = roundUp(ask.price, selectedRounding);
-      const existingAmount = asksMap.get(roundedPrice) || 0;
-      asksMap.set(roundedPrice, existingAmount + ask.amount);
+      if (asksMap.has(roundedPrice)) {
+        const existingAmount = asksMap.get(roundedPrice) || 0;
+        asksMap.set(roundedPrice, existingAmount + ask.amount);
+      }
     });
 
     // Convert asks map to array and sort by price ascending
-    let aggregatedAsks = Array.from(asksMap.entries())
-      .map(([price, amount]) => ({ price, amount }))
+    let aggregatedAsks = staticAskLevels
+      .map(price => ({ price, amount: asksMap.get(price) || 0 }))
       .sort((a, b) => a.price - b.price);
-
 
     return {
       symbol: currentOrderBook.symbol,
@@ -121,7 +148,7 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
       asks: aggregatedAsks,
       timestamp: currentOrderBook.timestamp,
     };
-  }, [currentOrderBook, selectedRounding]);
+  }, [currentOrderBook, selectedRounding, displayDepth]);
 
   // Cleanup WebSocket when component unmounts or symbol changes
   useEffect(() => {
@@ -273,13 +300,12 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     return formatLargeNumber(total);
   };
 
-  // Get sliced bids and asks based on display depth with proper null safety
-  // Use aggregated data for display
-  const displayBids = aggregatedOrderBook?.bids ? aggregatedOrderBook.bids.slice(0, displayDepth) : [];
+  // Use aggregated data for display (already limited to displayDepth in aggregation)
+  const displayBids = aggregatedOrderBook?.bids || [];
   // Asks are typically sorted ascending by price, but displayed descending (highest price at top, lowest at bottom)
   // To achieve "lowest value at the bottom" as per the task, we sort ascending and then reverse for display.
   const displayAsks = aggregatedOrderBook?.asks
-    ? [...aggregatedOrderBook.asks].slice(0, displayDepth).reverse()
+    ? [...aggregatedOrderBook.asks].reverse()
     : [];
 
   // Render loading state
