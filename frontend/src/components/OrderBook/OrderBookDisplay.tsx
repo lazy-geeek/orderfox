@@ -405,8 +405,11 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
           <div className="asks-list">
             {displayAsks.length > 0 ? (
               displayAsks.map((ask, index) => {
+                // For asks, since displayAsks is reversed (highest price first), 
+                // cumulative should represent volume available at this price and higher
+                // We need to sum from current index to the end (which represents lower to higher prices)
                 const total = displayAsks
-                  .slice(0, index + 1)
+                  .slice(index)
                   .reduce((sum, level) => sum + level.amount, 0);
                 
                 return (
@@ -448,6 +451,8 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
           <div className="bids-list">
             {displayBids.length > 0 ? (
               displayBids.map((bid, index) => {
+                // For bids, cumulative total should be from top down (highest price to current price)
+                // Since bids are displayed highest to lowest, we sum from 0 to current index
                 const total = displayBids
                   .slice(0, index + 1)
                   .reduce((sum, level) => sum + level.amount, 0);
