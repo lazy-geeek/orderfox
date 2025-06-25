@@ -66,6 +66,38 @@ interface Candle {
 }
 
 /**
+ * Ticker data for real-time price information
+ */
+interface TickerData {
+  /** Trading symbol */
+  symbol: string;
+  /** Last traded price */
+  last: number;
+  /** Best bid price */
+  bid: number;
+  /** Best ask price */
+  ask: number;
+  /** Highest price in 24h */
+  high: number;
+  /** Lowest price in 24h */
+  low: number;
+  /** Opening price */
+  open: number;
+  /** Current close price */
+  close: number;
+  /** Price change from open */
+  change: number;
+  /** Percentage change from open */
+  percentage: number;
+  /** 24h trading volume */
+  volume: number;
+  /** 24h quote volume */
+  quote_volume: number;
+  /** Timestamp of ticker data */
+  timestamp: number;
+}
+
+/**
  * Helper function to validate and filter candle data.
  * Ensures all required numerical properties exist and are valid numbers.
  */
@@ -164,6 +196,63 @@ const validateOrderBook = (orderBook: any): OrderBook | null => {
 };
 
 /**
+ * Helper function to validate ticker data.
+ * Ensures all required fields exist and contain valid numeric values.
+ */
+const validateTicker = (ticker: any): TickerData | null => {
+  if (!ticker || typeof ticker !== 'object') {
+    console.warn('Invalid ticker data: not an object', ticker);
+    return null;
+  }
+
+  // Validate timestamp
+  let timestamp: number;
+  if (typeof ticker.timestamp === 'number') {
+    timestamp = ticker.timestamp;
+  } else if (typeof ticker.timestamp === 'string') {
+    const dateTimestamp = new Date(ticker.timestamp).getTime();
+    if (!isNaN(dateTimestamp)) {
+      timestamp = dateTimestamp;
+    } else {
+      timestamp = Date.now(); // Fallback to current time
+    }
+  } else {
+    timestamp = Date.now(); // Fallback to current time
+  }
+
+  // Parse and validate numeric fields
+  const numericFields = ['last', 'bid', 'ask', 'high', 'low', 'open', 'close', 'change', 'percentage', 'volume', 'quote_volume'];
+  const parsedTicker: any = { symbol: ticker.symbol || '', timestamp };
+
+  // At minimum, we need the 'last' price to be valid
+  const lastPrice = parseFloat(ticker.last);
+  if (isNaN(lastPrice)) {
+    console.warn(`❌ Invalid ticker data: 'last' price is required but not a valid number`, ticker.last, 'Full ticker:', ticker);
+    return null;
+  }
+
+  for (const field of numericFields) {
+    const value = parseFloat(ticker[field]);
+    if (isNaN(value) || ticker[field] === null || ticker[field] === undefined) {
+      // Use fallback values for missing/invalid fields
+      if (field === 'last') {
+        parsedTicker[field] = lastPrice; // We already validated this above
+      } else if (field === 'change') {
+        parsedTicker[field] = 0; // Default to no change
+      } else if (field === 'percentage') {
+        parsedTicker[field] = 0; // Default to no percentage change
+      } else {
+        parsedTicker[field] = lastPrice; // Use last price as fallback for bid/ask/etc
+      }
+    } else {
+      parsedTicker[field] = value;
+    }
+  }
+
+  return parsedTicker as TickerData;
+};
+
+/**
  * Redux state for market data management
  */
 interface MarketDataState {
@@ -193,6 +282,12 @@ interface MarketDataState {
   candlesWsConnected: boolean;
   /** WebSocket connection status for order book */
   orderBookWsConnected: boolean;
+  /** Current ticker data */
+  currentTicker: TickerData | null;
+  /** WebSocket connection status for ticker */
+  tickerWsConnected: boolean;
+  /** Error message for ticker data */
+  tickerError: string | null;
   /** Currently selected rounding precision */
   selectedRounding: number | null;
   /** Available rounding options for the current symbol */
@@ -217,6 +312,9 @@ const initialState: MarketDataState = {
   symbolsError: null,
   candlesWsConnected: false,
   orderBookWsConnected: false,
+  currentTicker: null,
+  tickerWsConnected: false,
+  tickerError: null,
   selectedRounding: null,
   availableRoundingOptions: [],
   shouldRestartWebSocketAfterFetch: false,
@@ -330,6 +428,30 @@ export const stopOrderBookWebSocket = createAsyncThunk<
   }
 );
 
+export const startTickerWebSocket = createAsyncThunk<
+  void,
+  { symbol: string },
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/startTickerWebSocket',
+  async ({ symbol }, { dispatch }) => {
+    await connectWebSocketStream(dispatch, symbol, 'ticker');
+  }
+);
+
+export const stopTickerWebSocket = createAsyncThunk<
+  void,
+  { symbol: string },
+  { dispatch: AppDispatch; state: RootState }
+>(
+  'marketData/stopTickerWebSocket',
+  async ({ symbol }, { dispatch }) => {
+    disconnectWebSocketStream('ticker', symbol);
+    // Clear the ticker data immediately to prevent stale data
+    dispatch(marketDataSlice.actions.setTickerWsConnected(false));
+  }
+);
+
 export const stopAllWebSockets = createAsyncThunk<
   void,
   void,
@@ -354,8 +476,10 @@ const marketDataSlice = createSlice({
       if (previousSymbol !== action.payload) {
         state.currentOrderBook = null;
         state.currentCandles = [];
+        state.currentTicker = null;
         state.candlesWsConnected = false;
         state.orderBookWsConnected = false;
+        state.tickerWsConnected = false;
         state.selectedRounding = null;
         state.availableRoundingOptions = [];
       }
@@ -369,6 +493,7 @@ const marketDataSlice = createSlice({
       state.selectedSymbol = null;
       state.currentOrderBook = null;
       state.currentCandles = [];
+      state.currentTicker = null;
     },
     updateOrderBookFromWebSocket: (state, action: PayloadAction<any>) => {
       const validatedOrderBook = validateOrderBook(action.payload);
@@ -423,10 +548,27 @@ const marketDataSlice = createSlice({
     setOrderBookWsConnected: (state, action: PayloadAction<boolean>) => {
       state.orderBookWsConnected = action.payload;
     },
+    updateTickerFromWebSocket: (state, action: PayloadAction<any>) => {
+      const validatedTicker = validateTicker(action.payload);
+      if (validatedTicker) {
+        // Only update if the symbol matches the currently selected symbol
+        if (state.selectedSymbol && validatedTicker.symbol === state.selectedSymbol) {
+          state.currentTicker = validatedTicker;
+        } else {
+          console.warn('Received ticker for different symbol, skipping update:', validatedTicker.symbol, 'vs', state.selectedSymbol);
+        }
+      } else {
+        console.warn('Received invalid ticker from WebSocket, skipping update:', action.payload);
+      }
+    },
+    setTickerWsConnected: (state, action: PayloadAction<boolean>) => {
+      state.tickerWsConnected = action.payload;
+    },
     clearError: (state) => {
       state.candlesError = null;
       state.orderBookError = null;
       state.symbolsError = null;
+      state.tickerError = null;
     },
     setSelectedRounding: (state, action: PayloadAction<number | null>) => {
       state.selectedRounding = action.payload;
@@ -541,6 +683,8 @@ export const initializeMarketDataStreams = createAsyncThunk<
       dispatch(startOrderBookWebSocket({ symbol: selectedSymbol, limit: MIN_RAW_LIMIT }));
       // Start candles WebSocket
       dispatch(startCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
+      // Start ticker WebSocket
+      dispatch(startTickerWebSocket({ symbol: selectedSymbol }));
     }
   }
 );
@@ -575,6 +719,7 @@ export const cleanupMarketDataStreams = createAsyncThunk<
     if (selectedSymbol) {
       dispatch(stopCandlesWebSocket({ symbol: selectedSymbol, timeframe: selectedTimeframe }));
       dispatch(stopOrderBookWebSocket({ symbol: selectedSymbol }));
+      dispatch(stopTickerWebSocket({ symbol: selectedSymbol }));
     }
     dispatch(stopAllWebSockets()); // Ensure all are closed
   }
@@ -603,6 +748,7 @@ export const changeSelectedSymbol = createAsyncThunk<
       console.log(`Cleaning up WebSocket connections for ${currentSymbol}`);
       await dispatch(stopCandlesWebSocket({ symbol: currentSymbol, timeframe: selectedTimeframe }));
       await dispatch(stopOrderBookWebSocket({ symbol: currentSymbol }));
+      await dispatch(stopTickerWebSocket({ symbol: currentSymbol }));
       
       // Wait longer to ensure cleanup is complete and connections are fully closed
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -643,6 +789,10 @@ export const changeSelectedSymbol = createAsyncThunk<
       console.log(`Starting candles WebSocket for ${newSymbol}`);
       await dispatch(startCandlesWebSocket({ symbol: newSymbol, timeframe: selectedTimeframe }));
       
+      // Start ticker WebSocket (also not dependent on order book)
+      console.log(`Starting ticker WebSocket for ${newSymbol}`);
+      await dispatch(startTickerWebSocket({ symbol: newSymbol }));
+      
       // Wait a bit before starting orderbook WebSocket to prevent connection conflicts
       await new Promise(resolve => setTimeout(resolve, 300));
       
@@ -658,8 +808,10 @@ export const {
   clearSelectedSymbol,
   updateOrderBookFromWebSocket,
   updateCandlesFromWebSocket,
+  updateTickerFromWebSocket,
   setCandlesWsConnected,
   setOrderBookWsConnected,
+  setTickerWsConnected,
   clearError,
   setSelectedRounding,
   setAvailableRoundingOptions,

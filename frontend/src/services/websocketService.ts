@@ -2,8 +2,10 @@ import { AppDispatch } from '../store/store';
 import { 
   updateCandlesFromWebSocket, 
   updateOrderBookFromWebSocket,
+  updateTickerFromWebSocket,
   setCandlesWsConnected,
   setOrderBookWsConnected,
+  setTickerWsConnected,
 } from '../features/marketData/marketDataSlice';
 
 interface WebSocketManager {
@@ -19,14 +21,14 @@ const connectionInProgress: { [key: string]: boolean } = {};
  * Establishes and manages WebSocket connections for market data streams.
  * @param dispatch - The Redux dispatch function.
  * @param symbol - The trading symbol (e.g., 'ETHUSDT').
- * @param streamType - The type of stream ('candles' or 'orderbook').
+ * @param streamType - The type of stream ('candles', 'orderbook', or 'ticker').
  * @param timeframe - Optional, for 'candles' stream (e.g., '1m', '5m').
  * @param limit - Optional, for 'orderbook' stream, number of levels to fetch.
  */
 export const connectWebSocketStream = async (
   dispatch: AppDispatch,
   symbol: string,
-  streamType: 'candles' | 'orderbook',
+  streamType: 'candles' | 'orderbook' | 'ticker',
   timeframe?: string,
   limit?: number
 ) => {
@@ -138,16 +140,31 @@ export const connectWebSocketStream = async (
         dispatch(setCandlesWsConnected(true));
       } else if (streamType === 'orderbook') {
         dispatch(setOrderBookWsConnected(true));
+      } else if (streamType === 'ticker') {
+        dispatch(setTickerWsConnected(true));
       }
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (streamType === 'candles') {
+        
+        // Route messages based on their actual type, not just the stream type
+        if (data.type === 'candle_update') {
           dispatch(updateCandlesFromWebSocket(data));
-        } else if (streamType === 'orderbook') {
+        } else if (data.type === 'orderbook_update') {
           dispatch(updateOrderBookFromWebSocket(data));
+        } else if (data.type === 'ticker_update') {
+          dispatch(updateTickerFromWebSocket(data));
+        } else {
+          // Fallback to stream-based routing for backwards compatibility
+          if (streamType === 'candles') {
+            dispatch(updateCandlesFromWebSocket(data));
+          } else if (streamType === 'orderbook') {
+            dispatch(updateOrderBookFromWebSocket(data));
+          } else if (streamType === 'ticker') {
+            dispatch(updateTickerFromWebSocket(data));
+          }
         }
       } catch (error) {
         console.error(`Error parsing WebSocket message for ${streamKey}:`, error);
@@ -175,6 +192,8 @@ export const connectWebSocketStream = async (
           dispatch(setCandlesWsConnected(false));
         } else if (streamType === 'orderbook') {
           dispatch(setOrderBookWsConnected(false));
+        } else if (streamType === 'ticker') {
+          dispatch(setTickerWsConnected(false));
         }
       }
     };
@@ -191,6 +210,8 @@ export const connectWebSocketStream = async (
           dispatch(setCandlesWsConnected(false));
         } else if (streamType === 'orderbook') {
           dispatch(setOrderBookWsConnected(false));
+        } else if (streamType === 'ticker') {
+          dispatch(setTickerWsConnected(false));
         }
         delete activeWebSockets[streamKey];
 
@@ -228,12 +249,12 @@ export const connectWebSocketStream = async (
 
 /**
  * Disconnects a specific WebSocket stream.
- * @param streamType - The type of stream ('candles' or 'orderbook').
+ * @param streamType - The type of stream ('candles', 'orderbook', or 'ticker').
  * @param symbol - The trading symbol.
  * @param timeframe - Optional, for 'candles' stream.
  */
 export const disconnectWebSocketStream = (
-  streamType: 'candles' | 'orderbook',
+  streamType: 'candles' | 'orderbook' | 'ticker',
   symbol: string,
   timeframe?: string
 ) => {

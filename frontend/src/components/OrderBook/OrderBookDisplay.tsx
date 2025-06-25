@@ -51,9 +51,11 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
     selectedSymbol,
     symbolsList,
     currentOrderBook,
+    currentTicker,
     orderBookLoading,
     orderBookError,
     orderBookWsConnected,
+    tickerWsConnected,
     selectedRounding,
     availableRoundingOptions,
   } = useAppSelector((state) => state.marketData);
@@ -452,20 +454,29 @@ const OrderBookDisplay: React.FC<OrderBookDisplayProps> = ({ className }) => {
           </div>
         </div>
 
-        {/* Spread Section */}
-        {aggregatedOrderBook && displayBids.length > 0 && displayAsks.length > 0 && (
-          <div className="spread-section">
-            <div className="spread-info">
-              <span className="spread-label">Spread:</span>
-              <span className="spread-value">
-                {formatPrice(displayAsks[displayAsks.length - 1].price - displayBids[0].price)}
+        {/* Current Price Section */}
+        <div className="current-price-section">
+          <div className="current-price-info">
+            {currentTicker ? (
+              <>
+                <span className="price-label">Current Price:</span>
+                <span className={`current-price ${currentTicker.change >= 0 ? 'positive' : 'negative'}`}>
+                  {formatPrice(currentTicker.last)}
+                </span>
+                <span className={`price-change ${currentTicker.change >= 0 ? 'positive' : 'negative'}`}>
+                  {currentTicker.change >= 0 ? '+' : ''}{formatPrice(currentTicker.change)} ({currentTicker.percentage.toFixed(2)}%)
+                </span>
+              </>
+            ) : (
+              <span className="price-label">
+                {tickerWsConnected ? 'Waiting for price data...' : 'Connecting to price feed...'}
               </span>
-              <span className="spread-percentage">
-                ({(((displayAsks[displayAsks.length - 1].price - displayBids[0].price) / displayBids[0].price) * 100).toFixed(4)}%)
-              </span>
-            </div>
+            )}
+            <span className={`connection-indicator ${tickerWsConnected ? 'connected' : 'disconnected'}`}>
+              {tickerWsConnected ? '●' : '○'}
+            </span>
           </div>
-        )}
+        </div>
 
         {/* Bids Section */}
         <div className="bids-section">

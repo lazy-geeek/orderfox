@@ -251,7 +251,9 @@ class ConnectionManager:
         if stream_type == "orderbook":
             task = asyncio.create_task(self._stream_orderbook(stream_key))
         elif stream_type == "ticker":
-            task = asyncio.create_task(self._stream_ticker(stream_key))
+            # For ticker streams, extract symbol from stream_key (format: "SYMBOL:ticker" -> "SYMBOL")
+            symbol = stream_key.replace(":ticker", "") if stream_key.endswith(":ticker") else stream_key
+            task = asyncio.create_task(self._stream_ticker(symbol))
         elif stream_type == "candles":
             parts = stream_key.split(":")
             if len(parts) >= 2:

@@ -45,6 +45,9 @@ describe('OrderBookDisplay - Initial Connection', () => {
           orderBookLoading: false,
           orderBookError: null,
           orderBookWsConnected: true, // WebSocket just connected
+          currentTicker: null,
+          tickerWsConnected: false,
+          tickerError: null,
           selectedRounding: 0.01,
           availableRoundingOptions: [0.01, 0.1, 1],
           displayDepth: 10,
@@ -125,6 +128,9 @@ describe('OrderBookDisplay - Initial Connection', () => {
           orderBookLoading: false,
           orderBookError: null,
           orderBookWsConnected: true,
+          currentTicker: null,
+          tickerWsConnected: false,
+          tickerError: null,
           selectedRounding: 0.1, // Different rounding to trigger useEffect
           availableRoundingOptions: [0.01, 0.1, 1],
           displayDepth: 10,

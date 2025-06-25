@@ -197,8 +197,9 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
             await websocket.close(code=4000, reason=error_msg)
             return
 
-        # Connect to the connection manager using exchange symbol
-        await connection_manager.connect(websocket, exchange_symbol, "ticker", symbol)
+        # Connect to the connection manager using unique ticker stream key
+        ticker_stream_key = f"{exchange_symbol}:ticker"
+        await connection_manager.connect(websocket, ticker_stream_key, "ticker", symbol)
         logger.info(
             f"WebSocket ticker streaming started for {symbol} (exchange: {exchange_symbol})"
         )
