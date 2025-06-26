@@ -1,0 +1,121 @@
+/* General App Styles */
+.orderfox-app {
+  text-align: center;
+}
+
+/* ManualTradeForm.css */
+.orderfox-manual-trade-form {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.orderfox-manual-trade-form .form-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5rem;
+}
+
+.orderfox-manual-trade-form .trade-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.orderfox-manual-trade-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.orderfox-manual-trade-form .form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #34495e;
+  margin-bottom: 0.25rem;
+}
+
+.orderfox-manual-trade-form .form-input,
+.orderfox-manual-trade-form .form-select {
+  padding: 0.5rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: #ffffff;
+}
+
+.orderfox-manual-trade-form .form-input:focus,
+.orderfox-manual-trade-form .form-select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* OrderBookDisplay.css */
+.orderfox-order-book-display {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.orderfox-order-book-display .order-book-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+/* PositionsTable.css */
+.orderfox-positions-table-container {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+.orderfox-positions-table-container .positions-title {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* TradingModeToggle.css */
+.orderfox-trading-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.orderfox-trading-mode-toggle .mode-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #ecf0f1;
+}
+
+/* index.css */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}

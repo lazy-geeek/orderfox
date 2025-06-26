@@ -1,0 +1,15 @@
+{
+  "name": "orderfox-root",
+  "version": "1.0.0",
+  "description": "Root package for OrderFox application",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"cd backend && uvicorn app.main:app --reload\" \"cd frontend_vanilla && npm run dev\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

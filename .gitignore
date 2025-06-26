@@ -193,3 +193,5 @@ prompt.txt
 .mcp.json
 
 .gemini/
+
+node_modules/
