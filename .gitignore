@@ -195,3 +195,6 @@ prompt.txt
 .gemini/
 
 node_modules/
+
+PLAN.md
+TODO.md

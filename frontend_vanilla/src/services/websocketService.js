@@ -1,6 +1,6 @@
 
 import { 
-  updateCandlesFromWebSocket, 
+  updateCandlesFromWebSocket,
   updateOrderBookFromWebSocket,
   updateTickerFromWebSocket,
   setCandlesWsConnected,

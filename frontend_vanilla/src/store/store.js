@@ -15,6 +15,7 @@ const state = {
   tickerWsConnected: false,
   selectedRounding: null,
   availableRoundingOptions: [],
+  displayDepth: 10,
   tradingMode: 'paper',
   isSubmittingTrade: false,
   tradeError: null,
@@ -179,6 +180,58 @@ const validateTicker = (ticker) => {
 };
 
 // Mutator functions (equivalent to Redux reducers and actions)
+function calculateAndSetRoundingOptions(symbolId) {
+  if (!symbolId) {
+    setAvailableRoundingOptions([], null);
+    return;
+  }
+
+  const selectedSymbolData = state.symbolsList.find(symbol => symbol.id === symbolId);
+  if (!selectedSymbolData) {
+    setAvailableRoundingOptions([], null);
+    return;
+  }
+
+  // Calculate baseRounding from pricePrecision (same logic as React frontend)
+  const baseRounding = 1 / (10 ** (selectedSymbolData.pricePrecision || 2));
+
+  // Generate options array starting with baseRounding
+  const options = [baseRounding];
+  
+  // Get current price for stopping condition (use highest bid if available)
+  const currentPrice = state.currentOrderBook?.bids?.[0]?.price;
+  
+  // Generate additional options by multiplying by 10
+  let nextOption = baseRounding;
+  while (options.length < 7) { // Maximum 7 options as a sensible limit
+    nextOption = nextOption * 10;
+    
+    // Stop if rounding becomes too large relative to current price
+    // or if we reach a sensible maximum
+    if (currentPrice && nextOption > currentPrice / 10) {
+      break;
+    }
+    if (nextOption > 1000) { // Sensible maximum absolute value
+      break;
+    }
+    
+    options.push(nextOption);
+  }
+
+  // Ensure we have at least 3-4 options if possible
+  if (options.length < 3) {
+    // If we don't have current price data or need more options, add a few more
+    let tempOption = options[options.length - 1];
+    while (options.length < 4 && tempOption * 10 <= 1000) {
+      tempOption = tempOption * 10;
+      options.push(tempOption);
+    }
+  }
+
+  // Set the calculated options with baseRounding as default
+  setAvailableRoundingOptions(options, baseRounding);
+}
+
 function setSelectedSymbol(symbol) {
   const previousSymbol = state.selectedSymbol;
   state.selectedSymbol = symbol;
@@ -191,6 +244,9 @@ function setSelectedSymbol(symbol) {
     state.tickerWsConnected = false;
     state.selectedRounding = null;
     state.availableRoundingOptions = [];
+    
+    // Calculate rounding options for the new symbol
+    calculateAndSetRoundingOptions(symbol);
   }
   notify('selectedSymbol');
   notify('currentOrderBook');
@@ -216,6 +272,11 @@ function updateOrderBookFromWebSocket(payload) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
       state.currentOrderBook = validatedOrderBook;
       notify('currentOrderBook');
+      
+      // Recalculate rounding options when order book data is updated (like React frontend)
+      if (state.availableRoundingOptions.length === 0) {
+        calculateAndSetRoundingOptions(state.selectedSymbol);
+      }
     } else {
       console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
     }
@@ -342,6 +403,26 @@ function addToTradeHistory(trade) {
   notify('tradeHistory');
 }
 
+// Helper function to get valid Binance orderbook limit
+function getValidOrderBookLimit(desiredLimit) {
+  // Binance API supports: 5, 10, 20, 50, 100, 500, 1000
+  const validLimits = [5, 10, 20, 50, 100, 500, 1000];
+  
+  // For orderbook aggregation, we need much more data than display depth
+  // Always fetch at least 100 levels, or more if needed
+  const minimumLimit = Math.max(100, desiredLimit);
+  
+  // Find the smallest valid limit that's >= minimum limit
+  for (const limit of validLimits) {
+    if (limit >= minimumLimit) {
+      return limit;
+    }
+  }
+  
+  // If desired limit is very large, return the maximum
+  return 1000;
+}
+
 // Async functions (equivalent to Redux thunks)
 async function fetchSymbols() {
   state.symbolsLoading = true;
@@ -376,7 +457,9 @@ async function fetchOrderBook(symbol, limit) {
   notify('orderBookLoading');
   notify('orderBookError');
   try {
-    const params = limit ? `?limit=${limit}` : '';
+    // Use valid Binance limit if limit is provided
+    const validLimit = limit ? getValidOrderBookLimit(limit) : null;
+    const params = validLimit ? `?limit=${validLimit}` : '';
     const response = await fetch(`http://localhost:8000/api/v1/orderbook/${symbol}${params}`);
     if (!response.ok) {
       const errorData = await response.json();
@@ -536,5 +619,6 @@ export {
   fetchOpenPositions,
   executePaperTrade,
   executeLiveTrade,
-  setTradingModeApi
+  setTradingModeApi,
+  getValidOrderBookLimit
 };

@@ -65,30 +65,13 @@ export function createMainLayout() {
   orderBookPlaceholder.id = 'order-book-placeholder';
   orderBookPlaceholder.textContent = 'OrderBookDisplay';
 
-  const manualTradeFormPlaceholder = document.createElement('div');
-  manualTradeFormPlaceholder.id = 'manual-trade-form-placeholder';
-  manualTradeFormPlaceholder.textContent = 'ManualTradeForm';
-
   rightSidebar.appendChild(orderBookPlaceholder);
-  rightSidebar.appendChild(manualTradeFormPlaceholder);
 
   mainContent.appendChild(chartSection);
   mainContent.appendChild(rightSidebar);
 
-  // Footer
-  const footer = document.createElement('footer');
-  footer.style.padding = '1rem';
-  footer.style.borderTop = '1px solid #ccc';
-  footer.style.backgroundColor = '#f9f9f9';
-
-  const positionsTablePlaceholder = document.createElement('div');
-  positionsTablePlaceholder.id = 'positions-table-placeholder';
-  positionsTablePlaceholder.textContent = 'PositionsTable';
-  footer.appendChild(positionsTablePlaceholder);
-
   layout.appendChild(header);
   layout.appendChild(mainContent);
-  layout.appendChild(footer);
 
   return layout;
 }

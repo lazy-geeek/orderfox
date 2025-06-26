@@ -1,10 +1,10 @@
 
+import './style.css';
+
 import { createMainLayout } from './layouts/MainLayout.js';
 import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
 import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart } from './components/CandlestickChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
-import { createManualTradeForm, updateManualTradeForm } from './components/ManualTradeForm.js';
-import { createPositionsTable, updatePositionsTable } from './components/PositionsTable.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 
 import {
@@ -28,6 +28,7 @@ import {
   setCandlesWsConnected,
   setOrderBookWsConnected,
   setTickerWsConnected,
+  getValidOrderBookLimit,
 } from './store/store.js';
 
 import {
@@ -47,8 +48,6 @@ app.appendChild(mainLayout);
 const symbolSelectorPlaceholder = document.querySelector('#symbol-selector-placeholder');
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
-const manualTradeFormPlaceholder = document.querySelector('#manual-trade-form-placeholder');
-const positionsTablePlaceholder = document.querySelector('#positions-table-placeholder');
 const tradingModeTogglePlaceholder = document.querySelector('#trading-mode-toggle-placeholder');
 
 // Create and append the actual components
@@ -62,12 +61,6 @@ const candlestickChart = createCandlestickChart(candlestickChartContainer);
 const orderBookDisplay = createOrderBookDisplay();
 orderBookPlaceholder.replaceWith(orderBookDisplay);
 
-const manualTradeForm = createManualTradeForm();
-manualTradeFormPlaceholder.replaceWith(manualTradeForm);
-
-const positionsTable = createPositionsTable();
-positionsTablePlaceholder.replaceWith(positionsTable);
-
 const tradingModeToggle = createTradingModeToggle();
 tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
 
@@ -75,8 +68,6 @@ tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
 updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
 updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe);
 updateOrderBookDisplay(orderBookDisplay, state);
-updateManualTradeForm(manualTradeForm, state);
-updatePositionsTable(positionsTable, state);
 updateTradingModeToggle(tradingModeToggle, state);
 
 // Subscribe to state changes and update UI
@@ -94,24 +85,15 @@ subscribe((key) => {
     case 'orderBookWsConnected':
     case 'selectedRounding':
     case 'availableRoundingOptions':
+    case 'displayDepth':
       updateOrderBookDisplay(orderBookDisplay, state);
       break;
     case 'tradingMode':
-    case 'isSubmittingTrade':
-    case 'tradeError':
-      updateManualTradeForm(manualTradeForm, state);
       updateTradingModeToggle(tradingModeToggle, state);
       break;
-    case 'openPositions':
-    case 'positionsLoading':
-    case 'positionsError':
-      updatePositionsTable(positionsTable, state);
-      break;
     case 'candlesWsConnected':
-    case 'tickerWsConnected':
-      // Update chart and order book to reflect connection status
+      // Update chart to reflect connection status
       updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe);
-      updateOrderBookDisplay(orderBookDisplay, state);
       break;
     default:
       break;
@@ -123,14 +105,16 @@ symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
   // Re-fetch data and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-  fetchOrderBook(state.selectedSymbol);
+  // Use dynamic limit for orderbook with valid Binance limit
+  const dynamicLimit = (state.displayDepth || 10) * 5;
+  const validLimit = getValidOrderBookLimit(dynamicLimit);
+  fetchOrderBook(state.selectedSymbol, validLimit);
   disconnectAllWebSockets(); // Disconnect all old streams
   
   // Introduce a delay to allow old WebSockets to fully close
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
     connectWebSocketStream(state.selectedSymbol, 'orderbook');
-    connectWebSocketStream(state.selectedSymbol, 'ticker');
   }, 500); // 500ms delay
 });
 
@@ -147,61 +131,27 @@ const timeframeSelector = createTimeframeSelector((newTimeframe) => {
 candlestickChartContainer.prepend(timeframeSelector);
 
 orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
-  setDisplayDepth(Number(e.target.value));
-  // Re-fetch order book with new depth, which will trigger WS restart
-  fetchOrderBook(state.selectedSymbol, state.displayDepth);
+  const newDepth = Number(e.target.value);
+  setDisplayDepth(newDepth);
+  // Calculate dynamic limit like React frontend: displayDepth * 5, then get valid Binance limit
+  const dynamicLimit = newDepth * 5;
+  const validLimit = getValidOrderBookLimit(dynamicLimit);
+  // Re-fetch order book with valid limit to get enough data for aggregation
+  fetchOrderBook(state.selectedSymbol, validLimit);
 });
 
 orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
   setSelectedRounding(Number(e.target.value));
-  // Re-fetch order book with new rounding, which will trigger WS restart
-  fetchOrderBook(state.selectedSymbol, state.displayDepth);
+  // When rounding changes, we need to re-fetch with current limit to ensure proper aggregation
+  const dynamicLimit = (state.displayDepth || 10) * 5;
+  const validLimit = getValidOrderBookLimit(dynamicLimit);
+  fetchOrderBook(state.selectedSymbol, validLimit);
 });
 
-manualTradeForm.querySelector('.trade-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const tradeDetails = {
-    symbol: formData.get('symbol'),
-    side: formData.get('side'),
-    amount: parseFloat(formData.get('amount')),
-    type: formData.get('type'),
-    price: formData.get('type') === 'limit' ? parseFloat(formData.get('price')) : undefined,
-  };
-
-  if (state.tradingMode === 'paper') {
-    await executePaperTrade(tradeDetails);
-  } else {
-    await executeLiveTrade(tradeDetails);
-  }
-});
-
-positionsTable.addEventListener('click', async (e) => {
-  if (e.target.classList.contains('close-button')) {
-    const row = e.target.closest('tr');
-    const symbol = row.querySelector('.symbol').textContent;
-    const side = row.querySelector('.side').textContent.toLowerCase();
-    const size = parseFloat(row.querySelector('.size').textContent);
-
-    const tradeDetails = {
-      symbol,
-      side: side === 'long' ? 'sell' : 'buy', // Close long with sell, close short with buy
-      amount: size,
-      type: 'market',
-    };
-
-    if (state.tradingMode === 'paper') {
-      await executePaperTrade(tradeDetails);
-    } else {
-      await executeLiveTrade(tradeDetails);
-    }
-  }
-});
 
 tradingModeToggle.querySelector('.mode-button').addEventListener('click', async () => {
   const newMode = state.tradingMode === 'paper' ? 'live' : 'paper';
   await setTradingModeApi(newMode);
-  fetchOpenPositions(); // Refresh positions after mode change
 });
 
 // Initial data fetch
@@ -211,7 +161,6 @@ fetchSymbols().then(() => {
   //   setSelectedSymbol(state.symbolsList[0].id); 
   // }
 });
-fetchOpenPositions();
 
 // Global cleanup on page unload
 window.addEventListener('beforeunload', () => {
