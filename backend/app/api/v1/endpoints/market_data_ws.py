@@ -7,7 +7,7 @@ streaming including order books, tickers, and candlestick data.
 
 import asyncio
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.services.exchange_service import exchange_service
 from app.services.symbol_service import symbol_service
 from app.api.v1.endpoints.connection_manager import connection_manager
@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/orderbook/{symbol}")
-async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = 20):
+async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Query(default=20, ge=5, le=1000)):
     """
     WebSocket endpoint for real-time order book updates.
 

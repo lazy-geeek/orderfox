@@ -153,9 +153,17 @@ function updateOrderBookDisplay(container, data) {
   const asksList = container.querySelector('.asks-list');
   const bidsList = container.querySelector('.bids-list');
 
-  if (asksList && bidsList && orderBook && orderBook.asks && orderBook.bids) {
-    asksList.innerHTML = '';
-    bidsList.innerHTML = '';
+  if (asksList && bidsList) {
+    // Show loading state if transitioning
+    if (data.orderBookLoading) {
+      asksList.innerHTML = '<div class="loading-state">Loading...</div>';
+      bidsList.innerHTML = '<div class="loading-state">Loading...</div>';
+      return;
+    }
+
+    if (orderBook && orderBook.asks && orderBook.bids) {
+      asksList.innerHTML = '';
+      bidsList.innerHTML = '';
 
     // Get current market price (use highest bid or lowest ask)
     const currentPrice = orderBook.bids?.[0]?.price || orderBook.asks?.[0]?.price;
@@ -189,6 +197,13 @@ function updateOrderBookDisplay(container, data) {
       // Take exactly effectiveDepth levels
       return sortedLevels.slice(0, effectiveDepth);
     };
+
+    // Validate we have enough raw data for proper aggregation
+    const minRequiredRawData = effectiveDepth * 5; // Need at least 5x more raw data than display depth
+    if (orderBook.asks.length < minRequiredRawData || orderBook.bids.length < minRequiredRawData) {
+      console.warn(`Insufficient orderbook data for aggregation. Need at least ${minRequiredRawData} levels, have asks: ${orderBook.asks.length}, bids: ${orderBook.bids.length}`);
+      // Still proceed but log the warning
+    }
 
     // Get exactly the needed number of levels for asks and bids
     const aggregatedAsks = getExactLevels(orderBook.asks, true);
@@ -233,6 +248,11 @@ function updateOrderBookDisplay(container, data) {
       `;
       bidsList.appendChild(row);
     });
+    } else {
+      // Show empty state if no data
+      asksList.innerHTML = '<div class="empty-state">No order book data</div>';
+      bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
+    }
   }
 
 

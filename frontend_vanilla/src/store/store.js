@@ -376,8 +376,10 @@ function setDisplayDepth(depth) {
 function clearOrderBook() {
   state.currentOrderBook = { bids: [], asks: [], symbol: '', timestamp: 0 };
   state.orderBookWsConnected = false;
+  state.orderBookLoading = true; // Indicate transition state
   notify('currentOrderBook');
   notify('orderBookWsConnected');
+  notify('orderBookLoading');
 }
 
 function setTradingMode(mode) {
@@ -409,8 +411,8 @@ function getValidOrderBookLimit(desiredLimit) {
   const validLimits = [5, 10, 20, 50, 100, 500, 1000];
   
   // For orderbook aggregation, we need much more data than display depth
-  // Always fetch at least 100 levels, or more if needed
-  const minimumLimit = Math.max(100, desiredLimit);
+  // Always fetch at least 200 levels, or more if needed for better aggregation
+  const minimumLimit = Math.max(200, desiredLimit);
   
   // Find the smallest valid limit that's >= minimum limit
   for (const limit of validLimits) {

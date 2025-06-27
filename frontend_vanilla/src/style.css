@@ -165,7 +165,8 @@
 }
 
 .orderfox-order-book-display .order-book-content {
-  /* Remove scrollbar to show full orderbook */
+  display: flex;
+  flex-direction: column;
 }
 
 .orderfox-order-book-display .section-header {
@@ -392,7 +393,19 @@
 
 .orderfox-order-book-display .asks-list,
 .orderfox-order-book-display .bids-list {
-  /* Remove min-height constraint */
+  overflow: visible;
+}
+
+.orderfox-order-book-display .loading-state,
+.orderfox-order-book-display .empty-state {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.orderfox-order-book-display .loading-state {
+  color: #007bff;
 }
 
 /* PositionsTable.css */

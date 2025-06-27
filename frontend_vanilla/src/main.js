@@ -105,8 +105,8 @@ symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
   // Re-fetch data and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-  // Use dynamic limit for orderbook with valid Binance limit
-  const dynamicLimit = (state.displayDepth || 10) * 5;
+  // Use dynamic limit for orderbook with valid Binance limit (increased multiplier)
+  const dynamicLimit = (state.displayDepth || 10) * 10;
   const validLimit = getValidOrderBookLimit(dynamicLimit);
   fetchOrderBook(state.selectedSymbol, validLimit);
   disconnectAllWebSockets(); // Disconnect all old streams
@@ -114,7 +114,7 @@ symbolSelector.addEventListener('change', (e) => {
   // Introduce a delay to allow old WebSockets to fully close
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
-    connectWebSocketStream(state.selectedSymbol, 'orderbook');
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
   }, 500); // 500ms delay
 });
 
@@ -133,19 +133,40 @@ candlestickChartContainer.prepend(timeframeSelector);
 orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
   const newDepth = Number(e.target.value);
   setDisplayDepth(newDepth);
-  // Calculate dynamic limit like React frontend: displayDepth * 5, then get valid Binance limit
-  const dynamicLimit = newDepth * 5;
+  // Calculate dynamic limit: displayDepth * 10 for better aggregation, then get valid Binance limit
+  const dynamicLimit = newDepth * 10;
   const validLimit = getValidOrderBookLimit(dynamicLimit);
+  
+  // Clear order book to prevent old data display
+  clearOrderBook();
+  
   // Re-fetch order book with valid limit to get enough data for aggregation
   fetchOrderBook(state.selectedSymbol, validLimit);
+  
+  // Restart WebSocket connection with new limit
+  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  setTimeout(() => {
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+  }, 500); // 500ms delay to allow cleanup
 });
 
 orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
   setSelectedRounding(Number(e.target.value));
-  // When rounding changes, we need to re-fetch with current limit to ensure proper aggregation
-  const dynamicLimit = (state.displayDepth || 10) * 5;
+  // When rounding changes, we need to re-fetch with current limit and restart WebSocket
+  const dynamicLimit = (state.displayDepth || 10) * 10;
   const validLimit = getValidOrderBookLimit(dynamicLimit);
+  
+  // Clear order book to prevent old data display
+  clearOrderBook();
+  
+  // Re-fetch order book with valid limit
   fetchOrderBook(state.selectedSymbol, validLimit);
+  
+  // Restart WebSocket connection with current limit
+  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  setTimeout(() => {
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+  }, 500); // 500ms delay to allow cleanup
 });
 
 
@@ -156,10 +177,23 @@ tradingModeToggle.querySelector('.mode-button').addEventListener('click', async 
 
 // Initial data fetch
 fetchSymbols().then(() => {
-  // Removed automatic selection of the first symbol to allow "Select a symbol..." to persist
-  // if (state.symbolsList.length > 0) {
-  //   setSelectedSymbol(state.symbolsList[0].id); 
-  // }
+  // Automatically select the first symbol (highest volume) after symbols are fetched
+  if (state.symbolsList.length > 0) {
+    const firstSymbol = state.symbolsList[0];
+    setSelectedSymbol(firstSymbol.id);
+    
+    // Fetch initial data for the selected symbol
+    fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
+    const dynamicLimit = (state.displayDepth || 10) * 10;
+    const validLimit = getValidOrderBookLimit(dynamicLimit);
+    fetchOrderBook(firstSymbol.id, validLimit);
+    
+    // Start WebSocket connections for the selected symbol
+    setTimeout(() => {
+      connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
+      connectWebSocketStream(firstSymbol.id, 'orderbook', null, validLimit);
+    }, 500);
+  }
 });
 
 // Global cleanup on page unload

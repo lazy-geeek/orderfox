@@ -299,7 +299,17 @@ class ConnectionManager:
         # Store the limit for this symbol stream
         if not hasattr(self, '_stream_limits'):
             self._stream_limits = {}
-        self._stream_limits[symbol] = limit
+        
+        # If this symbol already has an active stream with a different limit, update it
+        current_limit = self._stream_limits.get(symbol)
+        if current_limit != limit and symbol in self.active_connections:
+            logger.info(f"Updating orderbook limit for {symbol} from {current_limit} to {limit}")
+            self._stream_limits[symbol] = limit
+            # Signal the streaming task to restart with new limit
+            await self._restart_orderbook_stream(symbol)
+        else:
+            self._stream_limits[symbol] = limit
+            
         await self.connect(websocket, symbol, "orderbook", display_symbol)
 
     def disconnect_orderbook(self, websocket: WebSocket, symbol: str):
@@ -320,6 +330,9 @@ class ConnectionManager:
             # Get the dynamic limit for this symbol, default to 20
             limit = getattr(self, '_stream_limits', {}).get(symbol, 20)
             logger.info(f"Using limit {limit} for orderbook stream {symbol}")
+            
+            # Validate and clamp limit parameter (same as WebSocket endpoint)
+            limit = max(5, min(limit, 1000))
 
             # Test connection before starting stream
             if exchange_pro is None:
@@ -778,6 +791,20 @@ class ConnectionManager:
                 await asyncio.sleep(5)  # Wait before retrying
 
         logger.info(f"Mock ticker stream ended for {symbol}")
+
+    async def _restart_orderbook_stream(self, symbol: str):
+        """Restart orderbook stream with updated limit."""
+        logger.info(f"Restarting orderbook stream for {symbol} with new limit")
+        
+        # Stop the current streaming task if it exists
+        if symbol in self.streaming_tasks:
+            logger.info(f"Stopping existing orderbook task for {symbol}")
+            self._stop_streaming(symbol)
+            
+        # Start new streaming task with updated limit
+        if symbol in self.active_connections and self.active_connections[symbol]:
+            logger.info(f"Starting new orderbook task for {symbol}")
+            await self._start_streaming(symbol, "orderbook")
 
 
 # Global connection manager instance
