@@ -4,25 +4,30 @@ export function createMainLayout() {
   layout.style.display = 'flex';
   layout.style.flexDirection = 'column';
   layout.style.height = '100vh';
-  layout.style.fontFamily = 'Arial, sans-serif';
+  layout.style.fontFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+  layout.style.backgroundColor = 'var(--bg-primary)';
+  layout.style.color = 'var(--text-primary)';
 
   // Header
   const header = document.createElement('header');
-  header.style.padding = '1rem';
-  header.style.backgroundColor = '#2c3e50';
-  header.style.color = 'white';
-  header.style.borderBottom = '2px solid #34495e';
+  header.style.padding = '1rem 1.5rem';
+  header.style.backgroundColor = 'var(--bg-secondary)';
+  header.style.color = 'var(--text-primary)';
+  header.style.borderBottom = '1px solid var(--border-primary)';
+  header.style.boxShadow = 'var(--shadow-light)';
 
   const h1 = document.createElement('h1');
   h1.style.margin = '0 0 1rem 0';
   h1.style.fontSize = '1.5rem';
-  h1.textContent = 'Crypto Trading Bot';
+  h1.style.fontWeight = '600';
+  h1.style.color = 'var(--text-primary)';
+  h1.textContent = 'OrderFox';
 
   const headerControls = document.createElement('div');
   headerControls.style.display = 'flex';
   headerControls.style.justifyContent = 'space-between';
   headerControls.style.alignItems = 'center';
-  headerControls.style.gap = '1rem';
+  headerControls.style.gap = '1.5rem';
 
   const symbolSelectorPlaceholder = document.createElement('div');
   symbolSelectorPlaceholder.id = 'symbol-selector-placeholder';
@@ -44,11 +49,13 @@ export function createMainLayout() {
   mainContent.style.flex = '1';
   mainContent.style.gap = '1rem';
   mainContent.style.padding = '1rem';
+  mainContent.style.backgroundColor = 'var(--bg-primary)';
 
   const chartSection = document.createElement('main');
   chartSection.style.flex = '2';
   chartSection.style.display = 'flex';
   chartSection.style.flexDirection = 'column';
+  chartSection.style.backgroundColor = 'var(--bg-primary)';
 
   const candlestickChartPlaceholder = document.createElement('div');
   candlestickChartPlaceholder.id = 'candlestick-chart-placeholder';

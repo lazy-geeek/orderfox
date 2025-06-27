@@ -1,24 +1,84 @@
+/* Import Binance-style font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Global Dark Mode Theme */
+:root {
+  /* Binance Dark Theme Colors */
+  --bg-primary: #181A20;
+  --bg-secondary: #1E2329;
+  --bg-tertiary: #2B3139;
+  --bg-quaternary: #31363F;
+  
+  /* Text Colors */
+  --text-primary: #EAECEF;
+  --text-secondary: #B7BDC6;
+  --text-tertiary: #848E9C;
+  --text-quaternary: #5E6673;
+  
+  /* Accent Colors */
+  --color-buy: #0ECB81;
+  --color-sell: #F6465D;
+  --color-warning: #FCD535;
+  --color-info: #1BA8F7;
+  
+  /* Border Colors */
+  --border-primary: #2B3139;
+  --border-secondary: #31363F;
+  --border-tertiary: #404854;
+  
+  /* Hover/Focus States */
+  --hover-bg: #2B3139;
+  --focus-border: #1BA8F7;
+  
+  /* Shadows */
+  --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+}
+
 /* General App Styles */
 .orderfox-app {
   text-align: center;
+  background-color: var(--bg-primary);
+  min-height: 100vh;
 }
 
 /* ManualTradeForm.css */
 .orderfox-manual-trade-form {
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 1rem;
   margin-top: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
 }
 
 .orderfox-manual-trade-form .form-title {
   margin: 0 0 1rem 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #2c3e50;
-  border-bottom: 2px solid #3498db;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--color-info);
   padding-bottom: 0.5rem;
 }
 
@@ -37,36 +97,38 @@
 .orderfox-manual-trade-form .form-group label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #34495e;
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .orderfox-manual-trade-form .form-input,
 .orderfox-manual-trade-form .form-select {
-  padding: 0.5rem;
-  border: 1px solid #bdc3c7;
+  padding: 0.75rem;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.875rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: #ffffff;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
 }
 
 .orderfox-manual-trade-form .form-input:focus,
 .orderfox-manual-trade-form .form-select:focus {
   outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
 }
 
 /* OrderBookDisplay.css */
 .orderfox-order-book-display {
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  background: white;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  background: var(--bg-secondary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 12px;
   margin: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-light);
   overflow: hidden;
 }
 
@@ -75,15 +137,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
 }
 
 .orderfox-order-book-display .order-book-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .orderfox-order-book-display .header-controls {
@@ -94,7 +156,7 @@
 
 .orderfox-order-book-display .symbol-label {
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -105,25 +167,25 @@
 }
 
 .orderfox-order-book-display .status-indicator.connected {
-  color: #28a745;
+  color: var(--color-buy);
   font-size: 12px;
 }
 
 .orderfox-order-book-display .status-indicator.disconnected {
-  color: #dc3545;
+  color: var(--color-sell);
   font-size: 12px;
 }
 
 .orderfox-order-book-display .status-text {
   font-size: 11px;
-  color: #666;
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .orderfox-order-book-display .depth-selector {
   padding: 8px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -131,16 +193,18 @@
 
 .orderfox-order-book-display .depth-selector label {
   font-size: 11px;
-  color: #666;
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .orderfox-order-book-display .depth-select {
   font-size: 11px;
-  padding: 2px 4px;
-  border: 1px solid #ccc;
+  padding: 4px 6px;
+  border: 1px solid var(--border-primary);
   border-radius: 3px;
-  background: white;
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
 }
 
 .orderfox-order-book-display .rounding-selector-container {
@@ -152,16 +216,18 @@
 
 .orderfox-order-book-display .rounding-selector-container label {
   font-size: 11px;
-  color: #666;
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .orderfox-order-book-display .rounding-select {
   font-size: 11px;
-  padding: 2px 4px;
-  border: 1px solid #ccc;
+  padding: 4px 6px;
+  border: 1px solid var(--border-primary);
   border-radius: 3px;
-  background: white;
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
 }
 
 .orderfox-order-book-display .order-book-content {
@@ -173,11 +239,11 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   padding: 10px 16px;
-  background: #f1f3f4;
-  border-bottom: 1px solid #e0e0e0;
-  font-weight: 700;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  font-weight: 600;
   font-size: 11px;
-  color: #555;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -192,15 +258,15 @@
 }
 
 .orderfox-order-book-display .asks-header {
-  color: #dc3545;
-  border-bottom: 1px solid #e0e0e0;
-  background: rgba(220, 53, 69, 0.05);
+  color: var(--color-sell);
+  border-bottom: 1px solid var(--border-primary);
+  background: rgba(246, 70, 93, 0.05);
 }
 
 .orderfox-order-book-display .bids-header {
-  color: #28a745;
-  border-top: 1px solid #e0e0e0;
-  background: rgba(40, 167, 69, 0.05);
+  color: var(--color-buy);
+  border-top: 1px solid var(--border-primary);
+  background: rgba(14, 203, 129, 0.05);
 }
 
 .orderfox-order-book-display .price-header,
@@ -215,7 +281,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   padding: 6px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-primary);
   font-size: 12px;
   line-height: 1.4;
   transition: background-color 0.1s ease;
@@ -231,37 +297,37 @@
 }
 
 .orderfox-order-book-display .order-level:hover {
-  background: #f8f9fa;
+  background: var(--hover-bg);
 }
 
 .orderfox-order-book-display .ask-level .price,
 .orderfox-order-book-display .ask-price {
-  color: #dc3545;
-  font-weight: 700;
+  color: var(--color-sell);
+  font-weight: 600;
   text-align: left;
   font-size: 13px;
 }
 
 .orderfox-order-book-display .bid-level .price,
 .orderfox-order-book-display .bid-price {
-  color: #28a745;
-  font-weight: 700;
+  color: var(--color-buy);
+  font-weight: 600;
   text-align: left;
   font-size: 13px;
 }
 
 .orderfox-order-book-display .amount, 
 .orderfox-order-book-display .total {
-  color: #444;
+  color: var(--text-secondary);
   font-weight: 500;
   font-size: 12px;
 }
 
 .orderfox-order-book-display .current-price-section {
   padding: 12px 16px;
-  background: #fff3cd;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
   text-align: center;
 }
 
@@ -275,7 +341,7 @@
 }
 
 .orderfox-order-book-display .price-label {
-  color: #666;
+  color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 500;
 }
@@ -286,11 +352,11 @@
 }
 
 .orderfox-order-book-display .current-price.positive {
-  color: #28a745;
+  color: var(--color-buy);
 }
 
 .orderfox-order-book-display .current-price.negative {
-  color: #dc3545;
+  color: var(--color-sell);
 }
 
 .orderfox-order-book-display .price-change {
@@ -299,11 +365,11 @@
 }
 
 .orderfox-order-book-display .price-change.positive {
-  color: #28a745;
+  color: var(--color-buy);
 }
 
 .orderfox-order-book-display .price-change.negative {
-  color: #dc3545;
+  color: var(--color-sell);
 }
 
 .orderfox-order-book-display .connection-indicator {
@@ -312,23 +378,23 @@
 }
 
 .orderfox-order-book-display .connection-indicator.connected {
-  color: #28a745;
+  color: var(--color-buy);
 }
 
 .orderfox-order-book-display .connection-indicator.disconnected {
-  color: #dc3545;
+  color: var(--color-sell);
 }
 
 .orderfox-order-book-display .order-book-footer {
   padding: 8px 16px;
-  border-top: 1px solid #e0e0e0;
-  background: #f8f9fa;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
   text-align: center;
 }
 
 .orderfox-order-book-display .timestamp {
   font-size: 10px;
-  color: #666;
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
@@ -342,8 +408,8 @@
 .orderfox-order-book-display .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #007bff;
+  border: 2px solid var(--border-primary);
+  border-top: 2px solid var(--color-info);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 12px;
@@ -355,40 +421,43 @@
 }
 
 .orderfox-order-book-display .error-message {
-  color: #dc3545;
+  color: var(--color-sell);
   margin-bottom: 12px;
 }
 
 .orderfox-order-book-display .retry-button {
-  padding: 6px 12px;
-  background: #007bff;
-  color: white;
+  padding: 8px 16px;
+  background: var(--color-info);
+  color: var(--text-primary);
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
 }
 
 .orderfox-order-book-display .retry-button:hover {
-  background: #0056b3;
+  background: #1681CC;
 }
 
 .orderfox-order-book-display .no-data {
   padding: 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-tertiary);
   font-style: italic;
   font-size: 11px;
 }
 
 .orderfox-order-book-display .asks-section {
-  border-bottom: 1px solid #f0f0f0;
-  background: linear-gradient(to bottom, rgba(220, 53, 69, 0.02), rgba(255, 255, 255, 0));
+  border-bottom: 1px solid var(--border-primary);
+  background: linear-gradient(to bottom, rgba(246, 70, 93, 0.02), rgba(30, 35, 41, 0));
 }
 
 .orderfox-order-book-display .bids-section {
-  border-top: 1px solid #f0f0f0;
-  background: linear-gradient(to top, rgba(40, 167, 69, 0.02), rgba(255, 255, 255, 0));
+  border-top: 1px solid var(--border-primary);
+  background: linear-gradient(to top, rgba(14, 203, 129, 0.02), rgba(30, 35, 41, 0));
 }
 
 .orderfox-order-book-display .asks-list,
@@ -400,17 +469,17 @@
 .orderfox-order-book-display .empty-state {
   text-align: center;
   padding: 20px;
-  color: #666;
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
 .orderfox-order-book-display .loading-state {
-  color: #007bff;
+  color: var(--color-info);
 }
 
 .orderfox-order-book-display .market-depth-indicator {
-  background: #fff3cd;
-  border: 1px solid #ffd32a;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--color-warning);
   border-radius: 4px;
   padding: 8px 12px;
   margin-top: 8px;
@@ -419,29 +488,30 @@
 
 .orderfox-order-book-display .depth-warning {
   display: block;
-  color: #856404;
+  color: var(--color-warning);
   font-weight: 500;
   margin-bottom: 2px;
 }
 
 .orderfox-order-book-display .depth-hint {
   display: block;
-  color: #6c757d;
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
 /* PositionsTable.css */
 .orderfox-positions-table-container {
-  background: #ffffff;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
   margin: 20px 0;
+  border: 1px solid var(--border-primary);
 }
 
 .orderfox-positions-table-container .positions-title {
   margin: 0 0 16px 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 18px;
   font-weight: 600;
 }
@@ -450,26 +520,150 @@
 .orderfox-trading-mode-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .orderfox-trading-mode-toggle .mode-label {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: #ecf0f1;
+  color: var(--text-secondary);
 }
 
-/* index.css */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.orderfox-trading-mode-toggle .mode-button {
+  padding: 8px 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.orderfox-trading-mode-toggle .mode-button:hover {
+  background: var(--hover-bg);
+  border-color: var(--color-info);
+}
+
+.orderfox-trading-mode-toggle .mode-button.paper-mode {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.orderfox-trading-mode-toggle .mode-button.live-mode {
+  color: var(--color-sell);
+  border-color: var(--color-sell);
+}
+
+/* Symbol Selector Styles */
+.symbol-selector {
+  padding: 8px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.symbol-selector:focus {
+  outline: none;
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
+}
+
+.symbol-selector option {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Timeframe Selector Styles */
+.timeframe-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.timeframe-selector span {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.timeframe-selector button {
+  padding: 6px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeframe-selector button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.timeframe-selector button.active {
+  background: var(--color-info);
+  color: var(--text-primary);
+  border-color: var(--color-info);
+}
+
+/* Layout Overrides for Dark Mode */
+header {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-primary) !important;
+}
+
+main {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Chart container styling */
+.chart-container {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-quaternary);
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--focus-border);
+  outline-offset: 2px;
 }

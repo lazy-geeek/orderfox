@@ -14,26 +14,21 @@ let chartInstance = null;
 
 function createCandlestickChart(container) {
   const chartContainer = document.createElement('div');
+  chartContainer.className = 'chart-container';
   chartContainer.style.height = '500px';
   chartContainer.style.width = '100%';
   container.appendChild(chartContainer);
 
-  chartInstance = echarts.init(chartContainer);
+  chartInstance = echarts.init(chartContainer, 'dark');
 
   return chartContainer;
 }
 
 function createTimeframeSelector(handleTimeframeChange) {
   const timeframeContainer = document.createElement('div');
-  timeframeContainer.style.marginBottom = '20px';
-  timeframeContainer.style.display = 'flex';
-  timeframeContainer.style.alignItems = 'center';
-  timeframeContainer.style.gap = '10px';
-  timeframeContainer.style.flexWrap = 'wrap';
+  timeframeContainer.className = 'timeframe-selector';
 
   const label = document.createElement('span');
-  label.style.fontWeight = 'bold';
-  label.style.marginRight = '10px';
   label.textContent = 'Timeframe:';
   timeframeContainer.appendChild(label);
 
@@ -41,15 +36,21 @@ function createTimeframeSelector(handleTimeframeChange) {
     const button = document.createElement('button');
     button.textContent = tf.label;
     button.dataset.timeframe = tf.value;
-    button.style.padding = '8px 16px';
-    button.style.border = '1px solid #ddd';
-    button.style.borderRadius = '4px';
-    button.style.cursor = 'pointer';
-    button.style.fontSize = '14px';
-    button.style.transition = 'all 0.2s';
-    button.addEventListener('click', () => handleTimeframeChange(tf.value));
+    button.addEventListener('click', () => {
+      // Remove active class from all buttons
+      timeframeContainer.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+      // Add active class to clicked button
+      button.classList.add('active');
+      handleTimeframeChange(tf.value);
+    });
     timeframeContainer.appendChild(button);
   });
+
+  // Set default active timeframe (1m)
+  const defaultButton = timeframeContainer.querySelector('[data-timeframe="1m"]');
+  if (defaultButton) {
+    defaultButton.classList.add('active');
+  }
 
   return timeframeContainer;
 }
@@ -76,40 +77,73 @@ function updateCandlestickChart(data, symbol, timeframe) {
   const currentDataZoom = currentOption?.dataZoom || [];
 
   const option = {
+    backgroundColor: '#1E2329',
     title: {
       text: symbol ? `${symbol} - ${timeframe}` : 'Select a Symbol',
       left: 'center',
       textStyle: {
-        color: '#333',
-        fontSize: 16
+        color: '#EAECEF',
+        fontSize: 16,
+        fontFamily: 'Inter, sans-serif',
+        fontWeight: 600
       }
     },
     tooltip: {
         trigger: 'axis',
         showContent: false,
         axisPointer: {
-          type: 'cross'
+          type: 'cross',
+          crossStyle: {
+            color: '#848E9C'
+          }
         }
     },
     grid: {
       left: '5%',
       right: '80px',
-      bottom: '15%'
+      bottom: '15%',
+      backgroundColor: 'transparent',
+      borderColor: '#2B3139'
     },
     xAxis: {
       type: 'time',
-      scale: true
+      scale: true,
+      axisLine: {
+        lineStyle: {
+          color: '#2B3139'
+        }
+      },
+      axisLabel: {
+        color: '#848E9C',
+        fontFamily: 'Inter, sans-serif'
+      },
+      splitLine: {
+        show: false
+      }
     },
     yAxis: {
       position: 'right',
       scale: true,
-      splitArea: {
-        show: true
+      axisLine: {
+        lineStyle: {
+          color: '#2B3139'
+        }
       },
       axisLabel: {
+        color: '#848E9C',
+        fontFamily: 'Inter, sans-serif',
         formatter: function (value) {
           return value.toFixed(currentPrice && currentPrice < 1 ? 6 : 2);
         }
+      },
+      splitLine: {
+        lineStyle: {
+          color: '#2B3139',
+          type: 'dashed'
+        }
+      },
+      splitArea: {
+        show: false
       }
     },
     dataZoom: currentDataZoom.length > 0 ? currentDataZoom : [
@@ -125,10 +159,10 @@ function updateCandlestickChart(data, symbol, timeframe) {
         type: 'candlestick',
         data: formattedData,
         itemStyle: {
-          color: '#00da3c',
-          color0: '#ec0000',
-          borderColor: '#00da3c',
-          borderColor0: '#ec0000'
+          color: '#0ECB81',
+          color0: '#F6465D',
+          borderColor: '#0ECB81',
+          borderColor0: '#F6465D'
         }
       },
       // Current price line
@@ -142,7 +176,7 @@ function updateCandlestickChart(data, symbol, timeframe) {
             {
               yAxis: currentPrice,
               lineStyle: {
-                color: '#ff6b35',
+                color: '#FCD535',
                 width: 2,
                 type: 'dashed'
               },
@@ -152,12 +186,13 @@ function updateCandlestickChart(data, symbol, timeframe) {
                 formatter: function() {
                   return currentPrice.toFixed(currentPrice < 1 ? 6 : 2);
                 },
-                backgroundColor: '#ff6b35',
-                color: '#fff',
+                backgroundColor: '#FCD535',
+                color: '#181A20',
                 padding: [4, 8],
                 borderRadius: 4,
                 fontSize: 12,
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                fontFamily: 'Inter, sans-serif'
               }
             }
           ]

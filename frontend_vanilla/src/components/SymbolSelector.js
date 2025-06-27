@@ -1,10 +1,7 @@
 
 function createSymbolSelector() {
   const selector = document.createElement('select');
-  selector.style.padding = '0.5rem';
-  selector.style.borderRadius = '0.25rem';
-  selector.style.border = '1px solid #ccc';
-  selector.style.minWidth = '200px';
+  selector.className = 'symbol-selector';
 
   const defaultOption = document.createElement('option');
   defaultOption.value = '';

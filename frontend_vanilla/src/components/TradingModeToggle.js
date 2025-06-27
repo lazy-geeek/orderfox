@@ -20,7 +20,7 @@ function updateTradingModeToggle(container, data) {
   const modeText = container.querySelector('.mode-text');
 
   if (button && modeText) {
-    button.className = `mode-button ${tradingMode}`;
+    button.className = `mode-button ${tradingMode}-mode`;
     button.disabled = isSubmittingTrade;
     button.title = `Switch to ${tradingMode === 'paper' ? 'Live' : 'Paper'} mode`;
 
