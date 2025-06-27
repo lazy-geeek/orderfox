@@ -230,8 +230,9 @@ function calculateAndSetRoundingOptions(symbolId) {
     }
   }
 
-  // Set the calculated options with baseRounding as default
-  setAvailableRoundingOptions(options, baseRounding);
+  // Set the calculated options with third item as default (if available)
+  const defaultRounding = options.length >= 3 ? options[2] : baseRounding;
+  setAvailableRoundingOptions(options, defaultRounding);
 }
 
 function setSelectedSymbol(symbol) {
