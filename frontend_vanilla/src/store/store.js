@@ -409,10 +409,10 @@ function addToTradeHistory(trade) {
 
 // Helper function to get valid Binance orderbook limit
 function getValidOrderBookLimit(desiredLimit) {
-  // Binance API supports: 5, 10, 20, 50, 100, 500, 1000, and up to 5000
-  const validLimits = [5, 10, 20, 50, 100, 500, 1000, 5000];
+  // Binance API supports: 5, 10, 20, 50, 100, 500, 1000 (max for futures)
+  const validLimits = [5, 10, 20, 50, 100, 500, 1000];
   
-  // For higher rounding values, use maximum depth (5000) to get best market coverage
+  // For higher rounding values, use maximum depth (1000) to get best market coverage
   // This helps address market depth limitations at wider price ranges
   const minimumLimit = Math.max(100, desiredLimit * 50); // Use aggressive multiplier for depth
   
@@ -423,8 +423,8 @@ function getValidOrderBookLimit(desiredLimit) {
     }
   }
   
-  // Always return maximum limit (5000) for best market depth coverage
-  return 5000;
+  // Always return maximum limit (1000) for best market depth coverage
+  return 1000;
 }
 
 // Async functions (equivalent to Redux thunks)

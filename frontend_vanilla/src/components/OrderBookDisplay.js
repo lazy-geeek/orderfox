@@ -282,53 +282,51 @@ function updateOrderBookDisplay(container, data) {
       `;
       bidsList.appendChild(row);
     });
+    
+    // Remove any existing info message
+    const existingInfo = container.querySelector('.market-depth-info');
+    if (existingInfo) {
+      existingInfo.remove();
+    }
+    
+    // Show info when using Binance partial depth streams
+    if (orderBook.source === 'binance_partial_depth') {
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'market-depth-info';
+      infoDiv.innerHTML = `
+        <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+          📊 Using Binance partial depth stream (${orderBook.depth_level} levels) for optimal aggregation
+        </small>
+      `;
+      
+      // Insert info after the asks section
+      const asksSection = container.querySelector('.asks-section');
+      if (asksSection) {
+        asksSection.after(infoDiv);
+      }
+    }
+    
+    // Show warning only if we have very few levels (which should now be rare)
+    else if (aggregatedAsks.length < Math.min(5, effectiveDepth) || aggregatedBids.length < Math.min(5, effectiveDepth)) {
+      const warningDiv = document.createElement('div');
+      warningDiv.className = 'market-depth-info';
+      warningDiv.innerHTML = `
+        <small style="color: #f39c12; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+          ⚠️ Limited levels: ${Math.min(aggregatedAsks.length, aggregatedBids.length)} levels at $${effectiveRounding} rounding
+        </small>
+      `;
+      
+      // Insert warning after the asks section
+      const asksSection = container.querySelector('.asks-section');
+      if (asksSection) {
+        asksSection.after(warningDiv);
+      }
+    }
+    
     } else {
       // Show empty state if no data
       asksList.innerHTML = '<div class="empty-state">No order book data</div>';
       bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
-    }
-    
-    // Add info message about partial depth streams when using them
-    if (orderBook && orderBook.asks && orderBook.bids) {
-      // Remove any existing info message
-      const existingInfo = container.querySelector('.market-depth-info');
-      if (existingInfo) {
-        existingInfo.remove();
-      }
-      
-      // Show info when using Binance partial depth streams
-      if (orderBook.source === 'binance_partial_depth') {
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'market-depth-info';
-        infoDiv.innerHTML = `
-          <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
-            📊 Using Binance partial depth stream (${orderBook.depth_level} levels) for optimal aggregation
-          </small>
-        `;
-        
-        // Insert info after the asks section
-        const asksSection = container.querySelector('.asks-section');
-        if (asksSection) {
-          asksSection.after(infoDiv);
-        }
-      }
-      
-      // Show warning only if we have very few levels (which should now be rare)
-      else if (aggregatedAsks.length < Math.min(5, effectiveDepth) || aggregatedBids.length < Math.min(5, effectiveDepth)) {
-        const warningDiv = document.createElement('div');
-        warningDiv.className = 'market-depth-info';
-        warningDiv.innerHTML = `
-          <small style="color: #f39c12; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
-            ⚠️ Limited levels: ${Math.min(aggregatedAsks.length, aggregatedBids.length)} levels at $${effectiveRounding} rounding
-          </small>
-        `;
-        
-        // Insert warning after the asks section
-        const asksSection = container.querySelector('.asks-section');
-        if (asksSection) {
-          asksSection.after(warningDiv);
-        }
-      }
     }
   }
 
