@@ -1,4 +1,6 @@
 
+import { API_BASE_URL } from '../config/env.js';
+
 const state = {
   selectedSymbol: null,
   symbolsList: [],
@@ -432,7 +434,7 @@ async function fetchSymbols() {
   notify('symbolsLoading');
   notify('symbolsError');
   try {
-    const response = await fetch('http://localhost:8000/api/v1/symbols');
+    const response = await fetch(`${API_BASE_URL}/symbols`);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || 'Failed to fetch symbols');
@@ -462,7 +464,7 @@ async function fetchOrderBook(symbol, limit) {
     // Use valid Binance limit if limit is provided
     const validLimit = limit ? getValidOrderBookLimit(limit) : null;
     const params = validLimit ? `?limit=${validLimit}` : '';
-    const response = await fetch(`http://localhost:8000/api/v1/orderbook/${symbol}${params}`);
+    const response = await fetch(`${API_BASE_URL}/orderbook/${symbol}${params}`);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || 'Failed to fetch order book');
@@ -492,7 +494,7 @@ async function fetchCandles(symbol, timeframe = '1m', limit = 100) {
   notify('candlesLoading');
   notify('candlesError');
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/candles/${symbol}?timeframe=${timeframe}&limit=${limit}`);
+    const response = await fetch(`${API_BASE_URL}/candles/${symbol}?timeframe=${timeframe}&limit=${limit}`);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || 'Failed to fetch candles');
@@ -516,7 +518,7 @@ async function fetchOpenPositions() {
   notify('positionsLoading');
   notify('positionsError');
   try {
-    const response = await fetch('http://localhost:8000/api/v1/positions');
+    const response = await fetch(`${API_BASE_URL}/positions`);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || 'Could not load your positions.');
@@ -540,7 +542,7 @@ async function executeTrade(tradeDetails, mode) {
   notify('isSubmittingTrade');
   notify('tradeError');
   try {
-    const response = await fetch('http://localhost:8000/api/v1/trade', {
+    const response = await fetch(`${API_BASE_URL}/trade`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -574,7 +576,7 @@ async function executeLiveTrade(tradeDetails) {
 
 async function setTradingModeApi(mode) {
   try {
-    const response = await fetch('http://localhost:8000/api/v1/set_trading_mode', {
+    const response = await fetch(`${API_BASE_URL}/set_trading_mode`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

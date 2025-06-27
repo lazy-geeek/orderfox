@@ -8,13 +8,13 @@ import {
   setTickerWsConnected,
   clearOrderBook,
 } from '../store/store.js';
+import { WS_BASE_URL } from '../config/env.js';
 
 const activeWebSockets = {};
 const connectionAttempts = {};
 const lastConnectionAttempt = {};
 const connectionInProgress = {};
 
-const WS_BASE_URL = 'ws://localhost:8000/api/v1';
 
 export const connectWebSocketStream = async (
   symbol,
