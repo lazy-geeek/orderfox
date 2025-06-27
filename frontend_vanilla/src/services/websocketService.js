@@ -14,6 +14,8 @@ const activeWebSockets = {};
 const connectionAttempts = {};
 const lastConnectionAttempt = {};
 const connectionInProgress = {};
+const lastMessageTime = {};
+let isPageVisible = !document.hidden;
 
 
 export const connectWebSocketStream = async (
@@ -122,6 +124,9 @@ export const connectWebSocketStream = async (
 
     ws.onmessage = (event) => {
       try {
+        // Track last message time for connection health monitoring
+        lastMessageTime[streamKey] = Date.now();
+        
         const data = JSON.parse(event.data);
         
         if (data.type === 'candle_update') {
@@ -228,6 +233,7 @@ export const disconnectWebSocketStream = (
   delete connectionAttempts[streamKey];
   delete lastConnectionAttempt[streamKey];
   delete connectionInProgress[streamKey];
+  delete lastMessageTime[streamKey];
 };
 
 export const disconnectAllWebSockets = () => {
@@ -242,4 +248,96 @@ export const disconnectAllWebSockets = () => {
   Object.keys(connectionAttempts).forEach(key => delete connectionAttempts[key]);
   Object.keys(lastConnectionAttempt).forEach(key => delete lastConnectionAttempt[key]);
   Object.keys(connectionInProgress).forEach(key => delete connectionInProgress[key]);
+  Object.keys(lastMessageTime).forEach(key => delete lastMessageTime[key]);
 };
+
+// Handle page visibility changes to manage WebSocket connections when tab is not focused
+document.addEventListener('visibilitychange', () => {
+  const wasVisible = isPageVisible;
+  isPageVisible = !document.hidden;
+  
+  if (wasVisible && !isPageVisible) {
+    // Page became hidden - log but keep connections (browsers throttle but don't kill WebSockets)
+    console.log('Page became hidden, WebSocket connections may be throttled by browser');
+  } else if (!wasVisible && isPageVisible) {
+    // Page became visible again - check WebSocket health and reconnect if needed
+    console.log('Page became visible, checking WebSocket connection health');
+    checkAndRefreshConnections();
+  }
+});
+
+// Function to check and refresh WebSocket connections when page becomes visible
+function checkAndRefreshConnections() {
+  const staleConnections = [];
+  const now = Date.now();
+  const staleThreshold = 30000; // Reduced to 30 seconds for faster detection
+  
+  for (const [streamKey, ws] of Object.entries(activeWebSockets)) {
+    const lastMessage = lastMessageTime[streamKey] || 0;
+    const timeSinceLastMessage = now - lastMessage;
+    
+    // More aggressive stale connection detection for page visibility changes
+    // When page becomes visible, refresh connections that haven't received messages recently
+    // or are in a bad state
+    if (ws.readyState === WebSocket.CLOSED || 
+        ws.readyState === WebSocket.CLOSING || 
+        timeSinceLastMessage > staleThreshold) {
+      staleConnections.push(streamKey);
+      console.log(`Stale connection detected for ${streamKey}: readyState=${ws.readyState}, timeSinceLastMessage=${timeSinceLastMessage}ms`);
+    }
+  }
+  
+  // If no stale connections detected but page was hidden, force a data refresh
+  // This ensures we get latest data even if WebSocket appears healthy
+  if (staleConnections.length === 0) {
+    console.log('No stale connections found, but forcing data refresh after page visibility change');
+    forceDataRefresh();
+  }
+  
+  // Reconnect stale connections
+  if (staleConnections.length > 0) {
+    console.log(`Found ${staleConnections.length} stale WebSocket connections, reconnecting...`);
+    staleConnections.forEach(streamKey => {
+      // Parse streamKey to extract connection details
+      const parts = streamKey.split('-');
+      if (parts.length >= 2) {
+        const streamType = parts[0];
+        const symbol = parts[1];
+        const timeframe = parts.length > 2 ? parts[2] : null;
+        
+        // Clean up old connection
+        delete activeWebSockets[streamKey];
+        delete connectionAttempts[streamKey];
+        delete lastConnectionAttempt[streamKey];
+        delete connectionInProgress[streamKey];
+        delete lastMessageTime[streamKey];
+        
+        // Reconnect after a short delay
+        setTimeout(() => {
+          connectWebSocketStream(symbol, streamType, timeframe);
+        }, 1000);
+      }
+    });
+  }
+}
+
+// Force refresh data by fetching latest from API when page becomes visible
+async function forceDataRefresh() {
+  const { state, fetchOrderBook, fetchCandles } = await import('../store/store.js');
+  
+  if (state.selectedSymbol) {
+    console.log('Forcing data refresh for symbol:', state.selectedSymbol);
+    
+    // Refresh orderbook data
+    if (state.selectedRounding && state.displayDepth) {
+      const { getValidOrderBookLimit } = await import('../store/store.js');
+      const limit = getValidOrderBookLimit(state.displayDepth);
+      await fetchOrderBook(state.selectedSymbol, limit);
+    }
+    
+    // Refresh candle data
+    if (state.selectedTimeframe) {
+      await fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
+    }
+  }
+}

@@ -200,38 +200,43 @@ function calculateAndSetRoundingOptions(symbolId) {
   // Generate options array starting with baseRounding
   const options = [baseRounding];
   
-  // Get current price for stopping condition (use highest bid if available)
-  const currentPrice = state.currentOrderBook?.bids?.[0]?.price;
+  // Get current price for stopping condition (use highest bid, ticker, or estimate from symbol data)
+  let currentPrice = state.currentOrderBook?.bids?.[0]?.price || 
+                    state.currentTicker?.last ||
+                    null;
   
-  // Generate additional options by multiplying by 10
+  // If no price data available, use a conservative estimate based on symbol name patterns
+  if (!currentPrice) {
+    // For major pairs, use rough estimates to prevent excessive rounding options
+    if (symbolId.includes('BTC')) currentPrice = 50000;
+    else if (symbolId.includes('ETH')) currentPrice = 3000;
+    else if (symbolId.includes('USDT') || symbolId.includes('USDC')) currentPrice = 10; // Conservative for altcoins
+    else currentPrice = 100; // Default conservative estimate
+  }
+  
+  // Generate additional options by multiplying by 10, with stricter price-based limits
   let nextOption = baseRounding;
   while (options.length < 7) { // Maximum 7 options as a sensible limit
     nextOption = nextOption * 10;
     
-    // Stop if rounding becomes too large relative to current price
-    // or if we reach a sensible maximum
-    if (currentPrice && nextOption > currentPrice / 10) {
+    // Much stricter condition: stop if rounding becomes more than 1/10th of current price
+    // This ensures we don't show $100 rounding for a $2.7 token
+    if (nextOption > currentPrice / 10) {
       break;
     }
-    if (nextOption > 1000) { // Sensible maximum absolute value
+    
+    // Also keep the absolute maximum as a safety net
+    if (nextOption > 1000) {
       break;
     }
     
     options.push(nextOption);
   }
 
-  // Ensure we have at least 3-4 options if possible
-  if (options.length < 3) {
-    // If we don't have current price data or need more options, add a few more
-    let tempOption = options[options.length - 1];
-    while (options.length < 4 && tempOption * 10 <= 1000) {
-      tempOption = tempOption * 10;
-      options.push(tempOption);
-    }
-  }
-
-  // Set the calculated options with third item as default (if available)
-  const defaultRounding = options.length >= 3 ? options[2] : baseRounding;
+  // Set the calculated options with third item as default (if available), or second, or first
+  const defaultRounding = options.length >= 3 ? options[2] : 
+                          options.length >= 2 ? options[1] : 
+                          baseRounding;
   setAvailableRoundingOptions(options, defaultRounding);
 }
 
@@ -248,8 +253,7 @@ function setSelectedSymbol(symbol) {
     state.selectedRounding = null;
     state.availableRoundingOptions = [];
     
-    // Calculate rounding options for the new symbol
-    calculateAndSetRoundingOptions(symbol);
+    // Rounding options will be calculated after fetchOrderBook provides current price data
   }
   notify('selectedSymbol');
   notify('currentOrderBook');
@@ -275,11 +279,6 @@ function updateOrderBookFromWebSocket(payload) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
       state.currentOrderBook = validatedOrderBook;
       notify('currentOrderBook');
-      
-      // Recalculate rounding options when order book data is updated (like React frontend)
-      if (state.availableRoundingOptions.length === 0) {
-        calculateAndSetRoundingOptions(state.selectedSymbol);
-      }
     } else {
       console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
     }
@@ -474,6 +473,13 @@ async function fetchOrderBook(symbol, limit) {
     const validatedOrderBook = validateOrderBook(data);
     if (validatedOrderBook) {
       state.currentOrderBook = validatedOrderBook;
+      
+      // Calculate rounding options now that we have current price data from orderbook
+      if (symbol === state.selectedSymbol && state.availableRoundingOptions.length === 0) {
+        calculateAndSetRoundingOptions(symbol);
+        // Notify orderbook update again so display refreshes with new rounding selection
+        notify('currentOrderBook');
+      }
     } else {
       state.orderBookError = 'Received invalid order book data from server';
     }
