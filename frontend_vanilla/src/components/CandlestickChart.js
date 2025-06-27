@@ -68,6 +68,13 @@ function updateCandlestickChart(data, symbol, timeframe) {
     candle.volume
   ]);
 
+  // Get current price from the latest candle's close price
+  const currentPrice = currentCandles.length > 0 ? currentCandles[currentCandles.length - 1].close : null;
+
+  // Preserve current zoom state
+  const currentOption = chartInstance.getOption();
+  const currentDataZoom = currentOption?.dataZoom || [];
+
   const option = {
     title: {
       text: symbol ? `${symbol} - ${timeframe}` : 'Select a Symbol',
@@ -79,13 +86,14 @@ function updateCandlestickChart(data, symbol, timeframe) {
     },
     tooltip: {
         trigger: 'axis',
+        showContent: false,
         axisPointer: {
           type: 'cross'
         }
     },
     grid: {
-      left: '10%',
-      right: '10%',
+      left: '5%',
+      right: '80px',
       bottom: '15%'
     },
     xAxis: {
@@ -93,21 +101,20 @@ function updateCandlestickChart(data, symbol, timeframe) {
       scale: true
     },
     yAxis: {
+      position: 'right',
       scale: true,
       splitArea: {
         show: true
+      },
+      axisLabel: {
+        formatter: function (value) {
+          return value.toFixed(currentPrice && currentPrice < 1 ? 6 : 2);
+        }
       }
     },
-    dataZoom: [
+    dataZoom: currentDataZoom.length > 0 ? currentDataZoom : [
       {
         type: 'inside',
-        start: 50,
-        end: 100
-      },
-      {
-        show: true,
-        type: 'slider',
-        top: '90%',
         start: 50,
         end: 100
       }
@@ -123,11 +130,43 @@ function updateCandlestickChart(data, symbol, timeframe) {
           borderColor: '#00da3c',
           borderColor0: '#ec0000'
         }
-      }
-    ]
+      },
+      // Current price line
+      currentPrice ? {
+        name: 'Current Price',
+        type: 'line',
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [
+            {
+              yAxis: currentPrice,
+              lineStyle: {
+                color: '#ff6b35',
+                width: 2,
+                type: 'dashed'
+              },
+              label: {
+                show: true,
+                position: 'insideEndTop',
+                formatter: function() {
+                  return currentPrice.toFixed(currentPrice < 1 ? 6 : 2);
+                },
+                backgroundColor: '#ff6b35',
+                color: '#fff',
+                padding: [4, 8],
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 'bold'
+              }
+            }
+          ]
+        }
+      } : null
+    ].filter(Boolean)
   };
 
-  chartInstance.setOption(option);
+  chartInstance.setOption(option, { notMerge: false });
 }
 
 export { createCandlestickChart, createTimeframeSelector, updateCandlestickChart };
