@@ -408,6 +408,28 @@
   color: #007bff;
 }
 
+.orderfox-order-book-display .market-depth-indicator {
+  background: #fff3cd;
+  border: 1px solid #ffd32a;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.orderfox-order-book-display .depth-warning {
+  display: block;
+  color: #856404;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.orderfox-order-book-display .depth-hint {
+  display: block;
+  color: #6c757d;
+  font-style: italic;
+}
+
 /* PositionsTable.css */
 .orderfox-positions-table-container {
   background: #ffffff;

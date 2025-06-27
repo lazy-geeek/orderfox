@@ -321,7 +321,7 @@ class ConnectionManager:
         await self.broadcast_to_stream(symbol, data)
 
     async def _stream_orderbook(self, symbol: str):
-        """Stream order book updates using ccxtpro."""
+        """Stream order book updates using ccxtpro or Binance partial depth streams."""
         exchange_pro = None
         try:
             logger.info(f"Initializing orderbook stream for {symbol}")
@@ -332,7 +332,18 @@ class ConnectionManager:
             logger.info(f"Using limit {limit} for orderbook stream {symbol}")
             
             # Validate and clamp limit parameter (same as WebSocket endpoint)
-            limit = max(5, min(limit, 1000))
+            limit = max(5, min(limit, 5000))
+
+            # Check if we should use Binance partial depth streams for better coverage
+            use_partial_depth = self._should_use_partial_depth_stream(limit)
+            logger.info(f"Evaluating partial depth stream for {symbol}: limit={limit}, use_partial_depth={use_partial_depth}")
+            
+            if use_partial_depth:
+                logger.info(f"✅ Using Binance partial depth stream for {symbol} with limit {limit}")
+                await self._stream_partial_depth_orderbook(symbol, limit)
+                return
+            else:
+                logger.info(f"➡️ Using standard CCXT stream for {symbol} with limit {limit}")
 
             # Test connection before starting stream
             if exchange_pro is None:
@@ -413,6 +424,140 @@ class ConnectionManager:
         finally:
             # Do NOT close exchange_pro here. It should be managed globally.
             pass
+
+    def _should_use_partial_depth_stream(self, limit: int) -> bool:
+        """Determine if we should use Binance partial depth streams instead of full orderbook."""
+        # Temporarily disable partial depth streams to fix real-time updates
+        # The partial depth implementation needs to be reworked to properly integrate with FastAPI WebSocket
+        return False  # Disable partial depth streams for now
+
+    def _get_partial_depth_level(self, limit: int) -> int:
+        """Get the appropriate Binance partial depth level (5, 10, or 20) for the given limit."""
+        if limit <= 5:
+            return 5
+        elif limit <= 10:
+            return 10
+        else:
+            return 20  # For limits 11-100, use 20 levels
+
+    async def _stream_partial_depth_orderbook(self, symbol: str, requested_limit: int):
+        """Stream order book updates using Binance USDT-M Futures partial depth streams."""
+        try:
+            import websockets
+            import json
+        except ImportError as e:
+            logger.error(f"Failed to import websockets: {e}")
+            await self._stream_mock_orderbook(symbol)
+            return
+        
+        try:
+            # Get the appropriate depth level for Binance partial depth streams
+            depth_level = self._get_partial_depth_level(requested_limit)
+            
+            # Convert symbol to lowercase for Binance WebSocket
+            ws_symbol = symbol.lower()
+            
+            # Binance USDT-M Futures partial depth stream URL
+            # Format: wss://fstream.binance.com/ws/<symbol>@depth<levels>
+            ws_url = f"wss://fstream.binance.com/ws/{ws_symbol}@depth{depth_level}"
+            
+            logger.info(f"Connecting to Binance partial depth stream: {ws_url}")
+            
+            while symbol in self.active_connections and self.active_connections[symbol]:
+                try:
+                    async with websockets.connect(ws_url) as websocket:
+                        logger.info(f"Connected to Binance partial depth stream for {symbol}")
+                        
+                        async for message in websocket:
+                            # Check if we should still be streaming
+                            if symbol not in self.active_connections or not self.active_connections[symbol]:
+                                logger.info(f"Stopping partial depth stream for {symbol} - no active connections")
+                                break
+                                
+                            try:
+                                data = json.loads(message)
+                                
+                                # Binance partial depth stream format:
+                                # {
+                                #   "e": "depthUpdate",
+                                #   "E": 1640995200000,
+                                #   "s": "BTCUSDT", 
+                                #   "b": [["7403.89", "0.002"]],
+                                #   "a": [["7405.96", "3.340"]]
+                                # }
+                                
+                                if data.get("e") == "depthUpdate":
+                                    # Convert Binance format to our format
+                                    bids = [
+                                        {"price": float(bid[0]), "amount": float(bid[1])}
+                                        for bid in data.get("b", [])
+                                        if float(bid[1]) > 0  # Filter out zero quantities
+                                    ]
+                                    
+                                    asks = [
+                                        {"price": float(ask[0]), "amount": float(ask[1])}
+                                        for ask in data.get("a", [])
+                                        if float(ask[1]) > 0  # Filter out zero quantities
+                                    ]
+                                    
+                                    # Use display symbol if available, otherwise use the stream symbol
+                                    display_symbol = getattr(self, "_display_symbols", {}).get(symbol, symbol)
+                                    
+                                    formatted_data = {
+                                        "type": "orderbook_update",
+                                        "symbol": display_symbol,
+                                        "bids": bids,
+                                        "asks": asks,
+                                        "timestamp": data.get("E"),
+                                        "source": "binance_partial_depth",
+                                        "depth_level": depth_level
+                                    }
+                                    
+                                    # Broadcast to all connected clients for this symbol
+                                    await self.broadcast_to_symbol(symbol, formatted_data)
+                                    
+                                    # Pass order book update to trading engine service
+                                    try:
+                                        from app.api.v1.endpoints.trading import trading_engine_service_instance
+                                        
+                                        # Convert to ccxt format for trading engine compatibility
+                                        ccxt_format = {
+                                            "symbol": symbol,
+                                            "bids": [[float(bid["price"]), float(bid["amount"])] for bid in bids],
+                                            "asks": [[float(ask["price"]), float(ask["amount"])] for ask in asks],
+                                            "timestamp": data.get("E")
+                                        }
+                                        
+                                        await trading_engine_service_instance.process_order_book_update(symbol, ccxt_format)
+                                    except Exception as e:
+                                        logger.warning(f"Error processing order book update in trading engine for {symbol}: {str(e)}")
+                                        
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Invalid JSON received from Binance for {symbol}: {str(e)}")
+                            except Exception as e:
+                                logger.error(f"Error processing Binance partial depth message for {symbol}: {str(e)}")
+                                
+                except websockets.exceptions.ConnectionClosed:
+                    logger.warning(f"Binance partial depth WebSocket connection closed for {symbol}, reconnecting...")
+                    await asyncio.sleep(1)  # Wait before reconnecting
+                except Exception as e:
+                    logger.error(f"Error in Binance partial depth stream for {symbol}: {str(e)}")
+                    
+                    # Send error to clients
+                    error_data = {
+                        "type": "error",
+                        "message": f"Error in partial depth stream for {symbol}: {str(e)}",
+                    }
+                    await self.broadcast_to_symbol(symbol, error_data)
+                    await asyncio.sleep(5)  # Wait before retrying
+                    
+        except Exception as e:
+            logger.error(f"Failed to initialize Binance partial depth stream for {symbol}: {str(e)}")
+            error_data = {
+                "type": "error", 
+                "message": f"Failed to initialize partial depth streaming for {symbol}: {str(e)}",
+            }
+            await self.broadcast_to_symbol(symbol, error_data)
 
     async def _stream_ticker(self, symbol: str):
         """Stream ticker updates using ccxtpro."""

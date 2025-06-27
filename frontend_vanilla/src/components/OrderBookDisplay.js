@@ -198,16 +198,50 @@ function updateOrderBookDisplay(container, data) {
       return sortedLevels.slice(0, effectiveDepth);
     };
 
-    // Validate we have enough raw data for proper aggregation
-    const minRequiredRawData = effectiveDepth * 5; // Need at least 5x more raw data than display depth
-    if (orderBook.asks.length < minRequiredRawData || orderBook.bids.length < minRequiredRawData) {
-      console.warn(`Insufficient orderbook data for aggregation. Need at least ${minRequiredRawData} levels, have asks: ${orderBook.asks.length}, bids: ${orderBook.bids.length}`);
-      // Still proceed but log the warning
+    // Enhanced market depth validation and user feedback
+    const minRequiredRawData = effectiveDepth * 10; // Reasonable multiplier for aggregation
+    const hasInsufficientData = orderBook.asks.length < minRequiredRawData || orderBook.bids.length < minRequiredRawData;
+    
+    if (hasInsufficientData) {
+      console.warn(`Limited market depth for ${selectedSymbol} at $${effectiveRounding} rounding.`);
+      console.warn(`Raw data: ${orderBook.asks.length} asks, ${orderBook.bids.length} bids. Recommended: ${minRequiredRawData}+`);
     }
 
     // Get exactly the needed number of levels for asks and bids
     const aggregatedAsks = getExactLevels(orderBook.asks, true);
     const aggregatedBids = getExactLevels(orderBook.bids, false);
+    
+    // Smart market depth feedback and adaptive UI
+    const actualLevels = Math.min(aggregatedAsks.length, aggregatedBids.length);
+    const isMarketDepthLimited = actualLevels < effectiveDepth;
+    
+    if (isMarketDepthLimited) {
+      console.info(`📊 Market depth limited: ${actualLevels}/${effectiveDepth} levels for ${selectedSymbol} at $${effectiveRounding} rounding`);
+      console.info(`💡 This is normal for high rounding values - actual market orders may only exist within a narrow price range`);
+      
+      // Add market depth indicator to UI
+      const depthIndicator = container.querySelector('.market-depth-indicator') || (() => {
+        const indicator = document.createElement('div');
+        indicator.className = 'market-depth-indicator';
+        const depthSelector = container.querySelector('.depth-selector');
+        if (depthSelector) {
+          depthSelector.appendChild(indicator);
+        }
+        return indicator;
+      })();
+      
+      depthIndicator.innerHTML = `
+        <span class="depth-warning">⚠️ Limited market depth: ${actualLevels}/${effectiveDepth} levels</span>
+        <span class="depth-hint">Try smaller rounding for more levels</span>
+      `;
+      depthIndicator.style.display = 'block';
+    } else {
+      // Remove depth indicator if we have sufficient levels
+      const depthIndicator = container.querySelector('.market-depth-indicator');
+      if (depthIndicator) {
+        depthIndicator.style.display = 'none';
+      }
+    }
 
     // Prepare for display
     const displayAsks = aggregatedAsks.reverse(); // Reverse so highest price is at top
@@ -252,6 +286,49 @@ function updateOrderBookDisplay(container, data) {
       // Show empty state if no data
       asksList.innerHTML = '<div class="empty-state">No order book data</div>';
       bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
+    }
+    
+    // Add info message about partial depth streams when using them
+    if (orderBook && orderBook.asks && orderBook.bids) {
+      // Remove any existing info message
+      const existingInfo = container.querySelector('.market-depth-info');
+      if (existingInfo) {
+        existingInfo.remove();
+      }
+      
+      // Show info when using Binance partial depth streams
+      if (orderBook.source === 'binance_partial_depth') {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'market-depth-info';
+        infoDiv.innerHTML = `
+          <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+            📊 Using Binance partial depth stream (${orderBook.depth_level} levels) for optimal aggregation
+          </small>
+        `;
+        
+        // Insert info after the asks section
+        const asksSection = container.querySelector('.asks-section');
+        if (asksSection) {
+          asksSection.after(infoDiv);
+        }
+      }
+      
+      // Show warning only if we have very few levels (which should now be rare)
+      else if (aggregatedAsks.length < Math.min(5, effectiveDepth) || aggregatedBids.length < Math.min(5, effectiveDepth)) {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'market-depth-info';
+        warningDiv.innerHTML = `
+          <small style="color: #f39c12; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+            ⚠️ Limited levels: ${Math.min(aggregatedAsks.length, aggregatedBids.length)} levels at $${effectiveRounding} rounding
+          </small>
+        `;
+        
+        // Insert warning after the asks section
+        const asksSection = container.querySelector('.asks-section');
+        if (asksSection) {
+          asksSection.after(warningDiv);
+        }
+      }
     }
   }
 

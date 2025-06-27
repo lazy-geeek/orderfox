@@ -105,8 +105,8 @@ symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
   // Re-fetch data and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-  // Use dynamic limit for orderbook with valid Binance limit (increased multiplier)
-  const dynamicLimit = (state.displayDepth || 10) * 10;
+  // Use maximum depth (5000) to get deepest possible market coverage for aggregation
+  const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
   const validLimit = getValidOrderBookLimit(dynamicLimit);
   fetchOrderBook(state.selectedSymbol, validLimit);
   disconnectAllWebSockets(); // Disconnect all old streams
@@ -133,8 +133,8 @@ candlestickChartContainer.prepend(timeframeSelector);
 orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
   const newDepth = Number(e.target.value);
   setDisplayDepth(newDepth);
-  // Calculate dynamic limit: displayDepth * 10 for better aggregation, then get valid Binance limit
-  const dynamicLimit = newDepth * 10;
+  // Use maximum depth for comprehensive market coverage
+  const dynamicLimit = Math.max(1000, newDepth * 100);
   const validLimit = getValidOrderBookLimit(dynamicLimit);
   
   // Clear order book to prevent old data display
@@ -152,8 +152,8 @@ orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) =
 
 orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
   setSelectedRounding(Number(e.target.value));
-  // When rounding changes, we need to re-fetch with current limit and restart WebSocket
-  const dynamicLimit = (state.displayDepth || 10) * 10;
+  // Use maximum depth for comprehensive aggregation at higher rounding values
+  const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
   const validLimit = getValidOrderBookLimit(dynamicLimit);
   
   // Clear order book to prevent old data display
@@ -184,7 +184,7 @@ fetchSymbols().then(() => {
     
     // Fetch initial data for the selected symbol
     fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
-    const dynamicLimit = (state.displayDepth || 10) * 10;
+    const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
     const validLimit = getValidOrderBookLimit(dynamicLimit);
     fetchOrderBook(firstSymbol.id, validLimit);
     
