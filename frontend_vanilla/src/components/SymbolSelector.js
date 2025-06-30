@@ -2,12 +2,6 @@
 function createSymbolSelector() {
   const selector = document.createElement('select');
   selector.className = 'symbol-selector';
-
-  const defaultOption = document.createElement('option');
-  defaultOption.value = '';
-  defaultOption.textContent = 'Select a symbol...';
-  defaultOption.selected = true;
-  selector.appendChild(defaultOption);
   selector.disabled = true;
 
   return selector;
@@ -16,11 +10,6 @@ function createSymbolSelector() {
 function updateSymbolSelector(selector, symbols, selectedSymbol) {
   selector.innerHTML = ''; // Clear existing options
   selector.disabled = false;
-
-  const defaultOption = document.createElement('option');
-  defaultOption.value = '';
-  defaultOption.textContent = 'Select a symbol...';
-  selector.appendChild(defaultOption);
 
   symbols.forEach(symbol => {
     const option = document.createElement('option');
