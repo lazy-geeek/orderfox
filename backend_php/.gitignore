@@ -1,0 +1,51 @@
+# Composer
+/vendor/
+/composer.phar
+
+# Node (falls Frontend-Tools verwendet werden)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHPStorm/IDE
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Logs & Cache
+*.log
+*.cache
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# PHPUnit
+/phpunit.xml
+/phpunit.xml.dist
+
+# Coverage
+coverage/
+
+# Build/Deployment
+/build/
+/dist/
+/serverless
+
+# SASS/SCSS Cache
+.sass-cache/
+*.css.map
+*.sass.map
+*.scss.map
+
+# User uploads (anpassen, falls gewünscht)
+/uploads/
+/storage/
+
+# OS/Editor spezifisch
+.DS_Store
+Thumbs.db
+
+# Sonstiges
+.env
+.env.*

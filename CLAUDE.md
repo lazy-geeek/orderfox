@@ -6,13 +6,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OrderFox is a full-stack cryptocurrency trading application with:
 - **Frontend**: Vanilla JavaScript with ES6 modules and Vite (Active)
-- **Backend**: FastAPI + Python with WebSocket support
+- **Backend**: FastAPI + Python with WebSocket support (Legacy)
+- **Backend PHP**: Slim Framework + PHP with Ratchet WebSocket support (Active)
 - **Trading**: Binance API integration with paper trading mode
 - **Real-time**: WebSocket connections for live market data
 
 ## Development Commands
 
-### Backend (FastAPI)
+### Backend PHP (Active)
+```bash
+# Run backend server
+cd backend_php
+php -S localhost:8000 -t public
+
+# Run WebSocket server
+cd backend_php
+php websocket_server.php
+
+# Run unit tests
+cd backend_php
+./vendor/bin/phpunit tests/Unit/ --verbose
+
+# Run integration tests
+cd backend_php
+./vendor/bin/phpunit tests/Integration/ --verbose
+
+# Install dependencies
+cd backend_php
+composer install
+```
+
+### Backend (FastAPI - Legacy)
 ```bash
 # Run backend server
 cd backend
@@ -63,7 +87,20 @@ python test_paper_trading.py
 
 ## Architecture
 
-### Backend Structure
+### Backend PHP Structure (Active)
+- **backend_php/public/index.php**: Slim Framework application entry point with CORS and routing
+- **backend_php/src/Core/**: Core functionality (config, logger)
+- **backend_php/src/Api/V1/Controllers/**: REST API controllers for market data endpoints
+- **backend_php/src/Api/V1/DTOs/**: Data Transfer Objects for structured responses
+- **backend_php/src/Api/V1/Formatters/**: Response formatting utilities
+- **backend_php/src/Services/**: Business logic services (exchange, symbol, connection manager)
+- **backend_php/src/WebSocket/**: WebSocket server implementation with Ratchet
+  - **backend_php/src/WebSocket/Handlers/**: WebSocket message handlers for different data types
+- **backend_php/tests/Unit/**: PHPUnit unit tests for all components
+- **backend_php/tests/Integration/**: PHPUnit integration tests for API and WebSocket functionality
+- **backend_php/websocket_server.php**: WebSocket server entry point
+
+### Backend Structure (FastAPI - Legacy)
 - **backend/app/main.py**: FastAPI application entry point with CORS, exception handling, and startup/shutdown events
 - **backend/app/core/**: Core functionality (config, database, logging)
 - **backend/app/api/v1/endpoints/**: API endpoints for market data (HTTP/WebSocket) and trading
@@ -116,9 +153,13 @@ python test_paper_trading.py
 - **Solution**: Use smaller rounding values or accept fewer populated levels for high-value assets
 
 ### Testing Strategy
-- Backend: pytest with test coverage for all endpoints and services
+- Backend PHP: PHPUnit with comprehensive unit and integration test coverage for all endpoints, services, and WebSocket functionality
+- Backend (Legacy): pytest with test coverage for all endpoints and services
 - Frontend: Manual testing with comprehensive order book functionality
 - Integration: Comprehensive paper trading test that validates full application flow
+
+### Tool usage
+- Use context7 mcp server for researching documentation and code examples for used modules when planning new features or changes and you need further information you don't have.
 
 ### Model usage
 - Use Opus model when in planning mode.
@@ -126,3 +167,4 @@ python test_paper_trading.py
 
 ### When Implementing New Features or Changing Code
 - Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes.
+- Delete any temporarily test files you have created after testing is complete.
