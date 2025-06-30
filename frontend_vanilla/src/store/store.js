@@ -24,6 +24,7 @@ const state = {
   openPositions: [],
   positionsLoading: false,
   positionsError: null,
+  currentTheme: localStorage.getItem('theme') || 'dark',
 };
 
 const subscribers = [];
@@ -399,6 +400,13 @@ function clearPositionsError() {
   notify('positionsError');
 }
 
+function setTheme(theme) {
+  state.currentTheme = theme;
+  localStorage.setItem('theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+  notify('currentTheme');
+}
+
 function addToTradeHistory(trade) {
   state.tradeHistory.unshift(trade);
   if (state.tradeHistory.length > 100) {
@@ -626,6 +634,7 @@ export {
   setTradingMode,
   clearTradeError,
   clearPositionsError,
+  setTheme,
   addToTradeHistory,
   fetchOpenPositions,
   executePaperTrade,

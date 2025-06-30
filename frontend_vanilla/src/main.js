@@ -6,6 +6,7 @@ import { createSymbolSelector, updateSymbolSelector } from './components/SymbolS
 import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart } from './components/CandlestickChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
+import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 
 import {
   state,
@@ -37,6 +38,9 @@ import {
   disconnectAllWebSockets,
 } from './services/websocketService.js';
 
+// Initialize theme before rendering
+initializeTheme();
+
 // Get the app container
 const app = document.querySelector('#app');
 
@@ -49,6 +53,7 @@ const symbolSelectorPlaceholder = document.querySelector('#symbol-selector-place
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
 const tradingModeTogglePlaceholder = document.querySelector('#trading-mode-toggle-placeholder');
+const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 
 // Create and append the actual components
 const symbolSelector = createSymbolSelector();
@@ -63,6 +68,9 @@ orderBookPlaceholder.replaceWith(orderBookDisplay);
 
 const tradingModeToggle = createTradingModeToggle();
 tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
+
+const themeSwitcher = createThemeSwitcher();
+themeSwitcherPlaceholder.replaceWith(themeSwitcher);
 
 // Initial renders
 updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);

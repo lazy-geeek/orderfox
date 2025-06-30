@@ -11,6 +11,9 @@ const TIMEFRAMES = [
 ];
 
 let chartInstance = null;
+let lastChartData = null;
+let lastSymbol = null;
+let lastTimeframe = null;
 
 function createCandlestickChart(container) {
   const chartContainer = document.createElement('div');
@@ -19,7 +22,22 @@ function createCandlestickChart(container) {
   chartContainer.style.width = '100%';
   container.appendChild(chartContainer);
 
-  chartInstance = echarts.init(chartContainer, 'dark');
+  // Get current theme
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  chartInstance = echarts.init(chartContainer, currentTheme);
+
+  // Listen for theme changes
+  window.addEventListener('themechange', (e) => {
+    const newTheme = e.detail.theme;
+    // Dispose the old chart instance
+    chartInstance.dispose();
+    // Create new chart instance with the new theme
+    chartInstance = echarts.init(chartContainer, newTheme);
+    // Re-render the chart with last known data
+    if (lastChartData && lastSymbol && lastTimeframe) {
+      updateCandlestickChart(lastChartData, lastSymbol, lastTimeframe);
+    }
+  });
 
   return chartContainer;
 }
@@ -58,6 +76,11 @@ function createTimeframeSelector(handleTimeframeChange) {
 function updateCandlestickChart(data, symbol, timeframe) {
   if (!chartInstance) return;
 
+  // Store the last data for theme changes
+  lastChartData = data;
+  lastSymbol = symbol;
+  lastTimeframe = timeframe;
+
   const { currentCandles, candlesWsConnected } = data;
 
   const formattedData = currentCandles.map(candle => [
@@ -76,13 +99,17 @@ function updateCandlestickChart(data, symbol, timeframe) {
   const currentOption = chartInstance.getOption();
   const currentDataZoom = currentOption?.dataZoom || [];
 
+  // Get current theme
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const isDark = currentTheme === 'dark';
+
   const option = {
-    backgroundColor: '#1E2329',
+    backgroundColor: isDark ? '#1E2329' : '#FAFAFA',
     title: {
       text: symbol ? `${symbol} - ${timeframe}` : 'Select a Symbol',
       left: 'center',
       textStyle: {
-        color: '#EAECEF',
+        color: isDark ? '#EAECEF' : '#1A1A1A',
         fontSize: 16,
         fontFamily: 'Inter, sans-serif',
         fontWeight: 600
@@ -94,7 +121,7 @@ function updateCandlestickChart(data, symbol, timeframe) {
         axisPointer: {
           type: 'cross',
           crossStyle: {
-            color: '#848E9C'
+            color: isDark ? '#848E9C' : '#707A8A'
           }
         }
     },
@@ -103,18 +130,18 @@ function updateCandlestickChart(data, symbol, timeframe) {
       right: '80px',
       bottom: '15%',
       backgroundColor: 'transparent',
-      borderColor: '#2B3139'
+      borderColor: isDark ? '#2B3139' : '#EAECEF'
     },
     xAxis: {
       type: 'time',
       scale: true,
       axisLine: {
         lineStyle: {
-          color: '#2B3139'
+          color: isDark ? '#2B3139' : '#EAECEF'
         }
       },
       axisLabel: {
-        color: '#848E9C',
+        color: isDark ? '#848E9C' : '#707A8A',
         fontFamily: 'Inter, sans-serif'
       },
       splitLine: {
@@ -126,11 +153,11 @@ function updateCandlestickChart(data, symbol, timeframe) {
       scale: true,
       axisLine: {
         lineStyle: {
-          color: '#2B3139'
+          color: isDark ? '#2B3139' : '#EAECEF'
         }
       },
       axisLabel: {
-        color: '#848E9C',
+        color: isDark ? '#848E9C' : '#707A8A',
         fontFamily: 'Inter, sans-serif',
         formatter: function (value) {
           return value.toFixed(currentPrice && currentPrice < 1 ? 6 : 2);
@@ -138,7 +165,7 @@ function updateCandlestickChart(data, symbol, timeframe) {
       },
       splitLine: {
         lineStyle: {
-          color: '#2B3139',
+          color: isDark ? '#2B3139' : '#EAECEF',
           type: 'dashed'
         }
       },
@@ -187,7 +214,7 @@ function updateCandlestickChart(data, symbol, timeframe) {
                   return currentPrice.toFixed(currentPrice < 1 ? 6 : 2);
                 },
                 backgroundColor: '#FCD535',
-                color: '#181A20',
+                color: isDark ? '#181A20' : '#1A1A1A',
                 padding: [4, 8],
                 borderRadius: 4,
                 fontSize: 12,

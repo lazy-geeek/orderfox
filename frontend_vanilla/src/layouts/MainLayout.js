@@ -37,8 +37,13 @@ export function createMainLayout() {
   tradingModeTogglePlaceholder.id = 'trading-mode-toggle-placeholder';
   tradingModeTogglePlaceholder.textContent = 'TradingModeToggle';
 
+  const themeSwitcherPlaceholder = document.createElement('div');
+  themeSwitcherPlaceholder.id = 'theme-switcher-placeholder';
+  themeSwitcherPlaceholder.textContent = 'ThemeSwitcher';
+
   headerControls.appendChild(symbolSelectorPlaceholder);
   headerControls.appendChild(tradingModeTogglePlaceholder);
+  headerControls.appendChild(themeSwitcherPlaceholder);
 
   header.appendChild(h1);
   header.appendChild(headerControls);
