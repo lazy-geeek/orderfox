@@ -120,6 +120,9 @@ python test_paper_trading.py
 - Frontend: Manual testing with comprehensive order book functionality
 - Integration: Comprehensive paper trading test that validates full application flow
 
+### Model usage
+- Use Opus model when in planning mode.
+- Use Sonnet model when coding.
+
 ### When Implementing New Features or Changing Code
-- Update the CLAUDE.md file with any architecture changes or important notes for Claude Code to do a better job in the future.
 - Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes.
