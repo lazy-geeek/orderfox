@@ -25,6 +25,12 @@ class Config
     // Development settings
     public readonly bool $debug;
     
+    // Server configuration
+    public readonly string $phpHost;
+    public readonly int $phpPort;
+    public readonly string $websocketHost;
+    public readonly int $websocketPort;
+    
     private function __construct()
     {
         $this->loadEnvironmentVariables();
@@ -37,6 +43,12 @@ class Config
         $this->projectName = 'Trading Bot API';
         $this->maxOrderbookLimit = (int)($_ENV['MAX_ORDERBOOK_LIMIT'] ?? 5000);
         $this->debug = strtolower($_ENV['DEBUG'] ?? 'false') === 'true';
+        
+        // Server configuration - prefer container variables in container environment
+        $this->phpHost = $_ENV['CONTAINER_PHP_HOST'] ?? $_ENV['PHP_HOST'] ?? 'localhost';
+        $this->phpPort = (int)($_ENV['CONTAINER_PHP_PORT'] ?? $_ENV['PHP_PORT'] ?? 8000);
+        $this->websocketHost = $_ENV['CONTAINER_WEBSOCKET_HOST'] ?? $_ENV['WEBSOCKET_HOST'] ?? 'localhost';
+        $this->websocketPort = (int)($_ENV['CONTAINER_WEBSOCKET_PORT'] ?? $_ENV['WEBSOCKET_PORT'] ?? 8080);
         
         $this->validateConfiguration();
     }
@@ -98,7 +110,11 @@ class Config
             'apiV1Str' => $this->apiV1Str,
             'projectName' => $this->projectName,
             'maxOrderbookLimit' => $this->maxOrderbookLimit,
-            'debug' => $this->debug
+            'debug' => $this->debug,
+            'phpHost' => $this->phpHost,
+            'phpPort' => $this->phpPort,
+            'websocketHost' => $this->websocketHost,
+            'websocketPort' => $this->websocketPort
         ];
     }
 }

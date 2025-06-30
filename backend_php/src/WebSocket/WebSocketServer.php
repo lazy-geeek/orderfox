@@ -186,10 +186,10 @@ class WebSocketServer implements MessageComponentInterface
         }
     }
 
-    public static function start(int $port = 8080): void
+    public static function start(int $port = 8080, string $host = '0.0.0.0'): void
     {
         $logger = Logger::setup();
-        $logger->info("Starting WebSocket server on port {$port}");
+        $logger->info("Starting WebSocket server on {$host}:{$port}");
 
         $loop = Loop::get();
         $webSocketServer = new self();
@@ -199,11 +199,11 @@ class WebSocketServer implements MessageComponentInterface
             new HttpServer(
                 new WsServer($webSocketServer)
             ),
-            new ReactServer("0.0.0.0:{$port}", $loop),
+            new ReactServer("{$host}:{$port}", $loop),
             $loop
         );
 
-        $logger->info("WebSocket server started successfully on port {$port}");
+        $logger->info("WebSocket server started successfully on {$host}:{$port}");
         $server->run();
     }
 }

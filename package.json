@@ -7,7 +7,7 @@
     "dev": "concurrently \"cd backend_php && php -S localhost:8000 -t public\" \"cd backend_php && php websocket_server.php\" \"cd frontend && npm run dev\"",
     "dev:backend": "concurrently \"cd backend_php && php -S localhost:8000 -t public\" \"cd backend_php && php websocket_server.php\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:container": "concurrently \"cd backend_php && php -S 0.0.0.0:8000 -t public\" \"cd backend_php && php websocket_server.php\" \"cd frontend && npm run dev -- --host 0.0.0.0\"",
+    "dev:container": "concurrently \"cd backend_php && php -S 0.0.0.0:8000 -t public\" \"cd backend_php && php websocket_server.php\" \"cd frontend && npm run dev\"",
     "test:backend": "cd backend_php && ./vendor/bin/phpunit tests/ --verbose",
     "test:unit": "cd backend_php && ./vendor/bin/phpunit tests/Unit/ --verbose",
     "test:integration": "cd backend_php && ./vendor/bin/phpunit tests/Integration/ --verbose",

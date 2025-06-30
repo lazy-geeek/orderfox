@@ -237,6 +237,10 @@ CONTAINER_WEBSOCKET_HOST=0.0.0.0
 CONTAINER_WEBSOCKET_PORT=8080
 CONTAINER_FRONTEND_HOST=0.0.0.0
 CONTAINER_FRONTEND_PORT=3000
+
+# Frontend Environment Variables (Vite uses VITE_ prefix)
+VITE_APP_API_BASE_URL=http://localhost:8000/api/v1
+VITE_APP_WS_BASE_URL=ws://localhost:8080
 ```
 
 ### Running in Container Mode
@@ -369,6 +373,9 @@ The frontend has been successfully migrated from FastAPI to PHP backend while pr
 - **Backend Compatibility**: Frontend supports both FastAPI (legacy) and PHP (active) backends
 
 ### Recent Improvements
+- **Container Configuration**: Enhanced PHP backend and WebSocket server for Docker container networking
+- **Environment Variable Management**: Config.php now prioritizes CONTAINER_* variables for seamless container deployment
+- **Vite Container Support**: Added vite.config.js with container-optimized settings and polling for better file watching
 - **WebSocket Parameter Handling**: Fixed backend Query parameter validation for WebSocket endpoints
 - **Dynamic Limit Updates**: Connection manager now supports updating orderbook limits without full reconnection
 - **Race Condition Prevention**: Frontend properly sequences disconnect → clear → fetch → reconnect operations

@@ -13,13 +13,14 @@ try {
     
     $logger->info("Starting OrderFox WebSocket Server");
     
-    // Get WebSocket port from environment or use default
-    $port = (int)($_ENV['WEBSOCKET_PORT'] ?? 8080);
+    // Get WebSocket host and port from config (which handles container vs local environment)
+    $host = $config->websocketHost;
+    $port = $config->websocketPort;
     
-    $logger->info("WebSocket server will start on port: {$port}");
+    $logger->info("WebSocket server will start on {$host}:{$port}");
     
     // Start the WebSocket server
-    WebSocketServer::start($port);
+    WebSocketServer::start($port, $host);
     
 } catch (Exception $e) {
     echo "Failed to start WebSocket server: " . $e->getMessage() . "\n";
