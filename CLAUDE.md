@@ -26,6 +26,8 @@ The frontend has been successfully migrated from the FastAPI backend to the PHP 
 - Node.js 18+ with npm
 - Valid Binance API credentials
 - Git
+- Docker (optional, for containerized deployment)
+- Firebase CLI (optional, for Firebase integration)
 
 ### Initial Setup
 1. **Clone the repository**:
@@ -38,9 +40,11 @@ The frontend has been successfully migrated from the FastAPI backend to the PHP 
    ```bash
    # Copy and configure environment file
    cp .env.example .env
-   # Edit .env with your Binance API credentials:
+   # Edit .env with your configuration:
    # BINANCE_API_KEY=your_api_key
    # BINANCE_SECRET_KEY=your_secret_key
+   # FIREBASE_PROJECT_ID=your_firebase_project_id (optional)
+   # FIREBASE_CONFIG_JSON=path_to_firebase_service_account.json (optional)
    ```
 
 3. **Install PHP backend dependencies**:
@@ -62,6 +66,11 @@ The frontend has been successfully migrated from the FastAPI backend to the PHP 
    npm install
    ```
 
+6. **Install all dependencies at once (alternative)**:
+   ```bash
+   npm run install:all
+   ```
+
 ### Development Commands
 
 #### Quick Start (Recommended)
@@ -73,6 +82,21 @@ This command starts:
 - PHP HTTP server on port 8000
 - PHP WebSocket server on port 8080  
 - Frontend development server on port 3000
+
+#### Container Development Mode
+```bash
+# Run services in container-compatible mode (binds to 0.0.0.0)
+npm run dev:container
+```
+
+#### Individual Services
+```bash
+# Run only backend services (PHP + WebSocket)
+npm run dev:backend
+
+# Run only frontend
+npm run dev:frontend
+```
 
 #### Individual Services
 
@@ -86,12 +110,18 @@ php -S localhost:8000 -t public
 cd backend_php
 php websocket_server.php
 
-# Run unit tests
+# Run all tests
+npm run test:backend
+
+# Run unit tests only
+npm run test:unit
+
+# Run integration tests only
+npm run test:integration
+
+# Alternative: Direct PHPUnit commands
 cd backend_php
 ./vendor/bin/phpunit tests/Unit/ --verbose
-
-# Run integration tests
-cd backend_php
 ./vendor/bin/phpunit tests/Integration/ --verbose
 
 # Install dependencies
@@ -188,6 +218,73 @@ curl -s http://localhost:8000/api/v1/market-data/symbols | jq '.success'  # Shou
 python test_paper_trading.py
 ```
 
+## Docker Integration
+
+The project includes comprehensive Docker support with optimized .dockerignore configuration:
+
+### Docker Features
+- **Multi-stage builds**: Optimized for production deployments
+- **Legacy exclusion**: Automatically excludes legacy directories (backend/, frontend_vanilla/)
+- **Firebase ready**: Configured for Firebase integration with proper file exclusions
+- **Development mode**: Container-compatible development environment
+
+### Container Environment Variables
+```bash
+# Set these in .env for container deployment
+CONTAINER_PHP_HOST=0.0.0.0
+CONTAINER_PHP_PORT=8000
+CONTAINER_WEBSOCKET_HOST=0.0.0.0
+CONTAINER_WEBSOCKET_PORT=8080
+CONTAINER_FRONTEND_HOST=0.0.0.0
+CONTAINER_FRONTEND_PORT=3000
+```
+
+### Running in Container Mode
+```bash
+# Use container-compatible development mode
+npm run dev:container
+```
+
+## Firebase Integration
+
+The project includes Firebase configuration files and environment support:
+
+### Firebase Files
+- **firebase.json**: Firebase project configuration
+- **firestore.rules**: Firestore security rules
+- **firestore.indexes.json**: Firestore database indexes
+- **backend_php/FIREBASE_INTEGRATION.md**: PHP backend Firebase integration guide
+- **frontend/FIREBASE_INTEGRATION.md**: Frontend Firebase integration guide
+
+### Firebase Environment Variables
+```bash
+# Firebase project configuration
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_CONFIG_JSON=path_to_firebase_service_account.json
+
+# Firebase Emulator configuration (for local development)
+FIREBASE_EMULATOR_HOST=localhost
+FIRESTORE_EMULATOR_PORT=8080
+FIREBASE_AUTH_EMULATOR_PORT=9099
+FIREBASE_FUNCTIONS_EMULATOR_PORT=5001
+FIREBASE_HOSTING_EMULATOR_PORT=5000
+```
+
+### Firebase Setup
+```bash
+# Install Firebase CLI (if not already installed)
+npm install -g firebase-tools
+
+# Login to Firebase
+firebase login
+
+# Initialize Firebase in your project
+firebase init
+
+# Start Firebase emulators for local development
+firebase emulators:start
+```
+
 ## Architecture
 
 ### Backend PHP Structure (Active)
@@ -281,8 +378,13 @@ The frontend has been successfully migrated from FastAPI to PHP backend while pr
 
 ### Configuration
 - Environment variables loaded from .env file (multiple path detection)
-- Required: BINANCE_API_KEY, BINANCE_SECRET_KEY
-- Optional: FIREBASE_CONFIG_JSON, DEBUG, MAX_ORDERBOOK_LIMIT
+- **Required**: BINANCE_API_KEY, BINANCE_SECRET_KEY
+- **Optional**: 
+  - FIREBASE_PROJECT_ID, FIREBASE_CONFIG_JSON (Firebase integration)
+  - DEBUG, ENVIRONMENT, LOG_LEVEL (Development/logging)
+  - MAX_ORDERBOOK_LIMIT (Trading limits)
+  - Container variables (CONTAINER_*_HOST, CONTAINER_*_PORT)
+  - Firebase Emulator variables (FIREBASE_*_EMULATOR_PORT)
 - Trading mode defaults to paper trading for safety
 
 ### Known Limitations

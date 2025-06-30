@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to all users during development
+    // TODO: Implement proper security rules for production
+    
+    // User data - only authenticated users can access their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User trading data - only authenticated users can access their own trading data
+    match /trading/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow access to trading sessions and orders
+      match /sessions/{sessionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      match /orders/{orderId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      match /portfolio/{portfolioId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Market data - read-only access for all authenticated users
+    match /market_data/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false; // Market data should only be written by backend services
+    }
+    
+    // Public data - read access for all users
+    match /public/{document=**} {
+      allow read: if true;
+      allow write: if false; // Public data should only be written by admin
+    }
+    
+    // Admin data - no access through client SDK
+    match /admin/{document=**} {
+      allow read, write: if false; // Admin data should only be accessed by backend services
+    }
+    
+    // Development mode - allow all access for testing
+    // TODO: Remove this rule in production
+    match /dev_test/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

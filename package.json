@@ -1,12 +1,19 @@
 {
   "name": "orderfox-root",
   "version": "1.0.0",
-  "description": "Root package for OrderFox application",
+  "description": "Root package for OrderFox application - PHP Backend + Vanilla JS Frontend",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"cd backend && uvicorn app.main:app --reload\" \"cd frontend_vanilla && npm run dev\""
+    "dev": "concurrently \"cd backend_php && php -S localhost:8000 -t public\" \"cd backend_php && php websocket_server.php\" \"cd frontend && npm run dev\"",
+    "dev:backend": "concurrently \"cd backend_php && php -S localhost:8000 -t public\" \"cd backend_php && php websocket_server.php\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:container": "concurrently \"cd backend_php && php -S 0.0.0.0:8000 -t public\" \"cd backend_php && php websocket_server.php\" \"cd frontend && npm run dev -- --host 0.0.0.0\"",
+    "test:backend": "cd backend_php && ./vendor/bin/phpunit tests/ --verbose",
+    "test:unit": "cd backend_php && ./vendor/bin/phpunit tests/Unit/ --verbose",
+    "test:integration": "cd backend_php && ./vendor/bin/phpunit tests/Integration/ --verbose",
+    "install:all": "cd backend_php && composer install && cd ../frontend && npm install"
   },
-  "keywords": [],
+  "keywords": ["cryptocurrency", "trading", "php", "javascript", "binance", "websocket"],
   "author": "",
   "license": "ISC",
   "devDependencies": {
