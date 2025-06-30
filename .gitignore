@@ -194,6 +194,8 @@ prompt.txt
 
 .gemini/
 
+.devcontainer/
+
 node_modules/
 
 PLAN.md
@@ -201,3 +203,4 @@ plan.md
 TODO.md
 to-do.md
 todo.md
+

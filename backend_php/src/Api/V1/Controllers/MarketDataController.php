@@ -23,8 +23,8 @@ class MarketDataController
     public function __construct()
     {
         $this->logger = Logger::getLogger('market_data');
-        $this->exchangeService = new ExchangeService();
-        $this->symbolService = new SymbolService();
+        $this->exchangeService = ExchangeService::getInstance();
+        $this->symbolService = new SymbolService($this->exchangeService);
     }
 
     /**

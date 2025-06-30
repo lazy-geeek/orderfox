@@ -11,15 +11,40 @@ use ccxt\binance;
 
 class ExchangeService
 {
+    private static ?ExchangeService $instance = null;
+    private static bool $isInitializing = false; // Prevent infinite recursion
+    
     private \Monolog\Logger $logger;
     private Config $config;
     private Exchange $exchange;
+    private bool $isConnected = false;
 
-    public function __construct()
+    private function __construct()
     {
         $this->logger = Logger::getLogger('exchange');
         $this->config = Config::getInstance();
         $this->initializeExchange();
+    }
+
+    public static function getInstance(): ExchangeService
+    {
+        if (self::$instance === null && !self::$isInitializing) {
+            self::$isInitializing = true;
+            try {
+                self::$instance = new self();
+                self::$isInitializing = false;
+            } catch (\Exception $e) {
+                self::$isInitializing = false;
+                throw $e;
+            }
+        }
+        return self::$instance;
+    }
+
+    // Prevent cloning and unserialization
+    private function __clone() {}
+    public function __wakeup() {
+        throw new \Exception("Cannot unserialize singleton");
     }
 
     private function initializeExchange(): void
@@ -46,6 +71,7 @@ class ExchangeService
             }
 
             $this->exchange = new binance($exchangeConfig);
+            $this->isConnected = true;
 
             $this->logger->info('Exchange initialized successfully', [
                 'exchange' => 'binance',
@@ -54,6 +80,7 @@ class ExchangeService
             ]);
 
         } catch (\Exception $e) {
+            $this->isConnected = false;
             $this->logger->error('Failed to initialize exchange', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -63,11 +90,49 @@ class ExchangeService
     }
 
     /**
+     * Ensure exchange connection is healthy and reinitialize if needed
+     */
+    private function ensureConnection(): void
+    {
+        if (!$this->isConnected) {
+            $this->logger->info('Exchange connection lost, reinitializing...');
+            $this->initializeExchange();
+        }
+    }
+
+    /**
+     * Handle connection errors and attempt recovery
+     */
+    private function handleConnectionError(\Exception $e): void
+    {
+        $this->logger->error('Exchange connection error', [
+            'error' => $e->getMessage(),
+            'type' => get_class($e)
+        ]);
+        
+        // Mark connection as failed for next request
+        $this->isConnected = false;
+        
+        // For certain errors, try immediate reconnection
+        if (strpos($e->getMessage(), 'connection') !== false || 
+            strpos($e->getMessage(), 'timeout') !== false) {
+            try {
+                $this->initializeExchange();
+            } catch (\Exception $recoveryError) {
+                $this->logger->error('Failed to recover connection', [
+                    'error' => $recoveryError->getMessage()
+                ]);
+            }
+        }
+    }
+
+    /**
      * Fetch all available trading symbols
      */
     public function fetchSymbols(): array
     {
         try {
+            $this->ensureConnection();
             $this->logger->debug('Fetching markets from exchange');
             
             $markets = $this->exchange->load_markets();
@@ -112,6 +177,7 @@ class ExchangeService
             return $symbols;
 
         } catch (\Exception $e) {
+            $this->handleConnectionError($e);
             $this->logger->error('Failed to fetch symbols', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -126,6 +192,7 @@ class ExchangeService
     public function fetchTicker(string $symbol): array
     {
         try {
+            $this->ensureConnection();
             $this->logger->debug('Fetching ticker', ['symbol' => $symbol]);
             
             $ticker = $this->exchange->fetch_ticker($symbol);
@@ -161,6 +228,7 @@ class ExchangeService
             return $formattedTicker;
 
         } catch (\Exception $e) {
+            $this->handleConnectionError($e);
             $this->logger->error('Failed to fetch ticker', [
                 'symbol' => $symbol,
                 'error' => $e->getMessage(),
@@ -176,6 +244,7 @@ class ExchangeService
     public function fetchOrderBook(string $symbol, int $limit = 100): array
     {
         try {
+            $this->ensureConnection();
             $this->logger->debug('Fetching order book', [
                 'symbol' => $symbol,
                 'limit' => $limit
@@ -203,6 +272,7 @@ class ExchangeService
             return $formattedOrderBook;
 
         } catch (\Exception $e) {
+            $this->handleConnectionError($e);
             $this->logger->error('Failed to fetch order book', [
                 'symbol' => $symbol,
                 'limit' => $limit,
@@ -219,6 +289,7 @@ class ExchangeService
     public function fetchOHLCV(string $symbol, string $timeframe = '1h', int $limit = 100): array
     {
         try {
+            $this->ensureConnection();
             $this->logger->debug('Fetching OHLCV data', [
                 'symbol' => $symbol,
                 'timeframe' => $timeframe,
@@ -250,6 +321,7 @@ class ExchangeService
             return $formattedCandles;
 
         } catch (\Exception $e) {
+            $this->handleConnectionError($e);
             $this->logger->error('Failed to fetch OHLCV data', [
                 'symbol' => $symbol,
                 'timeframe' => $timeframe,
@@ -266,6 +338,7 @@ class ExchangeService
      */
     public function getExchange(): Exchange
     {
+        $this->ensureConnection();
         return $this->exchange;
     }
 

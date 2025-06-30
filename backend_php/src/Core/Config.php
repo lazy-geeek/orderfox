@@ -66,13 +66,13 @@ class Config
                 $dotenv = Dotenv::createImmutable(dirname($envPath), basename($envPath));
                 $dotenv->safeLoad();
                 $envLoaded = true;
-                echo "Loaded environment variables from: {$envPath}\n";
+                error_log("Loaded environment variables from: {$envPath}");
                 break;
             }
         }
         
         if (!$envLoaded) {
-            echo "Warning: No .env file found in expected locations\n";
+            error_log("Warning: No .env file found in expected locations");
         }
     }
     

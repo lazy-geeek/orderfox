@@ -25,7 +25,7 @@ class ConnectionManager
     public function __construct()
     {
         $this->logger = Logger::getLogger('connection_manager');
-        $this->exchangeService = new ExchangeService();
+        $this->exchangeService = ExchangeService::getInstance();
         $this->logger->info("ConnectionManager initialized");
     }
 
@@ -404,24 +404,61 @@ class ConnectionManager
     private function streamCandles(string $symbol, string $timeframe, string $streamKey): void
     {
         try {
-            // Fetch real OHLCV data from exchange
-            $ohlcv = $this->exchangeService->fetchOHLCV($symbol, $timeframe, 1);
+            // Get current ticker for live price updates
+            $ticker = $this->exchangeService->fetchTicker($symbol);
+            
+            if (!$ticker) {
+                throw new \Exception("Could not fetch ticker data for {$symbol}");
+            }
 
-            // Get the latest candle
+            // Calculate current candle timestamp based on timeframe
+            $currentTime = time() * 1000; // Current time in milliseconds
+            $timeframeMinutes = $this->getTimeframeMinutes($timeframe);
+            $candleStartTime = floor($currentTime / ($timeframeMinutes * 60 * 1000)) * ($timeframeMinutes * 60 * 1000);
+
+            // Fetch recent candles to get the base data
+            $ohlcv = $this->exchangeService->fetchOHLCV($symbol, $timeframe, 2);
+            
+            $currentCandle = null;
             if (!empty($ohlcv)) {
                 $latestCandle = end($ohlcv);
+                
+                // If latest candle is the current developing candle, use it as base
+                if ($latestCandle['timestamp'] == $candleStartTime) {
+                    $currentCandle = $latestCandle;
+                } else {
+                    // Create new developing candle starting from current time
+                    $currentCandle = [
+                        'timestamp' => $candleStartTime,
+                        'open' => (float)$ticker['last'],
+                        'high' => (float)$ticker['last'],
+                        'low' => (float)$ticker['last'],
+                        'close' => (float)$ticker['last'],
+                        'volume' => 0.0
+                    ];
+                }
+            }
 
+            if ($currentCandle) {
+                // Update candle with current ticker data
+                $currentPrice = (float)$ticker['last'];
+                
+                // Update high/low if current price exceeds them
+                $currentCandle['high'] = max($currentCandle['high'], $currentPrice);
+                $currentCandle['low'] = min($currentCandle['low'], $currentPrice);
+                $currentCandle['close'] = $currentPrice;
+                
                 // Convert to our schema format (matching Python API exactly)
                 $formattedData = [
                     'type' => 'candle_update',
                     'symbol' => $this->displaySymbols[$streamKey] ?? $symbol,
                     'timeframe' => $timeframe,
-                    'timestamp' => $latestCandle['timestamp'],
-                    'open' => (float)$latestCandle['open'],
-                    'high' => (float)$latestCandle['high'],
-                    'low' => (float)$latestCandle['low'],
-                    'close' => (float)$latestCandle['close'],
-                    'volume' => (float)$latestCandle['volume']
+                    'timestamp' => $currentCandle['timestamp'],
+                    'open' => $currentCandle['open'],
+                    'high' => $currentCandle['high'],
+                    'low' => $currentCandle['low'],
+                    'close' => $currentCandle['close'],
+                    'volume' => $currentCandle['volume']
                 ];
 
                 $this->broadcastToStream($streamKey, $formattedData);
@@ -437,6 +474,32 @@ class ConnectionManager
             ];
             $this->broadcastToStream($streamKey, $errorData);
         }
+    }
+
+    /**
+     * Convert timeframe string to minutes
+     */
+    private function getTimeframeMinutes(string $timeframe): int
+    {
+        $timeframeMap = [
+            '1m' => 1,
+            '3m' => 3,
+            '5m' => 5,
+            '15m' => 15,
+            '30m' => 30,
+            '1h' => 60,
+            '2h' => 120,
+            '4h' => 240,
+            '6h' => 360,
+            '8h' => 480,
+            '12h' => 720,
+            '1d' => 1440,
+            '3d' => 4320,
+            '1w' => 10080,
+            '1M' => 43200 // Approximate 30 days
+        ];
+        
+        return $timeframeMap[$timeframe] ?? 1;
     }
 
     /**

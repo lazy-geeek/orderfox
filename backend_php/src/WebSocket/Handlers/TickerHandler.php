@@ -1,20 +1,20 @@
 <?php
 
-namespace App\WebSocket\Handlers;
+namespace OrderFox\WebSocket\Handlers;
 
-use App\Core\Logger;
-use App\Services\ConnectionManager;
-use App\Services\SymbolService;
+use Monolog\Logger as MonologLogger;
+use OrderFox\Services\ConnectionManager;
+use OrderFox\Services\SymbolService;
 use Ratchet\ConnectionInterface;
 use Ratchet\MessageComponentInterface;
 
 class TickerHandler implements MessageComponentInterface
 {
     private ConnectionManager $connectionManager;
-    private Logger $logger;
+    private MonologLogger $logger;
     private SymbolService $symbolService;
 
-    public function __construct(ConnectionManager $connectionManager, Logger $logger)
+    public function __construct(ConnectionManager $connectionManager, MonologLogger $logger)
     {
         $this->connectionManager = $connectionManager;
         $this->logger = $logger;
@@ -35,20 +35,7 @@ class TickerHandler implements MessageComponentInterface
 
         try {
             // Validate and convert symbol using symbol service
-            $exchangeSymbol = $this->symbolService->resolveSymbolToExchangeFormat($symbol);
-            if (!$exchangeSymbol) {
-                // Get suggestions for invalid symbol
-                $suggestions = $this->symbolService->getSymbolSuggestions($symbol);
-                $errorMsg = "Symbol {$symbol} not found";
-                if (!empty($suggestions)) {
-                    $errorMsg .= ". Did you mean: " . implode(', ', array_slice($suggestions, 0, 3)) . "?";
-                }
-
-                $this->logger->warning("WebSocket ticker error: {$errorMsg}");
-                $this->sendError($conn, $errorMsg);
-                $conn->close();
-                return;
-            }
+            $exchangeSymbol = $this->symbolService->resolveSymbol($symbol);
 
             $this->logger->info("Using exchange symbol: {$exchangeSymbol} for WebSocket ticker: {$symbol}");
 

@@ -17,7 +17,7 @@ class SymbolService
     public function __construct(?ExchangeService $exchangeService = null)
     {
         $this->logger = Logger::getLogger('symbol');
-        $this->exchangeService = $exchangeService ?? new ExchangeService();
+        $this->exchangeService = $exchangeService ?? ExchangeService::getInstance();
     }
 
     /**

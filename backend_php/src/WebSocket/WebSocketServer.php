@@ -1,18 +1,19 @@
 <?php
 
-namespace App\WebSocket;
+namespace OrderFox\WebSocket;
 
-use App\Core\Logger;
-use App\Services\ConnectionManager;
-use App\WebSocket\Handlers\OrderBookHandler;
-use App\WebSocket\Handlers\TickerHandler;
-use App\WebSocket\Handlers\CandleHandler;
+use OrderFox\Core\Logger;
+use Monolog\Logger as MonologLogger;
+use OrderFox\Services\ConnectionManager;
+use OrderFox\WebSocket\Handlers\OrderBookHandler;
+use OrderFox\WebSocket\Handlers\TickerHandler;
+use OrderFox\WebSocket\Handlers\CandleHandler;
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\Http\HttpServer;
 use Ratchet\Http\Router;
-use Ratchet\Server\IoServer;
 use Ratchet\WebSocket\WsServer;
+use Ratchet\Server\IoServer;
 use React\EventLoop\Loop;
 use React\Socket\Server as ReactServer;
 use Symfony\Component\Routing\Route;
@@ -22,14 +23,14 @@ use Symfony\Component\Routing\RequestContext;
 
 class WebSocketServer implements MessageComponentInterface
 {
-    private Logger $logger;
+    private MonologLogger $logger;
     private ConnectionManager $connectionManager;
     private array $handlers = [];
     private UrlMatcher $urlMatcher;
 
     public function __construct()
     {
-        $this->logger = new Logger();
+        $this->logger = Logger::setup();
         $this->connectionManager = new ConnectionManager();
         $this->setupRoutes();
         $this->setupHandlers();
@@ -42,10 +43,10 @@ class WebSocketServer implements MessageComponentInterface
         $routes = new RouteCollection();
 
         // Add WebSocket routes
-        $routes->add('orderbook', new Route('/ws/orderbook/{symbol}', [], ['symbol' => '[A-Z]+']));
-        $routes->add('ticker', new Route('/ws/ticker/{symbol}', [], ['symbol' => '[A-Z]+']));
+        $routes->add('orderbook', new Route('/ws/orderbook/{symbol}', [], ['symbol' => '[A-Za-z0-9]+']));
+        $routes->add('ticker', new Route('/ws/ticker/{symbol}', [], ['symbol' => '[A-Za-z0-9]+']));
         $routes->add('candles', new Route('/ws/candles/{symbol}/{timeframe}', [], [
-            'symbol' => '[A-Z]+',
+            'symbol' => '[A-Za-z0-9]+',
             'timeframe' => '1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M'
         ]));
 
@@ -187,7 +188,7 @@ class WebSocketServer implements MessageComponentInterface
 
     public static function start(int $port = 8080): void
     {
-        $logger = new Logger();
+        $logger = Logger::setup();
         $logger->info("Starting WebSocket server on port {$port}");
 
         $loop = Loop::get();
@@ -196,9 +197,7 @@ class WebSocketServer implements MessageComponentInterface
         // Create the WebSocket server
         $server = new IoServer(
             new HttpServer(
-                new Router([
-                    '/ws' => new WsServer($webSocketServer)
-                ])
+                new WsServer($webSocketServer)
             ),
             new ReactServer("0.0.0.0:{$port}", $loop),
             $loop
