@@ -9,6 +9,7 @@ OrderFox is a full-stack cryptocurrency trading application with:
 - **Backend**: FastAPI + Python with WebSocket support
 - **Trading**: Binance API integration with paper trading mode
 - **Real-time**: WebSocket connections for live market data
+- **Container Support**: Docker and VS Code Dev Container configuration
 
 ## Development Commands
 
@@ -53,6 +54,30 @@ npm install
 ```bash
 # Run both frontend and backend concurrently from root
 npm run dev
+```
+
+### Docker Development
+```bash
+# Build and run with Docker Compose (recommended for consistent environment)
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d
+
+# Stop containers
+docker-compose down
+
+# View logs
+docker-compose logs -f
+```
+
+### VS Code Dev Container
+```bash
+# Open in VS Code Dev Container (if using VS Code)
+# 1. Install the "Dev Containers" extension
+# 2. Open Command Palette (Ctrl+Shift+P)
+# 3. Select "Dev Containers: Reopen in Container"
+# The container will automatically install dependencies and configure the environment
 ```
 
 ### Full Application Testing
@@ -101,12 +126,22 @@ python test_paper_trading.py
 - **Data Aggregation**: Improved orderbook aggregation with sufficient raw data (50x multiplier, minimum 500 levels)
 - **Automatic Symbol Selection**: First symbol (highest volume) is automatically selected on app load
 - **Market Depth Awareness**: Added handling for Binance API orderbook depth limitations (max 5000 entries, limited price range)
+- **Docker Integration**: Full Docker and Docker Compose support with multi-stage builds and container orchestration
+- **Dev Container Support**: VS Code Dev Container configuration with automatic environment setup and debugging
+- **Container-Aware Configuration**: Automatic detection and configuration for Docker/container environments
+- **Enhanced Logging**: Structured logging with environment-specific log levels and request timing
+- **Static File Serving**: Development mode serves frontend files directly from backend for simplified setup
+- **Health Checks**: Container health check endpoints for orchestration and monitoring
 
 ### Configuration
 - Environment variables loaded from .env file (multiple path detection)
-- Required: BINANCE_API_KEY, BINANCE_SECRET_KEY
-- Optional: FIREBASE_CONFIG_JSON, DEBUG, MAX_ORDERBOOK_LIMIT
+- **Required**: BINANCE_API_KEY, BINANCE_SECRET_KEY
+- **Optional**: FIREBASE_CONFIG_JSON, DEBUG, MAX_ORDERBOOK_LIMIT
+- **Container Configuration**: DEVCONTAINER_MODE, CONTAINER, HOST, PORT
+- **CORS Origins**: Configurable via CORS_ORIGINS environment variable
+- **WebSocket URLs**: Configurable Binance API endpoints (BINANCE_WS_BASE_URL, BINANCE_API_BASE_URL)
 - Trading mode defaults to paper trading for safety
+- **Container Detection**: Automatic detection of Docker/Dev Container environments with adaptive configuration
 
 ### Known Limitations
 - **Orderbook Depth**: Binance API limits orderbook to 5000 entries maximum, sourced from memory
@@ -120,6 +155,19 @@ python test_paper_trading.py
 - Frontend: Manual testing with comprehensive order book functionality
 - Integration: Comprehensive paper trading test that validates full application flow
 
-### When Implementing New Features or Changing Code
+### Model usage
+- Use Opus model when in planning mode.
+- Use Sonnet model when coding.
+
+### Development Environment Notes
+- **Auto-restart**: Backend and frontend automatically restart on file changes in development mode
+- **Container Development**: When using Docker or Dev Containers, all services are configured for hot-reload
+- **Debugging**: VS Code Dev Container includes debugpy configuration for Python debugging
+- **Environment Files**: Use .env.local for local overrides, .env.docker.example for container-specific configuration
+- **Static Files**: In development, backend serves frontend static files for simplified single-server setup
+
+### When Implementing New Features or Changing Code  
 - Update the CLAUDE.md file with any architecture changes or important notes for Claude Code to do a better job in the future.
-- Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes.
+- Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes
+- When working in containers, use the appropriate environment variables for container-specific URLs and ports
+- Test endpoints are configured to use environment variables for backend URLs to support different deployment scenarios
