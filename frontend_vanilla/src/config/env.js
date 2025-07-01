@@ -16,8 +16,15 @@ const getEnvVar = (name, defaultValue) => {
 };
 
 // API and WebSocket base URLs from environment variables
-export const API_BASE_URL = getEnvVar('VITE_APP_API_BASE_URL', 'http://localhost:8000/api/v1');
-export const WS_BASE_URL = getEnvVar('VITE_APP_WS_BASE_URL', 'ws://localhost:8000/api/v1');
+// In development, use relative URLs to leverage Vite's proxy configuration
+// This avoids CORS issues when connecting from Windows host to dev container
+const isDevelopment = import.meta.env.MODE === 'development';
+export const API_BASE_URL = getEnvVar('VITE_APP_API_BASE_URL', 
+  isDevelopment ? '/api/v1' : 'http://localhost:8000/api/v1'
+);
+export const WS_BASE_URL = getEnvVar('VITE_APP_WS_BASE_URL', 
+  isDevelopment ? 'ws://localhost:3000/api/v1' : 'ws://localhost:8000/api/v1'
+);
 
 // Log current configuration (useful for debugging)
 console.log('Frontend Configuration:', {

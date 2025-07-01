@@ -135,6 +135,9 @@ python test_paper_trading.py
 - **Dev Container Path Fix**: Fixed inconsistent workspace paths from `/workspace` to `/workspaces/orderfox` for VS Code compatibility
 - **Node.js Version Update**: Upgraded from Node.js 18 to Node.js 20 for Vite 7.0.0+ support
 - **Script Path Consistency**: Updated all supervisord, post-create, and entrypoint scripts to use consistent paths
+- **Windows Host to Container Connectivity**: Implemented Vite proxy configuration to resolve CORS issues when accessing dev container from Windows host browser
+- **Frontend Proxy Configuration**: Updated frontend to use relative URLs (`/api/v1`) instead of absolute URLs to leverage Vite's built-in proxy
+- **WebSocket Proxy Support**: Added WebSocket proxy configuration for `/api/v1/ws` endpoints to ensure real-time data works across container boundaries
 
 ### Configuration
 - Environment variables loaded from .env file (multiple path detection)
@@ -145,6 +148,7 @@ python test_paper_trading.py
 - **WebSocket URLs**: Configurable Binance API endpoints (BINANCE_WS_BASE_URL, BINANCE_API_BASE_URL)
 - Trading mode defaults to paper trading for safety
 - **Container Detection**: Automatic detection of Docker/Dev Container environments with adaptive configuration
+- **Cross-Platform Connectivity**: Special configuration for Windows host to container access using Vite proxy to avoid CORS issues
 
 ### Known Limitations
 - **Orderbook Depth**: Binance API limits orderbook to 5000 entries maximum, sourced from memory
@@ -172,7 +176,19 @@ python test_paper_trading.py
 - **Node.js Version**: Container uses Node.js 20+ for Vite 7.0.0+ compatibility
 - **Path Consistency**: All scripts and configuration files use consistent `/workspaces/orderfox` paths
 
+### Container Connectivity (Windows Host to Dev Container)
+- **Problem**: Accessing dev container from Windows host browser causes CORS issues when frontend tries to directly connect to backend
+- **Solution**: Vite proxy configuration routes all API and WebSocket requests through the frontend dev server
+- **Frontend Configuration**: 
+  - `frontend_vanilla/.env` uses relative URLs: `VITE_APP_API_BASE_URL=/api/v1` and `VITE_APP_WS_BASE_URL=/api/v1`
+  - `frontend_vanilla/vite.config.js` configures proxy rules for `/api` and `/api/v1/ws` endpoints
+- **Network Flow**: Windows Browser → localhost:3000 (Vite) → localhost:8000 (FastAPI backend inside container)
+- **Benefits**: Eliminates CORS issues, enables WebSocket connections, maintains hot reload functionality
+- **Auto-Configuration**: Dev container post-create script automatically configures frontend for proxy usage
+
 ### When Implementing New Features or Changing Code  
 - Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes
 - When working in containers, use the appropriate environment variables for container-specific URLs and ports
+- **IMPORTANT**: Always use relative URLs (`/api/v1`) in development mode, not absolute URLs (`http://localhost:8000/api/v1`)
 - Test endpoints are configured to use environment variables for backend URLs to support different deployment scenarios
+- If experiencing CORS issues, verify that frontend is using Vite proxy configuration with relative URLs
