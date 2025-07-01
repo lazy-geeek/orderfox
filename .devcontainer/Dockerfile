@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 18 for frontend development
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+# Install Node.js 20 for frontend development (required for Vite 7.0.0+)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
 # Install global Node.js development tools
@@ -46,7 +46,7 @@ RUN groupadd --gid 1000 vscode \
     && chmod 0440 /etc/sudoers.d/vscode
 
 # Set up working directory
-WORKDIR /workspace
+WORKDIR /workspaces/orderfox
 
 # Install Python development tools
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -62,15 +62,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Create necessary directories and set permissions
 RUN mkdir -p /var/log/supervisor && \
-    mkdir -p /workspace/logs && \
-    chown -R vscode:vscode /workspace && \
-    chmod -R 755 /workspace
+    mkdir -p /workspaces/orderfox/logs && \
+    chown -R vscode:vscode /workspaces/orderfox && \
+    chmod -R 755 /workspaces/orderfox
 
 # Switch to vscode user
 USER vscode
 
 # Set environment variables for development
-ENV PYTHONPATH=/workspace
+ENV PYTHONPATH=/workspaces/orderfox
 ENV NODE_ENV=development
 ENV ENVIRONMENT=development
 ENV DEBUG=true

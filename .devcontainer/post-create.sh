@@ -8,7 +8,7 @@ set -e
 echo "🚀 OrderFox Dev Container Post-Create Setup"
 
 # Ensure we're in the workspace directory
-cd /workspace
+cd /workspaces/orderfox
 
 # Install Python backend dependencies
 echo "📦 Installing Python backend dependencies..."

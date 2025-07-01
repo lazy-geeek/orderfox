@@ -10,15 +10,15 @@ mkdir -p /var/log/supervisor
 mkdir -p /var/run
 
 # Set up environment
-export PYTHONPATH="/workspace:$PYTHONPATH"
-export WORKSPACE_FOLDER="/workspace"
+export PYTHONPATH="/workspaces/orderfox:$PYTHONPATH"
+export WORKSPACE_FOLDER="/workspaces/orderfox"
 export DEVCONTAINER_MODE="true"
 
 # Handle environment setup
-if [ -f "/workspace/.env" ]; then
+if [ -f "/workspaces/orderfox/.env" ]; then
     echo "📝 Loading environment variables from .env..."
     set -a
-    source /workspace/.env
+    source /workspaces/orderfox/.env
     set +a
 else
     echo "⚠️  No .env file found, using defaults..."
@@ -48,19 +48,19 @@ health_check() {
     fi
     
     # Check if workspace is mounted
-    if [ ! -d "/workspace" ]; then
+    if [ ! -d "/workspaces/orderfox" ]; then
         echo "❌ Workspace directory not found!"
         exit 1
     fi
     
     # Check if backend directory exists
-    if [ ! -d "/workspace/backend" ]; then
+    if [ ! -d "/workspaces/orderfox/backend" ]; then
         echo "❌ Backend directory not found!"
         exit 1
     fi
     
     # Check if frontend directory exists
-    if [ ! -d "/workspace/frontend_vanilla" ]; then
+    if [ ! -d "/workspaces/orderfox/frontend_vanilla" ]; then
         echo "❌ Frontend vanilla directory not found!"
         exit 1
     fi
@@ -97,13 +97,13 @@ wait_for_deps() {
     echo "⏳ Waiting for dependencies to be ready..."
     
     # Wait for Python dependencies to be installed
-    while [ ! -f "/workspace/backend/requirements.txt" ] || [ ! -d "/usr/local/lib/python3.11/site-packages/fastapi" ]; do
+    while [ ! -f "/workspaces/orderfox/backend/requirements.txt" ] || [ ! -d "/usr/local/lib/python3.11/site-packages/fastapi" ]; do
         echo "   Waiting for Python dependencies..."
         sleep 2
     done
     
     # Wait for Node dependencies to be installed
-    while [ ! -f "/workspace/frontend_vanilla/package.json" ] || [ ! -d "/workspace/frontend_vanilla/node_modules" ]; do
+    while [ ! -f "/workspaces/orderfox/frontend_vanilla/package.json" ] || [ ! -d "/workspaces/orderfox/frontend_vanilla/node_modules" ]; do
         echo "   Waiting for Node dependencies..."
         sleep 2
     done
@@ -122,7 +122,7 @@ main() {
     setup_logging
     
     # Change to workspace directory
-    cd /workspace
+    cd /workspaces/orderfox
     
     # Wait for dependencies if needed
     if [ "${WAIT_FOR_DEPS:-true}" = "true" ]; then
@@ -131,7 +131,7 @@ main() {
     
     # Start supervisor
     echo "🎯 Starting supervisord..."
-    exec /usr/bin/supervisord -c /workspace/.devcontainer/supervisord.conf
+    exec /usr/bin/supervisord -c /workspaces/orderfox/.devcontainer/supervisord.conf
 }
 
 # Handle signals for graceful shutdown

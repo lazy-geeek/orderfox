@@ -22,11 +22,12 @@
 
 	// Set environment variables
 	"containerEnv": {
-		"PYTHONPATH": "/workspace",
+		"PYTHONPATH": "/workspaces/orderfox",
 		"NODE_ENV": "development",
 		"ENVIRONMENT": "development",
 		"DEBUG": "true",
-		"DEVCONTAINER_MODE": "true"
+		"DEVCONTAINER_MODE": "true",
+		"WORKSPACE_FOLDER": "/workspaces/orderfox"
 	},
 
 	// Configure VS Code settings and extensions
@@ -96,10 +97,8 @@
 	// Post-create command to set up the development environment
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
 
-	// Mount the workspace and preserve git history
-	"mounts": [
-		"source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
-	],
+	// Use VS Code's default workspace mounting
+	// "mounts": [], // VS Code will automatically mount to /workspaces/orderfox
 
 	// Run as vscode user
 	"remoteUser": "vscode",
