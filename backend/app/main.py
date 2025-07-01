@@ -13,6 +13,8 @@ from pydantic import ValidationError
 from app.api.v1.endpoints.market_data_http import router as market_data_http_router
 from app.api.v1.endpoints.market_data_ws import router as market_data_ws_router
 from app.api.v1.endpoints import trading as trading_router
+from app.api.v1.endpoints.monitoring import router as monitoring_router
+from app.services.monitoring_service import get_monitoring_service
 from app.core.logging_config import (
     setup_logging,
     configure_external_loggers,
@@ -129,6 +131,11 @@ async def startup_event():
     logger.info(f"Container mode: {DEVCONTAINER_MODE}")
     logger.info(f"Server binding to: {settings.HOST}:{settings.PORT}")
     
+    # Initialize monitoring service
+    monitoring_service = get_monitoring_service()
+    monitoring_service.start_monitoring(interval=30.0)
+    logger.info("Monitoring service started")
+    
     # Mount static files in development
     if settings.SERVE_STATIC_FILES:
         static_path = Path(settings.STATIC_FILES_PATH)
@@ -145,6 +152,12 @@ async def startup_event():
 async def shutdown_event():
     """Application shutdown event."""
     logger.info("Trading Bot API shutting down...")
+    
+    # Stop monitoring service
+    monitoring_service = get_monitoring_service()
+    monitoring_service.stop_monitoring()
+    logger.info("Monitoring service stopped")
+    
     logger.info("Application shutdown completed")
 
 
@@ -191,6 +204,7 @@ app.add_middleware(
 app.include_router(market_data_http_router, prefix="/api/v1", tags=["market-data-http"])
 app.include_router(market_data_ws_router, prefix="/api/v1", tags=["market-data-ws"])
 app.include_router(trading_router.router, prefix="/api/v1", tags=["trading"])
+app.include_router(monitoring_router, prefix="/api/v1", tags=["monitoring"])
 
 
 # Test WebSocket endpoint for debugging

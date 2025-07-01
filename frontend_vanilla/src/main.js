@@ -122,7 +122,7 @@ symbolSelector.addEventListener('change', (e) => {
   // Introduce a delay to allow old WebSockets to fully close
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit, state.selectedRounding);
   }, 500); // 500ms delay
 });
 
@@ -154,7 +154,7 @@ orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) =
   // Restart WebSocket connection with new limit
   disconnectWebSocketStream('orderbook', state.selectedSymbol);
   setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit, state.selectedRounding);
   }, 500); // 500ms delay to allow cleanup
 });
 
@@ -173,7 +173,7 @@ orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e
   // Restart WebSocket connection with current limit
   disconnectWebSocketStream('orderbook', state.selectedSymbol);
   setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit, state.selectedRounding);
   }, 500); // 500ms delay to allow cleanup
 });
 
@@ -199,7 +199,7 @@ fetchSymbols().then(() => {
     // Start WebSocket connections for the selected symbol
     setTimeout(() => {
       connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
-      connectWebSocketStream(firstSymbol.id, 'orderbook', null, validLimit);
+      connectWebSocketStream(firstSymbol.id, 'orderbook', null, validLimit, state.selectedRounding);
     }, 500);
   }
 });

@@ -119,18 +119,48 @@ const validateOrderBook = (orderBook) => {
     timestamp = Date.now();
   }
 
-  return {
-    symbol: orderBook.symbol || '',
-    bids: bids.filter((bid) =>
+  // Check if this is a backend-aggregated order book
+  const isAggregated = orderBook.aggregated === true;
+  
+  if (isAggregated) {
+    // For aggregated data, bids/asks may already include cumulative totals
+    // Validate structure but don't filter as heavily since backend has already processed
+    const validatedBids = bids.filter((bid) =>
       bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
       bid.price > 0 && bid.amount > 0
-    ),
-    asks: asks.filter((ask) =>
+    );
+    
+    const validatedAsks = asks.filter((ask) =>
       ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
       ask.price > 0 && ask.amount > 0
-    ),
-    timestamp
-  };
+    );
+
+    return {
+      symbol: orderBook.symbol || '',
+      bids: validatedBids,
+      asks: validatedAsks,
+      timestamp,
+      aggregated: true,
+      rounding: orderBook.rounding || null,
+      source: orderBook.source || null,
+      version: orderBook.version || '1.0'
+    };
+  } else {
+    // Legacy format - existing validation logic
+    return {
+      symbol: orderBook.symbol || '',
+      bids: bids.filter((bid) =>
+        bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
+        bid.price > 0 && bid.amount > 0
+      ),
+      asks: asks.filter((ask) =>
+        ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
+        ask.price > 0 && ask.amount > 0
+      ),
+      timestamp,
+      aggregated: false
+    };
+  }
 };
 
 const validateTicker = (ticker) => {

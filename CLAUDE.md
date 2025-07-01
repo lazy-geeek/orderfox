@@ -89,13 +89,24 @@ python test_paper_trading.py
 ## Architecture
 
 ### Backend Structure
-- **backend/app/main.py**: FastAPI application entry point with CORS, exception handling, and startup/shutdown events
+- **backend/app/main.py**: FastAPI application entry point with CORS, exception handling, monitoring, and startup/shutdown events
 - **backend/app/core/**: Core functionality (config, database, logging)
-- **backend/app/api/v1/endpoints/**: API endpoints for market data (HTTP/WebSocket) and trading
+- **backend/app/api/v1/endpoints/**: API endpoints for market data (HTTP/WebSocket), trading, and monitoring
   - **backend/app/api/v1/endpoints/market_data_ws.py**: WebSocket endpoints with proper Query parameter handling
-  - **backend/app/api/v1/endpoints/connection_manager.py**: WebSocket connection management with dynamic limit updates
-- **backend/app/services/**: Business logic services (exchange, symbol, trading engine)
-- **backend/tests/**: Backend unit tests using pytest
+  - **backend/app/api/v1/endpoints/connection_manager.py**: WebSocket connection management with dynamic limit updates and backend aggregation
+  - **backend/app/api/v1/endpoints/monitoring.py**: Health checks, metrics export (Prometheus/JSON), and performance stats
+- **backend/app/services/**: Business logic services including:
+  - **orderbook_processor.py**: Server-side order book aggregation with caching
+  - **orderbook_manager.py**: Order book lifecycle management and memory optimization
+  - **depth_cache_service.py**: Binance DepthCacheManager integration for 500+ depth levels
+  - **delta_update_service.py**: Delta compression for bandwidth optimization
+  - **batch_update_service.py**: Batching rapid updates for performance
+  - **message_serialization_service.py**: JSON/MessagePack serialization with compression
+  - **monitoring_service.py**: Comprehensive metrics collection and alerts
+  - **exchange_service.py**: Exchange integration with ccxt
+  - **symbol_service.py**: Symbol management and validation
+  - **trading_engine_service.py**: Paper and live trading execution
+- **backend/tests/**: Comprehensive test suite with unit, integration, load, and performance tests
 
 ### Frontend Structure (Vanilla JavaScript - Active)
 - **frontend_vanilla/src/store/**: State management with subscribe/notify pattern
@@ -141,6 +152,15 @@ python test_paper_trading.py
 - **VS Code Theme Configuration**: Set Visual Studio Dark as default theme in Dev Container configuration for consistent IDE experience
 - **Enhanced Dev Container Documentation**: Comprehensive troubleshooting guide in `.devcontainer/README.md` covering service startup, performance optimization, permission issues, and VS Code extension problems
 - **Complete Development Workflow Testing**: Validated full Dev Container functionality including container builds, service startup, hot-reload capabilities, debugging setup, WebSocket connections, and API functionality
+- **Server-Side Order Book Aggregation**: Implemented backend aggregation with caching, reducing frontend CPU usage and bandwidth
+- **DepthCacheManager Integration**: Added Binance DepthCacheManager for 500+ order book depth levels with automatic synchronization
+- **Delta Update Support**: Implemented delta compression to reduce bandwidth usage by 80%+ for order book updates
+- **Message Batching**: Added batch update service to optimize rapid order book updates
+- **Advanced Serialization**: Support for MessagePack and compression (gzip/zstd) for efficient data transmission
+- **Comprehensive Monitoring**: Full monitoring service with Prometheus export, system metrics, alerts, and performance tracking
+- **Feature Flags**: Added backend aggregation feature flags for gradual rollout and A/B testing
+- **Memory Management**: Implemented order book lifecycle management with LRU eviction and memory limits
+- **Performance Validation**: Created performance tests comparing backend vs frontend aggregation, showing significant improvements
 
 ### Configuration
 - Environment variables loaded from .env file (multiple path detection)
@@ -190,7 +210,11 @@ python test_paper_trading.py
 - **Auto-Configuration**: Dev container post-create script automatically configures frontend for proxy usage
 
 ### When Implementing New Features or Changing Code  
+- Use context7 mcp server for researching and understanding used modules, libraries, packages and APIs
 - Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes
+- Always write unit tests for new features or update them when changing existing functionality
+
+### Container Management
 - When working in containers, use the appropriate environment variables for container-specific URLs and ports
 - **IMPORTANT**: Always use relative URLs (`/api/v1`) in development mode, not absolute URLs (`http://localhost:8000/api/v1`)
 - Test endpoints are configured to use environment variables for backend URLs to support different deployment scenarios

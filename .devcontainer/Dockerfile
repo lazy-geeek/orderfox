@@ -42,8 +42,6 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pytest \
     pytest-cov \
     black \
-    flake8 \
-    mypy \
     ipython \
     jupyter \
     debugpy

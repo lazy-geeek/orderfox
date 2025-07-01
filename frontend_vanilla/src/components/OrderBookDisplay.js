@@ -1,4 +1,6 @@
 
+import { featureFlags } from '../services/featureFlags.js';
+
 function createOrderBookDisplay() {
   const container = document.createElement('div');
   container.className = 'order-book-display orderfox-order-book-display';
@@ -54,6 +56,57 @@ function createOrderBookDisplay() {
 }
 
 function updateOrderBookDisplay(container, data) {
+  // Use feature flag to determine display mode
+  if (featureFlags.useBackendAggregation()) {
+    return updateOrderBookDisplayNew(container, data);
+  } else {
+    return updateOrderBookDisplayLegacy(container, data);
+  }
+}
+
+// New display mode for backend-aggregated data
+function updateOrderBookDisplayNew(container, data) {
+  const { 
+    selectedSymbol,
+    currentOrderBook: orderBook, 
+    currentTicker: ticker, 
+    orderBookWsConnected, 
+    tickerWsConnected,
+    displayDepth
+  } = data;
+
+  // Update common UI elements
+  updateCommonUI(container, data);
+
+  // Handle new backend-aggregated data format
+  const asksList = container.querySelector('.asks-list');
+  const bidsList = container.querySelector('.bids-list');
+
+  if (asksList && bidsList) {
+    if (data.orderBookLoading) {
+      asksList.innerHTML = '<div class="loading-state">Loading...</div>';
+      bidsList.innerHTML = '<div class="loading-state">Loading...</div>';
+      return;
+    }
+
+    if (orderBook && orderBook.aggregated) {
+      // Backend has already done aggregation, just display the data
+      displayAggregatedOrderBook(container, orderBook, data);
+    } else if (orderBook && orderBook.asks && orderBook.bids) {
+      // Fallback to legacy aggregation if backend data isn't aggregated
+      console.warn('Backend aggregation enabled but received raw data, falling back to frontend aggregation');
+      displayLegacyOrderBook(container, orderBook, data);
+    } else {
+      asksList.innerHTML = '<div class="empty-state">No order book data</div>';
+      bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
+    }
+  }
+
+  updateTimestamp(container, orderBook);
+}
+
+// Legacy display mode for frontend aggregation
+function updateOrderBookDisplayLegacy(container, data) {
   const { 
     selectedSymbol,
     currentOrderBook: orderBook, 
@@ -63,6 +116,41 @@ function updateOrderBookDisplay(container, data) {
     selectedRounding,
     availableRoundingOptions,
     displayDepth
+  } = data;
+
+  // Update common UI elements
+  updateCommonUI(container, data);
+
+  // Handle legacy frontend aggregation
+  const asksList = container.querySelector('.asks-list');
+  const bidsList = container.querySelector('.bids-list');
+
+  if (asksList && bidsList) {
+    if (data.orderBookLoading) {
+      asksList.innerHTML = '<div class="loading-state">Loading...</div>';
+      bidsList.innerHTML = '<div class="loading-state">Loading...</div>';
+      return;
+    }
+
+    if (orderBook && orderBook.asks && orderBook.bids) {
+      displayLegacyOrderBook(container, orderBook, data);
+    } else {
+      asksList.innerHTML = '<div class="empty-state">No order book data</div>';
+      bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
+    }
+  }
+
+  updateTimestamp(container, orderBook);
+}
+
+// Common UI update function used by both modes
+function updateCommonUI(container, data) {
+  const { 
+    selectedSymbol,
+    orderBookWsConnected,
+    displayDepth,
+    selectedRounding,
+    availableRoundingOptions
   } = data;
 
   // Update symbol label
@@ -92,90 +180,127 @@ function updateOrderBookDisplay(container, data) {
     depthSelect.value = displayDepth;
   }
 
-  // Update rounding options
+  // Update rounding options (only shown in legacy mode)
   const roundingSelect = container.querySelector('#rounding-select');
   if (roundingSelect) {
-    roundingSelect.innerHTML = '';
-    availableRoundingOptions.forEach(option => {
-      const optionEl = document.createElement('option');
-      optionEl.value = option;
-      optionEl.textContent = option;
-      if (option === selectedRounding) {
-        optionEl.selected = true;
+    if (featureFlags.useBackendAggregation()) {
+      // Hide rounding selector in backend aggregation mode
+      const roundingContainer = container.querySelector('.rounding-selector-container');
+      if (roundingContainer) {
+        roundingContainer.style.display = 'none';
       }
-      roundingSelect.appendChild(optionEl);
-    });
+    } else {
+      // Show and populate rounding selector in legacy mode
+      const roundingContainer = container.querySelector('.rounding-selector-container');
+      if (roundingContainer) {
+        roundingContainer.style.display = 'block';
+      }
+      
+      roundingSelect.innerHTML = '';
+      availableRoundingOptions.forEach(option => {
+        const optionEl = document.createElement('option');
+        optionEl.value = option;
+        optionEl.textContent = option;
+        if (option === selectedRounding) {
+          optionEl.selected = true;
+        }
+        roundingSelect.appendChild(optionEl);
+      });
+    }
+  }
+}
+
+// Display function for backend-aggregated data (new mode)
+function displayAggregatedOrderBook(container, orderBook, data) {
+  const asksList = container.querySelector('.asks-list');
+  const bidsList = container.querySelector('.bids-list');
+  
+  asksList.innerHTML = '';
+  bidsList.innerHTML = '';
+
+  // Backend has already provided aggregated data
+  const { asks, bids, rounding, source } = orderBook;
+
+  // Display asks (should be pre-sorted by backend)
+  asks.forEach((ask, index) => {
+    const row = document.createElement('div');
+    row.className = 'order-level ask-level';
+    
+    row.innerHTML = `
+      <span class="price ask-price">${formatPrice(ask.price, rounding)}</span>
+      <span class="amount">${formatAmount(ask.amount)}</span>
+      <span class="total">${formatTotal(ask.cumulative || ask.amount)}</span>
+    `;
+    asksList.appendChild(row);
+  });
+
+  // Display bids (should be pre-sorted by backend)
+  bids.forEach((bid, index) => {
+    const row = document.createElement('div');
+    row.className = 'order-level bid-level';
+    
+    row.innerHTML = `
+      <span class="price bid-price">${formatPrice(bid.price, rounding)}</span>
+      <span class="amount">${formatAmount(bid.amount)}</span>
+      <span class="total">${formatTotal(bid.cumulative || bid.amount)}</span>
+    `;
+    bidsList.appendChild(row);
+  });
+
+  // Add source indicator
+  const existingInfo = container.querySelector('.aggregation-info');
+  if (existingInfo) {
+    existingInfo.remove();
   }
 
-  // Helper functions for rounding and formatting
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'aggregation-info';
+  infoDiv.innerHTML = `
+    <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+      🚀 Backend aggregation enabled (${source || 'unknown'}, rounding: ${rounding})
+    </small>
+  `;
+  
+  const asksSection = container.querySelector('.asks-section');
+  if (asksSection) {
+    asksSection.after(infoDiv);
+  }
+}
+
+// Display function for legacy frontend aggregation
+function displayLegacyOrderBook(container, orderBook, data) {
+  const { selectedRounding, displayDepth, selectedSymbol } = data;
+  
+  const asksList = container.querySelector('.asks-list');
+  const bidsList = container.querySelector('.bids-list');
+  
+  asksList.innerHTML = '';
+  bidsList.innerHTML = '';
+
+  // Get current market price (use highest bid or lowest ask)
+  const currentPrice = orderBook.bids?.[0]?.price || orderBook.asks?.[0]?.price;
+  
+  if (!currentPrice) {
+    return; // No price data available
+  }
+
+  const effectiveDepth = displayDepth || 10;
+  const effectiveRounding = selectedRounding || 0.01;
+
+  // Legacy frontend aggregation helpers
   const roundDown = (value, multiple) => {
     if (multiple <= 0) return value;
-    // Handle floating point precision by scaling up, rounding, then scaling down
     const scale = 1 / multiple;
     return Math.floor(value * scale) / scale;
   };
 
   const roundUp = (value, multiple) => {
     if (multiple <= 0) return value;
-    // Handle floating point precision by scaling up, rounding, then scaling down
     const scale = 1 / multiple;
     return Math.ceil(value * scale) / scale;
   };
 
-  const formatPrice = (price) => {
-    if (selectedRounding && selectedRounding > 0) {
-      // Calculate decimal places from rounding value
-      const decimalPlaces = Math.max(0, -Math.floor(Math.log10(selectedRounding)));
-      return price.toFixed(decimalPlaces);
-    }
-    return price.toFixed(2);
-  };
-
-  const formatAmount = (amount) => {
-    if (amount >= 1000000) {
-      return (amount / 1000000).toFixed(2) + 'M';
-    } else if (amount >= 1000) {
-      return (amount / 1000).toFixed(2) + 'K';
-    }
-    return amount.toFixed(2);
-  };
-
-  const formatTotal = (total) => {
-    if (total >= 1000000) {
-      return (total / 1000000).toFixed(2) + 'M';
-    } else if (total >= 1000) {
-      return (total / 1000).toFixed(2) + 'K';
-    }
-    return total.toFixed(2);
-  };
-
-  // Update asks and bids with cumulative totals
-  const asksList = container.querySelector('.asks-list');
-  const bidsList = container.querySelector('.bids-list');
-
-  if (asksList && bidsList) {
-    // Show loading state if transitioning
-    if (data.orderBookLoading) {
-      asksList.innerHTML = '<div class="loading-state">Loading...</div>';
-      bidsList.innerHTML = '<div class="loading-state">Loading...</div>';
-      return;
-    }
-
-    if (orderBook && orderBook.asks && orderBook.bids) {
-      asksList.innerHTML = '';
-      bidsList.innerHTML = '';
-
-    // Get current market price (use highest bid or lowest ask)
-    const currentPrice = orderBook.bids?.[0]?.price || orderBook.asks?.[0]?.price;
-    
-    if (!currentPrice) {
-      return; // No price data available
-    }
-
-    const effectiveDepth = displayDepth || 10;
-    const effectiveRounding = selectedRounding || 0.01;
-
-    // Helper function to get exactly the needed number of levels with volume
+  // Helper function to get exactly the needed number of levels with volume
     const getExactLevels = (rawData, isAsk) => {
       const buckets = new Map();
       
@@ -258,7 +383,7 @@ function updateOrderBookDisplay(container, data) {
       row.className = 'order-level ask-level';
       
       row.innerHTML = `
-        <span class="price ask-price">${formatPrice(ask.price)}</span>
+        <span class="price ask-price">${formatPrice(ask.price, effectiveRounding)}</span>
         <span class="amount">${formatAmount(ask.amount)}</span>
         <span class="total">${formatTotal(cumulativeTotal)}</span>
       `;
@@ -276,7 +401,7 @@ function updateOrderBookDisplay(container, data) {
       row.className = 'order-level bid-level';
       
       row.innerHTML = `
-        <span class="price bid-price">${formatPrice(bid.price)}</span>
+        <span class="price bid-price">${formatPrice(bid.price, effectiveRounding)}</span>
         <span class="amount">${formatAmount(bid.amount)}</span>
         <span class="total">${formatTotal(cumulativeTotal)}</span>
       `;
@@ -331,7 +456,38 @@ function updateOrderBookDisplay(container, data) {
   }
 
 
-  // Update timestamp
+}
+
+// Common formatting functions used by both display modes
+function formatPrice(price, rounding = null) {
+  if (rounding && rounding > 0) {
+    // Calculate decimal places from rounding value
+    const decimalPlaces = Math.max(0, -Math.floor(Math.log10(rounding)));
+    return price.toFixed(decimalPlaces);
+  }
+  return price.toFixed(2);
+}
+
+function formatAmount(amount) {
+  if (amount >= 1000000) {
+    return (amount / 1000000).toFixed(2) + 'M';
+  } else if (amount >= 1000) {
+    return (amount / 1000).toFixed(2) + 'K';
+  }
+  return amount.toFixed(2);
+}
+
+function formatTotal(total) {
+  if (total >= 1000000) {
+    return (total / 1000000).toFixed(2) + 'M';
+  } else if (total >= 1000) {
+    return (total / 1000).toFixed(2) + 'K';
+  }
+  return total.toFixed(2);
+}
+
+// Common timestamp update function
+function updateTimestamp(container, orderBook) {
   const timestampEl = container.querySelector('.timestamp');
   if (timestampEl && orderBook && orderBook.timestamp) {
     timestampEl.textContent = `Last updated: ${new Date(orderBook.timestamp).toLocaleTimeString()}`;

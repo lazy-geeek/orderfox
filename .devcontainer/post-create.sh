@@ -16,7 +16,7 @@ if [ -f "backend/requirements.txt" ]; then
     echo "   Installing from backend/requirements.txt (using pre-built wheels when possible)..."
     pip install --prefer-binary -r backend/requirements.txt
     # Install additional development tools
-    pip install --prefer-binary debugpy ipython black flake8 mypy pytest-asyncio
+    pip install --prefer-binary debugpy ipython black pytest-asyncio
     echo "   ✅ Python dependencies installed"
 else
     echo "⚠️  backend/requirements.txt not found, skipping Python dependency installation"
@@ -228,9 +228,7 @@ cat > .vscode/settings.json << 'EOF'
 {
     "python.defaultInterpreterPath": "/usr/local/bin/python",
     "python.analysis.typeCheckingMode": "basic",
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "python.linting.flake8Enabled": true,
+    "python.analysis.typeCheckingMode": "basic",
     "python.formatting.provider": "black",
     "python.formatting.blackArgs": ["--line-length", "88"],
     "python.testing.pytestEnabled": true,

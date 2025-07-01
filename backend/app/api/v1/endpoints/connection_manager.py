@@ -11,6 +11,8 @@ import json
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
 from app.services.trading_engine_service import TradingEngineService
+from app.services.orderbook_processor import OrderBookProcessor
+from app.services.orderbook_manager import orderbook_manager
 from app.core.logging_config import get_logger
 from app.core.config import settings
 
@@ -26,6 +28,7 @@ class ConnectionManager:
         # Tracks active stream types per symbol (e.g., {"BTCUSDT": {"orderbook", "candles:1m"}})
         self.symbol_active_streams: Dict[str, set[str]] = {}
         self.stream_key_types: Dict[str, str] = {}  # Stores the type of each stream_key
+        self.orderbook_processor = OrderBookProcessor()  # Add processor instance
 
     async def connect(
         self,
@@ -294,22 +297,36 @@ class ConnectionManager:
 
     # Keep backward compatibility for existing orderbook methods
     async def connect_orderbook(
-        self, websocket: WebSocket, symbol: str, display_symbol: str = None, limit: int = 20
+        self, websocket: WebSocket, symbol: str, display_symbol: str = None, limit: int = 20,
+        rounding: float = 0.01, aggregate: bool = False, use_depth_cache: bool = True
     ):
-        """Accept a new WebSocket connection for orderbook (backward compatibility)."""
-        # Store the limit for this symbol stream
-        if not hasattr(self, '_stream_limits'):
-            self._stream_limits = {}
+        """Accept a new WebSocket connection for orderbook with aggregation parameters."""
+        # Store the configuration for this symbol stream
+        if not hasattr(self, '_stream_configs'):
+            self._stream_configs = {}
         
-        # If this symbol already has an active stream with a different limit, update it
-        current_limit = self._stream_limits.get(symbol)
-        if current_limit != limit and symbol in self.active_connections:
-            logger.info(f"Updating orderbook limit for {symbol} from {current_limit} to {limit}")
-            self._stream_limits[symbol] = limit
-            # Signal the streaming task to restart with new limit
+        # Create configuration for this symbol
+        new_config = {
+            'limit': limit,
+            'rounding': rounding,
+            'aggregate': aggregate,
+            'use_depth_cache': use_depth_cache
+        }
+        
+        # Check if configuration changed and restart if needed
+        current_config = self._stream_configs.get(symbol)
+        if current_config != new_config and symbol in self.active_connections:
+            logger.info(f"Updating orderbook config for {symbol}: {new_config}")
+            self._stream_configs[symbol] = new_config
+            # Signal the streaming task to restart with new configuration
             await self._restart_orderbook_stream(symbol)
         else:
-            self._stream_limits[symbol] = limit
+            self._stream_configs[symbol] = new_config
+        
+        # Backward compatibility: also store limit separately
+        if not hasattr(self, '_stream_limits'):
+            self._stream_limits = {}
+        self._stream_limits[symbol] = limit
             
         await self.connect(websocket, symbol, "orderbook", display_symbol)
 
@@ -318,22 +335,88 @@ class ConnectionManager:
         self.disconnect(websocket, symbol)
 
     async def broadcast_to_symbol(self, symbol: str, data: dict):
-        """Broadcast data to all connections for a symbol (backward compatibility)."""
-        await self.broadcast_to_stream(symbol, data)
+        """Broadcast data to all connections for a symbol with optional aggregation."""
+        # Get configuration for this symbol
+        config = getattr(self, '_stream_configs', {}).get(symbol, {})
+        
+        # If aggregation is enabled and this is an orderbook update, process it
+        if (config.get('aggregate', False) and 
+            data.get('type') == 'orderbook_update' and 
+            'bids' in data and 'asks' in data):
+            
+            try:
+                # Convert message format to raw orderbook format for processor
+                raw_orderbook = {
+                    'bids': [[item['price'], item['amount']] for item in data.get('bids', [])],
+                    'asks': [[item['price'], item['amount']] for item in data.get('asks', [])],
+                    'timestamp': data.get('timestamp')
+                }
+                
+                # Process with aggregation
+                aggregated = self.orderbook_processor.process_orderbook(
+                    raw_orderbook=raw_orderbook,
+                    symbol=symbol,
+                    rounding=config.get('rounding', 0.01),
+                    depth=config.get('limit', 20),
+                    source=data.get('source', 'ccxtpro')
+                )
+                
+                # Convert back to WebSocket message format
+                aggregated_data = {
+                    "type": "orderbook_update",
+                    "symbol": data.get('symbol', symbol),
+                    "bids": [{"price": level.price, "amount": level.amount} for level in aggregated.bids],
+                    "asks": [{"price": level.price, "amount": level.amount} for level in aggregated.asks],
+                    "timestamp": aggregated.timestamp or data.get('timestamp'),
+                    "aggregated": True,
+                    "rounding": aggregated.rounding,
+                    "source": aggregated.source,
+                    "depth": aggregated.depth,
+                    "processing_time": int(asyncio.get_event_loop().time() * 1000)
+                }
+                
+                await self.broadcast_to_stream(symbol, aggregated_data)
+                
+            except Exception as e:
+                logger.error(f"Error processing aggregated orderbook for {symbol}: {e}")
+                # Fall back to raw data with aggregated=false
+                data = dict(data)  # Make a copy
+                data['aggregated'] = False
+                await self.broadcast_to_stream(symbol, data)
+        else:
+            # Add aggregated=false for backward compatibility
+            if data.get('type') == 'orderbook_update':
+                data = dict(data)  # Make a copy
+                data['aggregated'] = False
+            await self.broadcast_to_stream(symbol, data)
 
     async def _stream_orderbook(self, symbol: str):
-        """Stream order book updates using ccxtpro or Binance partial depth streams."""
+        """Stream order book updates using DepthCacheManager, ccxtpro, or Binance partial depth streams."""
         exchange_pro = None
         try:
             logger.info(f"Initializing orderbook stream for {symbol}")
             exchange_pro = exchange_service.get_exchange_pro()
 
-            # Get the dynamic limit for this symbol, default to 20
-            limit = getattr(self, '_stream_limits', {}).get(symbol, 20)
-            logger.info(f"Using limit {limit} for orderbook stream {symbol}")
+            # Get the configuration for this symbol
+            config = getattr(self, '_stream_configs', {}).get(symbol, {})
+            limit = config.get('limit', 20)
+            use_depth_cache = config.get('use_depth_cache', True)
+            aggregate = config.get('aggregate', False)
+            rounding = config.get('rounding', 0.01)
+            
+            logger.info(f"Using config for {symbol}: limit={limit}, aggregate={aggregate}, "
+                       f"rounding={rounding}, use_depth_cache={use_depth_cache}")
             
             # Validate and clamp limit parameter (same as WebSocket endpoint)
             limit = max(5, min(limit, 5000))
+
+            # Check if we should use DepthCacheManager for Binance symbols
+            if (settings.USE_DEPTH_CACHE_MANAGER and 
+                self._is_binance_symbol(symbol) and 
+                use_depth_cache):
+                logger.info(f"🚀 Using DepthCacheManager for {symbol} with limit {limit}")
+                await self._stream_orderbook_with_depth_cache(symbol, limit)
+                return
 
             # Check if we should use Binance partial depth streams for better coverage
             use_partial_depth = self._should_use_partial_depth_stream(limit)
@@ -345,76 +428,9 @@ class ConnectionManager:
                 return
             else:
                 logger.info(f"➡️ Using standard CCXT stream for {symbol} with limit {limit}")
-
-            # Test connection before starting stream
-            if exchange_pro is None:
-                logger.warning(f"CCXT Pro not available for {symbol}, using mock data")
-                await self._stream_mock_orderbook(symbol)
-                return
-
-            try:
-                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=limit)
-                logger.info(f"Exchange connection test successful for {symbol}")
-            except Exception as e:
-                logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")
-                logger.info(f"Falling back to mock orderbook data for {symbol}")
-                await self._stream_mock_orderbook(symbol)
-                return
-
-            while symbol in self.active_connections and self.active_connections[symbol]:
-                try:
-                    # Watch order book updates
-                    order_book_data = await exchange_pro.watch_order_book(symbol)
-
-                    # Convert to our schema format using dynamic limit
-                    bids = [
-                        {"price": float(bid[0]), "amount": float(bid[1])}
-                        for bid in order_book_data["bids"][:limit]  # Use dynamic limit
-                    ]
-
-                    asks = [
-                        {"price": float(ask[0]), "amount": float(ask[1])}
-                        for ask in order_book_data["asks"][:limit]  # Use dynamic limit
-                    ]
-
-                    # Use display symbol if available, otherwise use the stream symbol
-                    display_symbol = getattr(self, "_display_symbols", {}).get(
-                        symbol, symbol
-                    )
-                    formatted_data = {
-                        "type": "orderbook_update",
-                        "symbol": display_symbol,
-                        "bids": bids,
-                        "asks": asks,
-                        "timestamp": order_book_data["timestamp"],
-                    }
-
-                    # Broadcast to all connected clients for this symbol
-                    await self.broadcast_to_symbol(symbol, formatted_data)
-
-                    # Pass order book update to trading engine service
-                    try:
-                        # Import the shared trading engine service instance
-                        from app.api.v1.endpoints.trading import (
-                            trading_engine_service_instance,
-                        )
-
-                        await trading_engine_service_instance.process_order_book_update(
-                            symbol, order_book_data
-                        )
-                    except Exception as e:
-                        # Log error but don't interrupt the streaming
-                        print(
-                            f"Error processing order book update in trading engine for {symbol}: {str(e)}"
-                        )
-
-                except Exception as e:
-                    error_data = {
-                        "type": "error",
-                        "message": f"Error streaming order book for {symbol}: {str(e)}",
-                    }
-                    await self.broadcast_to_symbol(symbol, error_data)
-                    await asyncio.sleep(5)  # Wait before retrying
+                
+            # Use the extracted ccxtpro streaming method
+            await self._stream_orderbook_ccxtpro(symbol, limit)
 
         except Exception as e:
             error_data = {
@@ -951,6 +967,166 @@ class ConnectionManager:
         if symbol in self.active_connections and self.active_connections[symbol]:
             logger.info(f"Starting new orderbook task for {symbol}")
             await self._start_streaming(symbol, "orderbook")
+
+    def _is_binance_symbol(self, symbol: str) -> bool:
+        """Check if the symbol is a Binance symbol (USDT futures)."""
+        # Simple check - can be enhanced based on exchange service info
+        return symbol.endswith("USDT") or symbol.endswith("BUSD")
+
+    async def _stream_orderbook_with_depth_cache(self, symbol: str, limit: int):
+        """Stream order book updates using DepthCacheManager."""
+        try:
+            from app.services.depth_cache_service import depth_cache_service
+            
+            # Define callback to handle depth cache updates
+            async def depth_cache_callback(update_symbol: str, depth_data: dict):
+                """Process depth cache updates and broadcast to clients."""
+                try:
+                    # Get display symbol
+                    display_symbol = getattr(self, "_display_symbols", {}).get(
+                        symbol, symbol
+                    )
+                    
+                    # Get limited bids and asks
+                    bids = depth_data["bids"][:limit] if "bids" in depth_data else []
+                    asks = depth_data["asks"][:limit] if "asks" in depth_data else []
+                    
+                    # Format for our schema
+                    formatted_bids = [
+                        {"price": float(price), "amount": float(amount)}
+                        for price, amount in bids
+                    ]
+                    
+                    formatted_asks = [
+                        {"price": float(price), "amount": float(amount)}
+                        for price, amount in asks
+                    ]
+                    
+                    formatted_data = {
+                        "type": "orderbook_update",
+                        "symbol": display_symbol,
+                        "bids": formatted_bids,
+                        "asks": formatted_asks,
+                        "timestamp": depth_data.get("update_time", int(asyncio.get_event_loop().time() * 1000)),
+                        "source": "depth_cache_manager"
+                    }
+                    
+                    # Broadcast to all connected clients
+                    await self.broadcast_to_symbol(symbol, formatted_data)
+                    
+                    # Pass to trading engine if needed
+                    try:
+                        from app.api.v1.endpoints.trading import trading_engine_service_instance
+                        
+                        # Convert to ccxt-like format for trading engine
+                        ccxt_orderbook = {
+                            "symbol": symbol,
+                            "bids": [[float(price), float(amount)] for price, amount in bids],
+                            "asks": [[float(price), float(amount)] for price, amount in asks],
+                            "timestamp": depth_data.get("update_time")
+                        }
+                        
+                        await trading_engine_service_instance.process_order_book_update(
+                            symbol, ccxt_orderbook
+                        )
+                    except Exception as e:
+                        logger.error(f"Error processing depth cache update in trading engine: {str(e)}")
+                        
+                except Exception as e:
+                    logger.error(f"Error in depth cache callback for {symbol}: {str(e)}")
+            
+            # Start depth cache stream
+            await depth_cache_service.start_depth_cache(symbol, depth_cache_callback)
+            
+            # Keep the task alive while there are active connections
+            while symbol in self.active_connections and self.active_connections[symbol]:
+                await asyncio.sleep(1)
+                
+            # Stop depth cache when no more connections
+            await depth_cache_service.stop_depth_cache(symbol, depth_cache_callback)
+            
+        except ImportError:
+            logger.error("DepthCacheManager not available, falling back to standard stream")
+            # Fall back to regular ccxtpro stream
+            await self._stream_orderbook_ccxtpro(symbol, limit)
+        except Exception as e:
+            logger.error(f"Error in DepthCacheManager stream for {symbol}: {str(e)}")
+            # Send error to clients
+            error_data = {
+                "type": "error",
+                "message": f"DepthCacheManager error for {symbol}: {str(e)}"
+            }
+            await self.broadcast_to_symbol(symbol, error_data)
+            
+            # Fall back to regular stream
+            await self._stream_orderbook_ccxtpro(symbol, limit)
+
+    async def _stream_orderbook_ccxtpro(self, symbol: str, limit: int):
+        """Original ccxtpro orderbook streaming logic (extracted for clarity)."""
+        exchange_pro = exchange_service.get_exchange_pro()
+        
+        # Test connection before starting stream
+        if exchange_pro is None:
+            logger.warning(f"CCXT Pro not available for {symbol}, using mock data")
+            await self._stream_mock_orderbook(symbol)
+            return
+
+        try:
+            test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=limit)
+            logger.info(f"Exchange connection test successful for {symbol}")
+        except Exception as e:
+            logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")
+            logger.info(f"Falling back to mock orderbook data for {symbol}")
+            await self._stream_mock_orderbook(symbol)
+            return
+
+        while symbol in self.active_connections and self.active_connections[symbol]:
+            try:
+                # Watch order book updates
+                order_book_data = await exchange_pro.watch_order_book(symbol)
+
+                # Convert to our schema format using dynamic limit
+                bids = [
+                    {"price": float(bid[0]), "amount": float(bid[1])}
+                    for bid in order_book_data["bids"][:limit]
+                ]
+
+                asks = [
+                    {"price": float(ask[0]), "amount": float(ask[1])}
+                    for ask in order_book_data["asks"][:limit]
+                ]
+
+                # Use display symbol if available
+                display_symbol = getattr(self, "_display_symbols", {}).get(
+                    symbol, symbol
+                )
+                formatted_data = {
+                    "type": "orderbook_update",
+                    "symbol": display_symbol,
+                    "bids": bids,
+                    "asks": asks,
+                    "timestamp": order_book_data["timestamp"],
+                }
+
+                # Broadcast to all connected clients
+                await self.broadcast_to_symbol(symbol, formatted_data)
+
+                # Pass to trading engine
+                try:
+                    from app.api.v1.endpoints.trading import trading_engine_service_instance
+                    await trading_engine_service_instance.process_order_book_update(
+                        symbol, order_book_data
+                    )
+                except Exception as e:
+                    logger.error(f"Error processing order book update in trading engine: {str(e)}")
+
+            except Exception as e:
+                error_data = {
+                    "type": "error",
+                    "message": f"Error streaming order book for {symbol}: {str(e)}",
+                }
+                await self.broadcast_to_symbol(symbol, error_data)
+                await asyncio.sleep(5)  # Wait before retrying
 
 
 # Global connection manager instance

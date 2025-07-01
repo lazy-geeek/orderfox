@@ -20,7 +20,14 @@ router = APIRouter()
 
 
 @router.websocket("/ws/orderbook/{symbol}")
-async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Query(default=20, ge=5, le=5000)):
+async def websocket_orderbook(
+    websocket: WebSocket, 
+    symbol: str, 
+    limit: int = Query(default=20, ge=5, le=5000),
+    rounding: float = Query(default=0.01, ge=0.0001, le=1000.0),
+    aggregate: bool = Query(default=False),
+    use_depth_cache: bool = Query(default=True)
+):
     """
     WebSocket endpoint for real-time order book updates.
 
@@ -28,14 +35,35 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
         websocket: WebSocket connection
         symbol: Trading symbol (e.g., 'BTCUSDT')
         limit: Number of order book levels to stream (default: 20, max: 5000)
+        rounding: Price rounding multiple for aggregation (default: 0.01)
+        aggregate: Enable server-side aggregation (default: False for backward compatibility)
+        use_depth_cache: Use DepthCacheManager for Binance symbols (default: True)
 
     The WebSocket will send JSON messages with the following format:
+    
+    Raw format (aggregate=False):
     {
         "type": "orderbook_update",
         "symbol": "BTCUSDT",
         "bids": [{"price": 50000.0, "amount": 1.5}, ...],
         "asks": [{"price": 50100.0, "amount": 2.0}, ...],
-        "timestamp": 1640995200000
+        "timestamp": 1640995200000,
+        "aggregated": false,
+        "source": "ccxtpro"
+    }
+    
+    Aggregated format (aggregate=True):
+    {
+        "type": "orderbook_update",
+        "symbol": "BTCUSDT",
+        "bids": [{"price": 50000.0, "amount": 1.5}, ...],
+        "asks": [{"price": 50100.0, "amount": 2.0}, ...],
+        "timestamp": 1640995200000,
+        "aggregated": true,
+        "rounding": 0.01,
+        "source": "depth_cache",
+        "depth": 20,
+        "processing_time": 1640995200050
     }
 
     Error messages have the format:
@@ -76,8 +104,29 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
         # Validate and clamp limit parameter
         limit = max(5, min(limit, 1000))  # Ensure limit is between 5 and 1000
         
-        # Connect to the connection manager using the exchange symbol and limit
-        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol, limit)
+        # Validate parameter combinations
+        if aggregate and not use_depth_cache and exchange_symbol.endswith("USDT"):
+            logger.warning(f"Aggregation with ccxtpro for Binance symbols may be less efficient: {symbol}")
+        
+        # Validate rounding value
+        if rounding <= 0:
+            error_msg = "Rounding value must be positive"
+            logger.warning(f"WebSocket orderbook error: {error_msg}")
+            await websocket.send_text(json.dumps({"type": "error", "message": error_msg}))
+            await websocket.close(code=4000, reason=error_msg)
+            return
+        
+        # Log configuration
+        logger.info(
+            f"WebSocket orderbook config for {symbol}: limit={limit}, rounding={rounding}, "
+            f"aggregate={aggregate}, use_depth_cache={use_depth_cache}"
+        )
+        
+        # Connect to the connection manager with all parameters
+        await connection_manager.connect_orderbook(
+            websocket, exchange_symbol, symbol, limit, 
+            rounding=rounding, aggregate=aggregate, use_depth_cache=use_depth_cache
+        )
         logger.info(
             f"WebSocket orderbook streaming started for {symbol} (exchange: {exchange_symbol})"
         )

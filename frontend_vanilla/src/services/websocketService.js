@@ -9,12 +9,14 @@ import {
   clearOrderBook,
 } from '../store/store.js';
 import { WS_BASE_URL } from '../config/env.js';
+import { featureFlags } from './featureFlags.js';
 
 const activeWebSockets = {};
 const connectionAttempts = {};
 const lastConnectionAttempt = {};
 const connectionInProgress = {};
 const lastMessageTime = {};
+const streamParameters = {}; // Store connection parameters for reconnection
 let isPageVisible = !document.hidden;
 
 
@@ -22,9 +24,13 @@ export const connectWebSocketStream = async (
   symbol,
   streamType,
   timeframe,
-  limit
+  limit,
+  rounding = null
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
+  
+  // Store connection parameters for later reconnection
+  streamParameters[streamKey] = { symbol, streamType, timeframe, limit, rounding };
   
   const cleanWsBaseUrl = WS_BASE_URL.replace(/\/$/, '');
   
@@ -33,8 +39,26 @@ export const connectWebSocketStream = async (
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
   } else {
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
-    if (streamType === 'orderbook' && limit) {
-      wsUrl += `?limit=${limit}`;
+    if (streamType === 'orderbook') {
+      const params = new URLSearchParams();
+      
+      // Always include limit if provided
+      if (limit) {
+        params.append('limit', limit);
+      }
+      
+      // Include backend aggregation parameters if enabled
+      if (featureFlags.useBackendAggregation()) {
+        params.append('aggregate', 'true');
+        params.append('use_depth_cache', 'true');
+        if (rounding) {
+          params.append('rounding', rounding);
+        }
+      }
+      
+      if (params.toString()) {
+        wsUrl += `?${params.toString()}`;
+      }
     }
   }
 
@@ -129,6 +153,16 @@ export const connectWebSocketStream = async (
         
         const data = JSON.parse(event.data);
         
+        // Protocol version negotiation - detect message format
+        const messageVersion = data.version || '1.0';
+        const isNewFormat = data.aggregated === true || messageVersion !== '1.0';
+        
+        if (isNewFormat && featureFlags.useBackendAggregation()) {
+          console.log(`Received new format message (v${messageVersion}) for ${streamKey}`);
+        } else if (isNewFormat && !featureFlags.useBackendAggregation()) {
+          console.warn(`Received new format message but backend aggregation disabled, processing as legacy format`);
+        }
+        
         if (data.type === 'candle_update') {
           updateCandlesFromWebSocket(data);
         } else if (data.type === 'orderbook_update') {
@@ -189,7 +223,7 @@ export const connectWebSocketStream = async (
           console.log(`Attempting to reconnect WebSocket for ${streamKey} in ${reconnectDelay}ms...`);
           setTimeout(() => {
             if (!activeWebSockets[streamKey]) {
-              connectWebSocketStream(symbol, streamType, timeframe);
+              connectWebSocketStream(symbol, streamType, timeframe, limit, rounding);
             }
           }, reconnectDelay);
         } else if (event.code === 1006) {
@@ -234,6 +268,7 @@ export const disconnectWebSocketStream = (
   delete lastConnectionAttempt[streamKey];
   delete connectionInProgress[streamKey];
   delete lastMessageTime[streamKey];
+  delete streamParameters[streamKey];
 };
 
 export const disconnectAllWebSockets = () => {
@@ -249,6 +284,7 @@ export const disconnectAllWebSockets = () => {
   Object.keys(lastConnectionAttempt).forEach(key => delete lastConnectionAttempt[key]);
   Object.keys(connectionInProgress).forEach(key => delete connectionInProgress[key]);
   Object.keys(lastMessageTime).forEach(key => delete lastMessageTime[key]);
+  Object.keys(streamParameters).forEach(key => delete streamParameters[key]);
 };
 
 // Handle page visibility changes to manage WebSocket connections when tab is not focused
@@ -298,12 +334,10 @@ function checkAndRefreshConnections() {
   if (staleConnections.length > 0) {
     console.log(`Found ${staleConnections.length} stale WebSocket connections, reconnecting...`);
     staleConnections.forEach(streamKey => {
-      // Parse streamKey to extract connection details
-      const parts = streamKey.split('-');
-      if (parts.length >= 2) {
-        const streamType = parts[0];
-        const symbol = parts[1];
-        const timeframe = parts.length > 2 ? parts[2] : null;
+      // Use stored parameters if available
+      const params = streamParameters[streamKey];
+      if (params) {
+        const { symbol, streamType, timeframe, limit, rounding } = params;
         
         // Clean up old connection
         delete activeWebSockets[streamKey];
@@ -311,11 +345,32 @@ function checkAndRefreshConnections() {
         delete lastConnectionAttempt[streamKey];
         delete connectionInProgress[streamKey];
         delete lastMessageTime[streamKey];
+        delete streamParameters[streamKey];
         
         // Reconnect after a short delay
         setTimeout(() => {
-          connectWebSocketStream(symbol, streamType, timeframe);
+          connectWebSocketStream(symbol, streamType, timeframe, limit, rounding);
         }, 1000);
+      } else {
+        // Fallback to parsing streamKey (legacy support)
+        const parts = streamKey.split('-');
+        if (parts.length >= 2) {
+          const streamType = parts[0];
+          const symbol = parts[1];
+          const timeframe = parts.length > 2 ? parts[2] : null;
+          
+          // Clean up old connection
+          delete activeWebSockets[streamKey];
+          delete connectionAttempts[streamKey];
+          delete lastConnectionAttempt[streamKey];
+          delete connectionInProgress[streamKey];
+          delete lastMessageTime[streamKey];
+          
+          // Reconnect after a short delay
+          setTimeout(() => {
+            connectWebSocketStream(symbol, streamType, timeframe);
+          }, 1000);
+        }
       }
     });
   }

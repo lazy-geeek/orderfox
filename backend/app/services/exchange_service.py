@@ -138,7 +138,7 @@ class ExchangeService:
             ccxt.Exchange: The exchange instance
         """
         if self.exchange is None:
-            self.initialize_exchange()
+            self.exchange = self.initialize_exchange()
         return self.exchange
 
     def get_exchange_pro(self) -> Any:
@@ -163,8 +163,8 @@ class ExchangeService:
             logger.info("Testing connection to Binance API...")
             exchange = self.get_exchange()
 
-            # Test connection by fetching exchange status
-            status = await exchange.fetch_status()
+            # Test connection by fetching exchange status (synchronous call)
+            status = exchange.fetch_status()
 
             logger.info("Connection to Binance API successful")
             return {

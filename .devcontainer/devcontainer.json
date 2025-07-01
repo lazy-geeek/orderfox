@@ -41,8 +41,6 @@
 				"ms-python.vscode-pylance",
 				"ms-python.debugpy",
 				"ms-python.black-formatter",
-				"ms-python.flake8",
-				"ms-python.mypy-type-checker",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
 				"eamodio.gitlens",
@@ -66,9 +64,7 @@
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
 				"python.formatting.provider": "black",
-				"python.linting.enabled": true,
-				"python.linting.flake8Enabled": true,
-				"python.linting.mypyEnabled": true,
+				"python.analysis.typeCheckingMode": "basic",
 				"python.testing.pytestEnabled": true,
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestArgs": [

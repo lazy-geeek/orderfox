@@ -48,6 +48,7 @@ class Settings:
 
     # Market Data Configuration
     MAX_ORDERBOOK_LIMIT: int = int(os.getenv("MAX_ORDERBOOK_LIMIT", "5000"))
+    USE_DEPTH_CACHE_MANAGER: bool = os.getenv("USE_DEPTH_CACHE_MANAGER", "False").lower() == "true"
 
     # Development settings
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
