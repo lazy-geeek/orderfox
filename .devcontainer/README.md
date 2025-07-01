@@ -107,3 +107,28 @@ docker-compose up
 - Check that ports 3000, 8000, and 5678 are available
 - Verify port forwarding in `devcontainer.json`
 - Use `docker ps` to check for conflicting containers
+
+### Service Startup Issues
+- Check if both backend and frontend are running: `ps aux | grep -E "(uvicorn|vite)"`
+- Restart services: Use VS Code tasks or manually restart
+- Check logs: `tail -f /var/log/supervisord.log` (if using supervisord)
+
+### Performance Issues
+- File watching lag: Ensure volume mounts are configured for optimal performance
+- Slow builds: Use multi-stage Docker builds and leverage build cache
+- Memory usage: Monitor container resource usage with `docker stats`
+
+### Permission Problems
+- Ensure `vscode` user has proper permissions in container
+- Check file ownership: `ls -la` to verify permissions
+- Use `sudo chown -R vscode:vscode /workspaces/orderfox` if needed
+
+### VS Code Extension Issues
+- Reload window if extensions don't load: `Ctrl+Shift+P` → "Developer: Reload Window"
+- Check extension compatibility in dev container environment
+- Verify extension installation in `devcontainer.json`
+
+### Environment Variable Issues
+- Verify `.env` files are properly loaded
+- Check container environment variables: `printenv | grep VITE`
+- Ensure relative URLs are used for API calls in dev container mode
