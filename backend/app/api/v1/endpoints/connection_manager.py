@@ -12,6 +12,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
 from app.services.trading_engine_service import TradingEngineService
 from app.core.logging_config import get_logger
+from app.core.config import settings
 
 logger = get_logger("connection_manager")
 
@@ -458,8 +459,8 @@ class ConnectionManager:
             ws_symbol = symbol.lower()
             
             # Binance USDT-M Futures partial depth stream URL
-            # Format: wss://fstream.binance.com/ws/<symbol>@depth<levels>
-            ws_url = f"wss://fstream.binance.com/ws/{ws_symbol}@depth{depth_level}"
+            # Format: {base_url}/ws/<symbol>@depth<levels>
+            ws_url = f"{settings.BINANCE_WS_BASE_URL}/ws/{ws_symbol}@depth{depth_level}"
             
             logger.info(f"Connecting to Binance partial depth stream: {ws_url}")
             
