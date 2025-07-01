@@ -95,7 +95,7 @@
 				},
 				"git.autofetch": true,
 				"git.confirmSync": false,
-				"workbench.colorTheme": "Default Dark Modern",
+				"workbench.colorTheme": "Visual Studio Dark",
 				"workbench.iconTheme": "material-icon-theme"
 			}
 		}
