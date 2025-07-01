@@ -10,13 +10,13 @@ echo "🚀 OrderFox Dev Container Post-Create Setup"
 # Ensure we're in the workspace directory
 cd /workspaces/orderfox
 
-# Install Python backend dependencies
+# Install Python backend dependencies (prefer pre-built wheels to avoid compilation)
 echo "📦 Installing Python backend dependencies..."
 if [ -f "backend/requirements.txt" ]; then
-    echo "   Installing from backend/requirements.txt..."
-    pip install -r backend/requirements.txt
+    echo "   Installing from backend/requirements.txt (using pre-built wheels when possible)..."
+    pip install --prefer-binary -r backend/requirements.txt
     # Install additional development tools
-    pip install debugpy ipython black flake8 mypy pytest-asyncio
+    pip install --prefer-binary debugpy ipython black flake8 mypy pytest-asyncio
     echo "   ✅ Python dependencies installed"
 else
     echo "⚠️  backend/requirements.txt not found, skipping Python dependency installation"
@@ -31,6 +31,44 @@ if [ -f "frontend_vanilla/package.json" ]; then
     echo "   ✅ Frontend dependencies installed"
 else
     echo "⚠️  frontend_vanilla/package.json not found, skipping frontend dependency installation"
+fi
+
+# Configure frontend environment for dev container
+echo "🔧 Configuring frontend environment for dev container..."
+if [ -f "frontend_vanilla/.env" ]; then
+    # Update frontend .env to use relative URLs for Vite proxy (avoids CORS issues in dev container)
+    cat > frontend_vanilla/.env << 'EOF'
+# Frontend Configuration
+# Environment variables must be prefixed with VITE_ to be accessible in the browser
+# Use relative URLs to leverage Vite's proxy configuration and avoid CORS issues
+VITE_APP_API_BASE_URL=/api/v1
+VITE_APP_WS_BASE_URL=/api/v1
+EOF
+    echo "   ✅ Updated frontend_vanilla/.env for dev container proxy configuration"
+else
+    echo "⚠️  frontend_vanilla/.env not found, creating default configuration"
+    cat > frontend_vanilla/.env << 'EOF'
+# Frontend Configuration
+# Environment variables must be prefixed with VITE_ to be accessible in the browser
+# Use relative URLs to leverage Vite's proxy configuration and avoid CORS issues
+VITE_APP_API_BASE_URL=/api/v1
+VITE_APP_WS_BASE_URL=/api/v1
+EOF
+    echo "   ✅ Created frontend_vanilla/.env with dev container proxy configuration"
+fi
+
+# Ensure Vite config is properly set up for dev container
+echo "🔧 Updating Vite configuration for dev container..."
+if [ -f "frontend_vanilla/vite.config.js" ]; then
+    # Check if the config already has the correct proxy setup
+    if ! grep -q "/api/v1/ws" frontend_vanilla/vite.config.js; then
+        echo "   ⚠️  Vite config may need manual WebSocket proxy update"
+        echo "     Please ensure '/api/v1/ws' proxy is configured in vite.config.js"
+    else
+        echo "   ✅ Vite config appears to have correct proxy configuration"
+    fi
+else
+    echo "⚠️  frontend_vanilla/vite.config.js not found"
 fi
 
 # Install root development dependencies
@@ -72,7 +110,7 @@ FASTAPI_HOST=0.0.0.0
 FASTAPI_PORT=8000
 VITE_HOST=0.0.0.0
 VITE_PORT=3000
-WORKSPACE_FOLDER=/workspace
+WORKSPACE_FOLDER=/workspaces/orderfox
 EOF
     fi
 else
@@ -83,6 +121,11 @@ fi
 echo "🔧 Setting up script permissions..."
 chmod +x .devcontainer/post-create.sh
 chmod +x .devcontainer/docker-entrypoint.sh
+chmod +x .devcontainer/setup-zsh.sh
+
+# Setup zsh configuration to match WSL
+echo "🐚 Setting up zsh configuration..."
+bash .devcontainer/setup-zsh.sh
 
 # Create temp directories for development
 echo "📁 Creating development directories..."
@@ -129,7 +172,7 @@ cat > .vscode/launch.json << 'EOF'
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",
-                    "remoteRoot": "/workspace"
+                    "remoteRoot": "/workspaces/orderfox"
                 }
             ]
         },
@@ -210,12 +253,18 @@ cat > .vscode/settings.json << 'EOF'
         "*.json": "jsonc",
         "*.md": "markdown"
     },
-    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.defaultProfile.linux": "zsh",
     "terminal.integrated.profiles.linux": {
+        "zsh": {
+            "path": "/usr/bin/zsh",
+            "env": {
+                "PYTHONPATH": "/workspaces/orderfox"
+            }
+        },
         "bash": {
             "path": "/bin/bash",
             "env": {
-                "PYTHONPATH": "/workspace"
+                "PYTHONPATH": "/workspaces/orderfox"
             }
         }
     },
@@ -252,7 +301,45 @@ echo "🔍 Verifying Node.js installation..."
 node --version
 npm --version
 
+# Install Claude Code CLI via npm (pre-compiled binary)
+echo "🤖 Installing Claude Code CLI..."
+# Set up user-writable npm prefix to avoid permissions issues
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+export PATH=~/.npm-global/bin:$PATH
+npm install -g @anthropic-ai/claude-code
+echo "✅ Claude Code CLI installed"
+
+# Install any VS Code extensions that may have failed during initial setup
+echo "🔧 Installing any missing VS Code extensions..."
+if command -v code >/dev/null 2>&1; then
+    # Extensions that commonly fail during bulk installation
+    EXTENSIONS=(
+        "ms-vscode.vscode-json"
+        "anthropic.claude-vscode" 
+        "oleg-shilo.linesight"
+        "ethanfann.restore-terminals"
+    )
+    
+    for ext in "${EXTENSIONS[@]}"; do
+        if ! code --list-extensions | grep -q "$ext"; then
+            echo "Installing missing extension: $ext"
+            code --install-extension "$ext" --force || echo "Failed to install $ext (will retry on VS Code startup)"
+        fi
+    done
+else
+    echo "VS Code CLI not available in container - extensions will install on VS Code startup"
+fi
+
 echo "✅ Post-create setup completed successfully!"
+echo ""
+echo "🔧 Dev Container Configuration Applied:"
+echo "   • Frontend configured to use relative URLs (/api/v1) for Vite proxy"
+echo "   • WebSocket connections routed through Vite proxy to avoid CORS issues"
+echo "   • Environment variables set for Windows host → container connectivity"
+echo "   • HMR (Hot Module Reload) optimized for container environment"
 echo ""
 echo "📋 Next steps:"
 echo "1. Update .env file with your Binance API credentials"
@@ -263,7 +350,15 @@ echo "   • Backend API: http://localhost:8000"
 echo "   • API Documentation: http://localhost:8000/docs"
 echo ""
 echo "🎯 Useful commands:"
+echo "   • npm run dev                 - Start both frontend and backend"
 echo "   • supervisorctl status        - Check service status"
 echo "   • supervisorctl restart all   - Restart all services"
 echo "   • tail -f /var/log/supervisor/*.log - View logs"
+echo "   • claude                      - Launch Claude Code CLI"
+echo ""
+echo "🌐 Network Configuration:"
+echo "   • Frontend uses Vite proxy for API calls to avoid CORS issues"
+echo "   • All requests from browser go through localhost:3000"
+echo "   • Vite automatically forwards API requests to backend (localhost:8000)"
+echo "   • WebSocket connections also proxied through Vite server"
 echo ""

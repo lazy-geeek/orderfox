@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: orderfox-dev-container
     volumes:
-      - ../:/workspace:cached
-      - orderfox-node-modules:/workspace/frontend_vanilla/node_modules
+      - ../:/workspaces/orderfox:cached
+      - orderfox-node-modules:/workspaces/orderfox/frontend_vanilla/node_modules
       - orderfox-pip-cache:/root/.cache/pip
     ports:
       - "3000:3000"   # Frontend Vite dev server
@@ -17,13 +17,13 @@ services:
     environment:
       - NODE_ENV=development
       - DEVCONTAINER_MODE=true
-      - PYTHONPATH=/workspace
+      - PYTHONPATH=/workspaces/orderfox
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - DEBUG=true
     networks:
       - orderfox-network
-    working_dir: /workspace
+    working_dir: /workspaces/orderfox
     command: bash .devcontainer/docker-entrypoint.sh
     stdin_open: true
     tty: true
@@ -33,7 +33,7 @@ services:
   #   image: node:18-alpine
   #   container_name: orderfox-firebase-emulators
   #   volumes:
-  #     - ../:/workspace:cached
+  #     - ../:/workspaces/orderfox:cached
   #     - orderfox-firebase-cache:/root/.cache/firebase
   #   ports:
   #     - "4000:4000"   # Emulator Suite UI
@@ -43,7 +43,7 @@ services:
   #     - "4004:4004"   # Hosting Emulator
   #     - "4005:4005"   # Pub/Sub Emulator
   #     - "4400:4400"   # Emulator Hub
-  #   working_dir: /workspace
+  #   working_dir: /workspaces/orderfox
   #   command: |
   #     sh -c "
   #       npm install -g firebase-tools &&

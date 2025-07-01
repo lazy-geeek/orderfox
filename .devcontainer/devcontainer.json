@@ -27,7 +27,10 @@
 		"ENVIRONMENT": "development",
 		"DEBUG": "true",
 		"DEVCONTAINER_MODE": "true",
-		"WORKSPACE_FOLDER": "/workspaces/orderfox"
+		"WORKSPACE_FOLDER": "/workspaces/orderfox",
+		// Frontend proxy configuration (to avoid CORS issues when connecting from host to container)
+		"VITE_APP_API_BASE_URL": "/api/v1",
+		"VITE_APP_WS_BASE_URL": "/api/v1"
 	},
 
 	// Configure VS Code settings and extensions
@@ -37,6 +40,9 @@
 				"ms-python.python",
 				"ms-python.vscode-pylance",
 				"ms-python.debugpy",
+				"ms-python.black-formatter",
+				"ms-python.flake8",
+				"ms-python.mypy-type-checker",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
 				"eamodio.gitlens",
@@ -47,9 +53,6 @@
 				"yzhang.markdown-all-in-one",
 				"gruntfuggly.todo-tree",
 				"hediet.vscode-drawio",
-				"ms-python.black-formatter",
-				"ms-python.flake8",
-				"ms-python.mypy-type-checker",
 				"ms-vscode.vscode-json",
 				"anthropic.claude-vscode",
 				"agg4code.claude-image-paste",
@@ -57,7 +60,8 @@
 				"oleg-shilo.linesight",
 				"christian-kohler.npm-intellisense",
 				"christian-kohler.path-intellisense",
-				"ethanfann.restore-terminals"
+				"ethanfann.restore-terminals",
+				"pkief.material-icon-theme"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -80,8 +84,11 @@
 					"**/node_modules": true,
 					"**/.git": false
 				},
-				"terminal.integrated.defaultProfile.linux": "bash",
+				"terminal.integrated.defaultProfile.linux": "zsh",
 				"terminal.integrated.profiles.linux": {
+					"zsh": {
+						"path": "/usr/bin/zsh"
+					},
 					"bash": {
 						"path": "/bin/bash"
 					}
@@ -89,7 +96,7 @@
 				"git.autofetch": true,
 				"git.confirmSync": false,
 				"workbench.colorTheme": "Default Dark Modern",
-				"workbench.iconTheme": "vs-seti"
+				"workbench.iconTheme": "material-icon-theme"
 			}
 		}
 	},
@@ -105,11 +112,17 @@
 
 	// Features to add to the dev container
 	"features": {
-		"ghcr.io/devcontainers/features/git:1": {
-			"version": "latest"
-		},
 		"ghcr.io/devcontainers/features/github-cli:1": {
 			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": true,
+			"installOhMyZsh": true,
+			"installOhMyZshConfig": true,
+			"configureZshAsDefaultShell": true,
+			"username": "vscode",
+			"uid": "1000",
+			"gid": "1000"
 		}
 	},
 
