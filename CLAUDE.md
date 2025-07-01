@@ -132,6 +132,9 @@ python test_paper_trading.py
 - **Enhanced Logging**: Structured logging with environment-specific log levels and request timing
 - **Static File Serving**: Development mode serves frontend files directly from backend for simplified setup
 - **Health Checks**: Container health check endpoints for orchestration and monitoring
+- **Dev Container Path Fix**: Fixed inconsistent workspace paths from `/workspace` to `/workspaces/orderfox` for VS Code compatibility
+- **Node.js Version Update**: Upgraded from Node.js 18 to Node.js 20 for Vite 7.0.0+ support
+- **Script Path Consistency**: Updated all supervisord, post-create, and entrypoint scripts to use consistent paths
 
 ### Configuration
 - Environment variables loaded from .env file (multiple path detection)
@@ -165,6 +168,9 @@ python test_paper_trading.py
 - **Debugging**: VS Code Dev Container includes debugpy configuration for Python debugging
 - **Environment Files**: Use .env.local for local overrides, .env.docker.example for container-specific configuration
 - **Static Files**: In development, backend serves frontend static files for simplified single-server setup
+- **Container Paths**: Dev Container uses `/workspaces/orderfox` as the working directory (VS Code standard)
+- **Node.js Version**: Container uses Node.js 20+ for Vite 7.0.0+ compatibility
+- **Path Consistency**: All scripts and configuration files use consistent `/workspaces/orderfox` paths
 
 ### When Implementing New Features or Changing Code  
 - Update the CLAUDE.md file with any architecture changes or important notes for Claude Code to do a better job in the future.

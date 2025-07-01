@@ -8,7 +8,7 @@ set -e
 echo "🔄 OrderFox Dev Container Post-Start Setup"
 
 # Ensure we're in the workspace directory
-cd /workspace
+cd /workspaces/orderfox
 
 # Check if services are already running
 echo "🔍 Checking service status..."
