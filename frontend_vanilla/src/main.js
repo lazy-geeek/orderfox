@@ -109,15 +109,18 @@ subscribe((key) => {
 });
 
 // Event Listeners
-symbolSelector.addEventListener('change', (e) => {
+symbolSelector.addEventListener('change', async (e) => {
   setSelectedSymbol(e.target.value);
   // Re-fetch data and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
   // Use maximum depth (5000) to get deepest possible market coverage for aggregation
   const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
   const validLimit = getValidOrderBookLimit(dynamicLimit);
-  fetchOrderBook(state.selectedSymbol, validLimit);
+  
   disconnectAllWebSockets(); // Disconnect all old streams
+  
+  // Wait for order book fetch to complete (this calculates rounding options)
+  await fetchOrderBook(state.selectedSymbol, validLimit);
   
   // Introduce a delay to allow old WebSockets to fully close
   setTimeout(() => {
@@ -188,7 +191,7 @@ tradingModeToggle.querySelector('.mode-button').addEventListener('click', async 
 });
 
 // Initial data fetch
-fetchSymbols().then(() => {
+fetchSymbols().then(async () => {
   // Automatically select the first symbol (highest volume) after symbols are fetched
   if (state.symbolsList.length > 0) {
     const firstSymbol = state.symbolsList[0];
@@ -198,9 +201,11 @@ fetchSymbols().then(() => {
     fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
     const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
     const validLimit = getValidOrderBookLimit(dynamicLimit);
-    fetchOrderBook(firstSymbol.id, validLimit);
     
-    // Start WebSocket connections for the selected symbol
+    // Wait for order book fetch to complete (this calculates rounding options)
+    await fetchOrderBook(firstSymbol.id, validLimit);
+    
+    // Start WebSocket connections for the selected symbol with proper rounding
     setTimeout(() => {
       connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
       connectWebSocketStream(firstSymbol.id, 'orderbook', null, validLimit, state.selectedRounding);

@@ -9,7 +9,6 @@ import {
   clearOrderBook,
 } from '../store/store.js';
 import { WS_BASE_URL } from '../config/env.js';
-import { featureFlags } from './featureFlags.js';
 import { logger } from '../utils/logger.js';
 
 const activeWebSockets = {};
@@ -43,18 +42,14 @@ export const connectWebSocketStream = async (
     if (streamType === 'orderbook') {
       const params = new URLSearchParams();
       
-      // Always include limit if provided
+      // Include limit if provided
       if (limit) {
         params.append('limit', limit);
       }
       
-      // Include backend aggregation parameters if enabled
-      if (featureFlags.useBackendAggregation()) {
-        params.append('aggregate', 'true');
-        params.append('use_depth_cache', 'true');
-        if (rounding) {
-          params.append('rounding', rounding);
-        }
+      // Include rounding if provided
+      if (rounding) {
+        params.append('rounding', rounding);
       }
       
       if (params.toString()) {
@@ -162,15 +157,7 @@ export const connectWebSocketStream = async (
         const data = JSON.parse(event.data);
         
         
-        // Protocol version negotiation - detect message format
-        const messageVersion = data.version || '1.0';
-        const isNewFormat = data.aggregated === true || messageVersion !== '1.0';
-        
-        if (isNewFormat && featureFlags.useBackendAggregation()) {
-          logger.debug(`Received new format message (v${messageVersion}) for ${streamKey}`);
-        } else if (isNewFormat && !featureFlags.useBackendAggregation()) {
-          logger.warn(`Received new format message but backend aggregation disabled, processing as legacy format`);
-        }
+        // Process WebSocket messages
         
         if (data.type === 'candle_update') {
           updateCandlesFromWebSocket(data);

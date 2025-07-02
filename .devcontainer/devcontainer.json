@@ -32,6 +32,7 @@
 		"FASTAPI_PORT": "8000",
 		"VITE_PORT": "3000",
 		"WAIT_FOR_DEPS": "true",
+		"TZ": "Europe/Berlin",
 		// Backend-specific settings (from backend/.env)
 		"ENVIRONMENT": "development",
 		"DEBUG": "false",

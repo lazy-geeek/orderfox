@@ -25,7 +25,7 @@ async def websocket_orderbook(
     symbol: str, 
     limit: int = Query(default=20, ge=5, le=5000),
     rounding: float = Query(default=0.01, ge=0.0001, le=1000.0),
-    aggregate: bool = Query(default=False),
+    aggregate: bool = Query(default=True),
     use_depth_cache: bool = Query(default=True)
 ):
     """
@@ -36,7 +36,7 @@ async def websocket_orderbook(
         symbol: Trading symbol (e.g., 'BTCUSDT')
         limit: Number of order book levels to stream (default: 20, max: 5000)
         rounding: Price rounding multiple for aggregation (default: 0.01)
-        aggregate: Enable server-side aggregation (default: False for backward compatibility)
+        aggregate: Enable server-side aggregation (default: True)
         use_depth_cache: Use DepthCacheManager for Binance symbols (default: True)
 
     The WebSocket will send JSON messages with the following format:

@@ -120,48 +120,26 @@ const validateOrderBook = (orderBook) => {
     timestamp = Date.now();
   }
 
-  // Check if this is a backend-aggregated order book
-  const isAggregated = orderBook.aggregated === true;
+  // Validate backend-aggregated order book data
+  const validatedBids = bids.filter((bid) =>
+    bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
+    bid.price > 0 && bid.amount > 0
+  );
   
-  if (isAggregated) {
-    // For aggregated data, bids/asks may already include cumulative totals
-    // Validate structure but don't filter as heavily since backend has already processed
-    const validatedBids = bids.filter((bid) =>
-      bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
-      bid.price > 0 && bid.amount > 0
-    );
-    
-    const validatedAsks = asks.filter((ask) =>
-      ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
-      ask.price > 0 && ask.amount > 0
-    );
+  const validatedAsks = asks.filter((ask) =>
+    ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
+    ask.price > 0 && ask.amount > 0
+  );
 
-    return {
-      symbol: orderBook.symbol || '',
-      bids: validatedBids,
-      asks: validatedAsks,
-      timestamp,
-      aggregated: true,
-      rounding: orderBook.rounding || null,
-      source: orderBook.source || null,
-      version: orderBook.version || '1.0'
-    };
-  } else {
-    // Legacy format - existing validation logic
-    return {
-      symbol: orderBook.symbol || '',
-      bids: bids.filter((bid) =>
-        bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
-        bid.price > 0 && bid.amount > 0
-      ),
-      asks: asks.filter((ask) =>
-        ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
-        ask.price > 0 && ask.amount > 0
-      ),
-      timestamp,
-      aggregated: false
-    };
-  }
+  return {
+    symbol: orderBook.symbol || '',
+    bids: validatedBids,
+    asks: validatedAsks,
+    timestamp,
+    aggregated: true,
+    rounding: orderBook.rounding || null,
+    source: orderBook.source || null
+  };
 };
 
 const validateTicker = (ticker) => {
@@ -519,14 +497,9 @@ async function fetchOrderBook(symbol, limit) {
       params.append('limit', validLimit);
     }
     
-    // Check if backend aggregation is enabled
-    const { featureFlags } = await import('../services/featureFlags.js');
-    if (featureFlags.useBackendAggregation()) {
-      params.append('aggregate', 'true');
-      // Use current rounding if available, otherwise let backend use default
-      if (state.selectedRounding) {
-        params.append('rounding', state.selectedRounding);
-      }
+    // Include rounding if available
+    if (state.selectedRounding) {
+      params.append('rounding', state.selectedRounding);
     }
     
     const queryString = params.toString();
