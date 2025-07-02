@@ -32,8 +32,6 @@ class TradingEngineService:
         Returns "long", "short", or None.
         """
         try:
-            logger.debug(f"Analyzing order book data for signal generation: {symbol}")
-
             # Example: very basic logic, replace with actual analysis
             # This is just a placeholder and not real trading logic.
             if (
@@ -50,7 +48,6 @@ class TradingEngineService:
                     #     return "long" # Or "short" based on some other condition
                     pass  # Keep it simple for now
 
-            logger.debug(f"No signal generated for {symbol}")
             return None
 
         except Exception as e:
@@ -100,8 +97,6 @@ class TradingEngineService:
             order_book_data: Real-time order book data with bids and asks
         """
         try:
-            logger.debug(f"Processing order book update for {symbol}")
-
             signal = await self.determine_signal(symbol, order_book_data)
             if signal:
                 logger.info(f"Signal generated for {symbol}: {signal}")

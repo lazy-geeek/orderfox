@@ -75,13 +75,13 @@ class ConnectionManager:
         if stream_key in self.active_connections:
             if websocket in self.active_connections[stream_key]:
                 self.active_connections[stream_key].remove(websocket)
-                logger.info(
+                logger.debug(
                     f"WebSocket disconnected from stream {stream_key}. Remaining connections: {len(self.active_connections[stream_key])}"
                 )
 
             # Check if there are any remaining connections for this specific stream_key
             if not self.active_connections[stream_key]:
-                logger.info(
+                logger.debug(
                     f"No more connections for stream_key: {stream_key}. Stopping its specific streaming task."
                 )
                 self._stop_streaming(
@@ -280,7 +280,7 @@ class ConnectionManager:
     def _stop_streaming(self, stream_key: str):
         """Stop streaming data for a stream key. Cancels the task and removes it from tracking."""
         if stream_key in self.streaming_tasks:
-            logger.info(f"Cancelling and removing streaming task for {stream_key}")
+            logger.debug(f"Cancelling and removing streaming task for {stream_key}")
             try:
                 self.streaming_tasks[stream_key].cancel()
             except Exception as e:  # Catch potential errors during cancellation
@@ -337,14 +337,14 @@ class ConnectionManager:
 
             # Check if we should use Binance partial depth streams for better coverage
             use_partial_depth = self._should_use_partial_depth_stream(limit)
-            logger.info(f"Evaluating partial depth stream for {symbol}: limit={limit}, use_partial_depth={use_partial_depth}")
+            logger.debug(f"Evaluating partial depth stream for {symbol}: limit={limit}, use_partial_depth={use_partial_depth}")
             
             if use_partial_depth:
-                logger.info(f"✅ Using Binance partial depth stream for {symbol} with limit {limit}")
+                logger.debug(f"✅ Using Binance partial depth stream for {symbol} with limit {limit}")
                 await self._stream_partial_depth_orderbook(symbol, limit)
                 return
             else:
-                logger.info(f"➡️ Using standard CCXT stream for {symbol} with limit {limit}")
+                logger.debug(f"➡️ Using standard CCXT stream for {symbol} with limit {limit}")
 
             # Test connection before starting stream
             if exchange_pro is None:

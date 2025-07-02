@@ -111,7 +111,7 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
                                 )
 
                 except WebSocketDisconnect:
-                    logger.info(f"WebSocket orderbook client disconnected for {symbol}")
+                    logger.debug(f"WebSocket orderbook client disconnected for {symbol}")
                     break
                 except Exception as e:
                     logger.error(
@@ -120,10 +120,10 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
                     break
 
         except WebSocketDisconnect:
-            logger.info(f"WebSocket orderbook client disconnected for {symbol}")
+            logger.debug(f"WebSocket orderbook client disconnected for {symbol}")
         finally:
             connection_manager.disconnect_orderbook(websocket, exchange_symbol)
-            logger.info(f"WebSocket orderbook connection cleaned up for {symbol}")
+            logger.debug(f"WebSocket orderbook connection cleaned up for {symbol}")
 
     except Exception as e:
         logger.error(f"WebSocket orderbook error for {symbol}: {str(e)}", exc_info=True)

@@ -113,8 +113,7 @@ class SymbolService:
         # Then check if we can convert from ID to exchange format
         exchange_symbol = self._symbol_cache.get(symbol_id)
         if exchange_symbol:
-            logger.debug(f"Converted symbol {symbol_id} -> {exchange_symbol}")
-            return exchange_symbol
+                return exchange_symbol
 
         logger.warning(f"Symbol {symbol_id} not found in cache")
         return None
@@ -138,8 +137,7 @@ class SymbolService:
         # Then check if we can convert from exchange to ID format
         symbol_id = self._exchange_to_id_cache.get(exchange_symbol)
         if symbol_id:
-            logger.debug(f"Converted symbol {exchange_symbol} -> {symbol_id}")
-            return symbol_id
+                return symbol_id
 
         logger.warning(f"Exchange symbol {exchange_symbol} not found in cache")
         return None
