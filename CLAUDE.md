@@ -43,11 +43,10 @@ cd frontend_vanilla
 npm install
 ```
 
-### Legacy Frontend (React - Deprecated)
+### Legacy Frontend (React - Removed)
 ```bash
-# NOTE: This is legacy code for historical reference only
-# The frontend/ directory contains the old React implementation
-# Use frontend_vanilla/ for all new development
+# NOTE: The legacy React frontend has been completely removed
+# Use frontend_vanilla/ for all development
 ```
 
 ### Run Both Frontend and Backend Concurrently
@@ -105,11 +104,10 @@ python test_paper_trading.py
 - **frontend_vanilla/src/style.css**: Global styles with component-specific CSS
 - **frontend_vanilla/main.js**: Application entry point with event handling
 
-### Legacy Frontend Structure (React - Deprecated)
-- **frontend/src/store/**: Redux store configuration (LEGACY)
-- **frontend/src/features/**: Redux slices for market data and trading state management (LEGACY)
-- **frontend/src/components/**: React components (LEGACY)
-- **frontend/src/services/**: API client and WebSocket service (LEGACY)
+### Legacy Frontend Structure (React - Removed)
+- The legacy React frontend has been completely removed from the codebase
+- Historical reference: Previously contained Redux store, components, and services
+- Use `frontend_vanilla/` for all development - the active vanilla JavaScript implementation
 
 ### Key Technical Details
 - **State Management**: Custom state management with subscribe/notify pattern for reactive updates
