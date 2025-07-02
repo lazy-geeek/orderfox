@@ -5,14 +5,12 @@ This module provides the ConnectionManager class that handles WebSocket connecti
 for real-time market data streaming including order books, tickers, and candles.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Optional, Any
 import asyncio
 import json
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
-from app.services.trading_engine_service import TradingEngineService
 from app.services.orderbook_processor import OrderBookProcessor
-from app.services.orderbook_manager import orderbook_manager
 from app.core.logging_config import get_logger
 from app.core.config import settings
 
@@ -35,7 +33,7 @@ class ConnectionManager:
         websocket: WebSocket,
         stream_key: str,
         stream_type: str = "orderbook",
-        display_symbol: str = None,
+        display_symbol: Optional[str] = None,
     ):
         """Accept a new WebSocket connection for a stream."""
         logger.info(
@@ -297,13 +295,13 @@ class ConnectionManager:
 
     # Keep backward compatibility for existing orderbook methods
     async def connect_orderbook(
-        self, websocket: WebSocket, symbol: str, display_symbol: str = None, limit: int = 20,
+        self, websocket: WebSocket, symbol: str, display_symbol: Optional[str] = None, limit: int = 20,
         rounding: float = 0.01, aggregate: bool = False, use_depth_cache: bool = True
     ):
         """Accept a new WebSocket connection for orderbook with aggregation parameters."""
         # Store the configuration for this symbol stream
         if not hasattr(self, '_stream_configs'):
-            self._stream_configs = {}
+            self._stream_configs: Dict[str, Dict[str, Any]] = {}
         
         # Create configuration for this symbol
         new_config = {
@@ -312,6 +310,8 @@ class ConnectionManager:
             'aggregate': aggregate,
             'use_depth_cache': use_depth_cache
         }
+        
+        logger.debug(f"Setting orderbook config for {symbol}: {new_config}")
         
         # Check if configuration changed and restart if needed
         current_config = self._stream_configs.get(symbol)
@@ -344,6 +344,7 @@ class ConnectionManager:
             data.get('type') == 'orderbook_update' and 
             'bids' in data and 'asks' in data):
             
+            logger.debug(f"Performing backend aggregation for {symbol}")
             try:
                 # Convert message format to raw orderbook format for processor
                 raw_orderbook = {
@@ -353,11 +354,14 @@ class ConnectionManager:
                 }
                 
                 # Process with aggregation
+                # Use a reasonable depth for backend aggregation
+                # Frontend will slice to displayDepth, so generate enough levels
+                aggregation_depth = 100  # Generate up to 100 aggregated levels
                 aggregated = self.orderbook_processor.process_orderbook(
                     raw_orderbook=raw_orderbook,
                     symbol=symbol,
                     rounding=config.get('rounding', 0.01),
-                    depth=config.get('limit', 20),
+                    depth=aggregation_depth,
                     source=data.get('source', 'ccxtpro')
                 )
                 
@@ -404,8 +408,10 @@ class ConnectionManager:
             aggregate = config.get('aggregate', False)
             rounding = config.get('rounding', 0.01)
             
-            logger.info(f"Using config for {symbol}: limit={limit}, aggregate={aggregate}, "
-                       f"rounding={rounding}, use_depth_cache={use_depth_cache}")
+            logger.info(
+                f"Using config for {symbol}: limit={limit}, aggregate={aggregate}, "
+                f"rounding={rounding}, use_depth_cache={use_depth_cache}"
+            )
             
             # Validate and clamp limit parameter (same as WebSocket endpoint)
             limit = max(5, min(limit, 5000))
@@ -420,7 +426,10 @@ class ConnectionManager:
 
             # Check if we should use Binance partial depth streams for better coverage
             use_partial_depth = self._should_use_partial_depth_stream(limit)
-            logger.info(f"Evaluating partial depth stream for {symbol}: limit={limit}, use_partial_depth={use_partial_depth}")
+            logger.info(
+                f"Evaluating partial depth stream for {symbol}: "
+                f"limit={limit}, use_partial_depth={use_partial_depth}"
+            )
             
             if use_partial_depth:
                 logger.info(f"✅ Using Binance partial depth stream for {symbol} with limit {limit}")
@@ -547,7 +556,10 @@ class ConnectionManager:
                                         
                                         await trading_engine_service_instance.process_order_book_update(symbol, ccxt_format)
                                     except Exception as e:
-                                        logger.warning(f"Error processing order book update in trading engine for {symbol}: {str(e)}")
+                                        logger.warning(
+                            f"Error processing order book update in trading engine "
+                            f"for {symbol}: {str(e)}"
+                        )
                                         
                             except json.JSONDecodeError as e:
                                 logger.warning(f"Invalid JSON received from Binance for {symbol}: {str(e)}")
@@ -555,7 +567,10 @@ class ConnectionManager:
                                 logger.error(f"Error processing Binance partial depth message for {symbol}: {str(e)}")
                                 
                 except websockets.exceptions.ConnectionClosed:
-                    logger.warning(f"Binance partial depth WebSocket connection closed for {symbol}, reconnecting...")
+                    logger.warning(
+                        f"Binance partial depth WebSocket connection closed for {symbol}, "
+                        "reconnecting..."
+                    )
                     await asyncio.sleep(1)  # Wait before reconnecting
                 except Exception as e:
                     logger.error(f"Error in Binance partial depth stream for {symbol}: {str(e)}")
@@ -815,6 +830,7 @@ class ConnectionManager:
                     "bids": bids,
                     "asks": asks,
                     "timestamp": current_time,
+                    "source": "mock",  # Add source field for aggregation logic
                     "mock": True,  # Indicate this is mock data
                 }
 
@@ -1106,6 +1122,7 @@ class ConnectionManager:
                     "bids": bids,
                     "asks": asks,
                     "timestamp": order_book_data["timestamp"],
+                    "source": "ccxtpro",  # Add source field for aggregation logic
                 }
 
                 # Broadcast to all connected clients

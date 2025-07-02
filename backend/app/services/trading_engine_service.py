@@ -1,6 +1,5 @@
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException
-from app.api.v1.schemas import OrderBook  # Assuming OrderBook is defined in schemas
 from app.core.logging_config import get_logger
 
 # If OrderBook is not the correct type for order_book_data, adjust as needed.

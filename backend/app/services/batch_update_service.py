@@ -56,7 +56,7 @@ class BatchUpdateService:
     to reduce WebSocket message frequency and improve efficiency.
     """
     
-    def __init__(self, config: BatchConfig = None):
+    def __init__(self, config: Optional[BatchConfig] = None):
         """
         Initialize the batch update service.
         
@@ -222,7 +222,7 @@ class BatchUpdateService:
         self.batch_timers.pop(connection_id, None)
         
         # Collect updates for batch
-        batch_updates = []
+        batch_updates: List[Any] = []
         batch_start_time = time.time()
         
         # Take up to max_batch_size updates
@@ -270,7 +270,7 @@ class BatchUpdateService:
         if queue:
             self._schedule_batch_processing(connection_id)
     
-    def force_flush(self, connection_id: str = None):
+    def force_flush(self, connection_id: Optional[str] = None):
         """
         Force immediate processing of all queued updates.
         
@@ -293,7 +293,7 @@ class BatchUpdateService:
         
         self.logger.debug(f"Force flushed {len(connections_to_flush)} connections")
     
-    def get_queue_stats(self, connection_id: str = None) -> Dict[str, Any]:
+    def get_queue_stats(self, connection_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get queue statistics.
         

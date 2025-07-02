@@ -3,23 +3,31 @@ import logging
 from typing import Optional
 from dotenv import load_dotenv
 
-# Try multiple locations for .env file
-env_paths = [
-    ".env",  # Current directory
+# Load .env files in hierarchical order: global first, then local overrides
+env_files_loaded = []
+
+# 1. Load global .env file first (shared settings)
+global_env_paths = [
     "../.env",  # Parent directory (if running from backend/)
     "../../.env",  # Grandparent directory (if running from backend/app/)
 ]
 
-env_loaded = False
-for env_path in env_paths:
+for env_path in global_env_paths:
     if os.path.exists(env_path):
-        load_dotenv(env_path)
-        env_loaded = True
-        print(f"Loaded environment variables from: {env_path}")
+        load_dotenv(env_path, override=False)  # Don't override existing env vars
+        env_files_loaded.append(f"global: {env_path}")
         break
 
-if not env_loaded:
-    print("Warning: No .env file found in expected locations")
+# 2. Load local backend .env file second (backend-specific overrides)
+local_env_path = ".env"  # Current directory (backend/.env)
+if os.path.exists(local_env_path):
+    load_dotenv(local_env_path, override=True)  # Allow overrides of global settings
+    env_files_loaded.append(f"local: {local_env_path}")
+
+if env_files_loaded:
+    print(f"Loaded environment variables from: {', '.join(env_files_loaded)}")
+else:
+    print("Warning: No .env files found in expected locations")
 
 
 class Settings:

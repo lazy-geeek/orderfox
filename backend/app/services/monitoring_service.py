@@ -91,13 +91,13 @@ class MetricsCollector:
         
         logger.info("MetricsCollector initialized")
     
-    def increment_counter(self, name: str, value: float = 1.0, labels: Dict[str, str] = None):
+    def increment_counter(self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None):
         """Increment a counter metric."""
         with self.lock:
             full_name = self._build_metric_name(name, labels)
             self.counters[full_name] += value
     
-    def set_gauge(self, name: str, value: float, labels: Dict[str, str] = None):
+    def set_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Set a gauge metric value."""
         with self.lock:
             full_name = self._build_metric_name(name, labels)
@@ -107,13 +107,13 @@ class MetricsCollector:
                 labels=labels or {}
             )
     
-    def record_histogram(self, name: str, value: float, labels: Dict[str, str] = None):
+    def record_histogram(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Record a value in a histogram metric."""
         with self.lock:
             full_name = self._build_metric_name(name, labels)
             self.histograms[full_name].add_value(value)
     
-    def record_timer(self, name: str, duration: float, labels: Dict[str, str] = None):
+    def record_timer(self, name: str, duration: float, labels: Optional[Dict[str, str]] = None):
         """Record a timer measurement."""
         with self.lock:
             full_name = self._build_metric_name(name, labels)
@@ -123,7 +123,7 @@ class MetricsCollector:
                 labels=labels or {}
             ))
     
-    def _build_metric_name(self, name: str, labels: Dict[str, str] = None) -> str:
+    def _build_metric_name(self, name: str, labels: Optional[Dict[str, str]] = None) -> str:
         """Build a full metric name including labels."""
         if not labels:
             return name
@@ -131,7 +131,7 @@ class MetricsCollector:
         label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
         return f"{name}{{{label_str}}}"
     
-    def get_metric_value(self, name: str, metric_type: MetricType, labels: Dict[str, str] = None) -> Any:
+    def get_metric_value(self, name: str, metric_type: MetricType, labels: Optional[Dict[str, str]] = None) -> Any:
         """Get current value of a metric."""
         with self.lock:
             full_name = self._build_metric_name(name, labels)
@@ -170,7 +170,7 @@ class MetricsCollector:
 class Timer:
     """Context manager for timing operations."""
     
-    def __init__(self, collector: MetricsCollector, metric_name: str, labels: Dict[str, str] = None):
+    def __init__(self, collector: MetricsCollector, metric_name: str, labels: Optional[Dict[str, str]] = None):
         self.collector = collector
         self.metric_name = metric_name
         self.labels = labels
@@ -407,19 +407,19 @@ class MonitoringService:
             "total_metrics": len(self.collector.get_all_metrics())
         }
     
-    def timer(self, metric_name: str, labels: Dict[str, str] = None) -> Timer:
+    def timer(self, metric_name: str, labels: Optional[Dict[str, str]] = None) -> Timer:
         """Create a timer context manager."""
         return Timer(self.collector, metric_name, labels)
     
-    def increment(self, metric_name: str, value: float = 1.0, labels: Dict[str, str] = None):
+    def increment(self, metric_name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None):
         """Increment a counter metric."""
         self.collector.increment_counter(metric_name, value, labels)
     
-    def gauge(self, metric_name: str, value: float, labels: Dict[str, str] = None):
+    def gauge(self, metric_name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Set a gauge metric."""
         self.collector.set_gauge(metric_name, value, labels)
     
-    def histogram(self, metric_name: str, value: float, labels: Dict[str, str] = None):
+    def histogram(self, metric_name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Record a histogram value."""
         self.collector.record_histogram(metric_name, value, labels)
     

@@ -163,15 +163,30 @@ python test_paper_trading.py
 - **Performance Validation**: Created performance tests comparing backend vs frontend aggregation, showing significant improvements
 
 ### Configuration
-- Environment variables loaded from .env file (multiple path detection)
-- **Required**: BINANCE_API_KEY, BINANCE_SECRET_KEY
-- **Optional**: FIREBASE_CONFIG_JSON, DEBUG, MAX_ORDERBOOK_LIMIT
-- **Container Configuration**: DEVCONTAINER_MODE, CONTAINER, HOST, PORT
-- **CORS Origins**: Configurable via CORS_ORIGINS environment variable
-- **WebSocket URLs**: Configurable Binance API endpoints (BINANCE_WS_BASE_URL, BINANCE_API_BASE_URL)
-- Trading mode defaults to paper trading for safety
+
+Environment variables are organized in a hierarchical structure for clear separation of concerns:
+
+#### .env File Structure
+- **Global `.env`**: Project-wide shared settings (API keys, ports, business logic)
+- **Backend `backend/.env`**: Backend-specific overrides and settings
+- **Frontend `frontend_vanilla/.env`**: Frontend-specific settings (all VITE_ prefixed)
+
+#### Configuration Loading
+- **Backend**: Loads global `.env` first, then `backend/.env` for overrides
+- **Frontend**: Vite automatically loads `frontend_vanilla/.env` with VITE_ prefix requirement
+- **Precedence**: Local settings override global settings
+
+#### Key Variables
+- **Global Shared**: FASTAPI_PORT, VITE_PORT, NODE_ENV, DEVCONTAINER_MODE, PYTHONPATH, WORKSPACE_FOLDER
+- **Backend Specific**: BINANCE_API_KEY, BINANCE_SECRET_KEY, DEBUG, LOG_LEVEL, CORS_ORIGINS, USE_DEPTH_CACHE_MANAGER, MAX_ORDERBOOK_LIMIT, PAPER_TRADING
+- **Frontend Specific**: VITE_APP_API_BASE_URL, VITE_USE_BACKEND_AGGREGATION, VITE_DEBUG_LOGGING
+- **Optional Shared**: FIREBASE_PROJECT_ID, FIREBASE_CONFIG_JSON
+
+#### Features
 - **Container Detection**: Automatic detection of Docker/Dev Container environments with adaptive configuration
 - **Cross-Platform Connectivity**: Special configuration for Windows host to container access using Vite proxy to avoid CORS issues
+- **Hierarchical Loading**: Backend loads both global and local .env files for maximum flexibility
+- **Trading Safety**: Defaults to paper trading mode for safety
 
 ### Known Limitations
 - **Orderbook Depth**: Binance API limits orderbook to 5000 entries maximum, sourced from memory

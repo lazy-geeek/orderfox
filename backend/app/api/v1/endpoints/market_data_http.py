@@ -148,6 +148,16 @@ async def get_orderbook(
         le=settings.MAX_ORDERBOOK_LIMIT,
         description="Number of order book levels to fetch per side",
     ),
+    rounding: Optional[float] = Query(
+        default=None,
+        ge=0.0001,
+        le=1000.0,
+        description="Price rounding multiple for aggregation (enables backend aggregation)"
+    ),
+    aggregate: Optional[bool] = Query(
+        default=False,
+        description="Enable server-side aggregation"
+    ),
 ):
     """
     Get the current order book for a given symbol.
@@ -155,9 +165,11 @@ async def get_orderbook(
     Args:
         symbol: Trading symbol (e.g., 'BTCUSDT')
         limit: Number of order book levels to fetch per side (default: 100, max: configurable via settings)
+        rounding: Price rounding multiple for aggregation (enables backend aggregation)
+        aggregate: Enable server-side aggregation
 
     Returns:
-        OrderBook: Current order book data
+        OrderBook: Current order book data (raw or aggregated based on parameters)
 
     Raises:
         HTTPException: If unable to fetch order book or symbol not found
@@ -178,25 +190,74 @@ async def get_orderbook(
         # Fetch order book data using exchange symbol with limit
         order_book_data = exchange.fetch_order_book(exchange_symbol, limit=limit)
 
-        # Convert to our schema format
-        bids = [
-            OrderBookLevel(price=float(bid[0]), amount=float(bid[1]))
-            for bid in order_book_data["bids"]
-        ]
+        # Check if aggregation is requested
+        if aggregate:
+            # Use default rounding if not provided (consistent with WebSocket)
+            if rounding is None:
+                rounding = 0.01
+            # Import OrderBookProcessor for aggregation
+            from app.services.orderbook_processor import OrderBookProcessor
+            
+            logger.info(f"HTTP endpoint: Backend aggregation requested for {symbol} with rounding {rounding}")
+            
+            # Create processor instance
+            processor = OrderBookProcessor()
+            
+            # Convert exchange data to raw format for processor
+            raw_orderbook = {
+                'bids': order_book_data["bids"],
+                'asks': order_book_data["asks"], 
+                'timestamp': order_book_data["timestamp"]
+            }
+            
+            # Process with aggregation
+            aggregated = processor.process_orderbook(
+                raw_orderbook=raw_orderbook,
+                symbol=symbol,
+                rounding=rounding,
+                depth=limit,  # Use the requested limit as depth
+                source="http_endpoint"
+            )
+            
+            # Convert aggregated result to OrderBook format
+            bids = [
+                OrderBookLevel(price=level.price, amount=level.amount)
+                for level in aggregated.bids
+            ]
+            
+            asks = [
+                OrderBookLevel(price=level.price, amount=level.amount)
+                for level in aggregated.asks
+            ]
+            
+            return OrderBook(
+                symbol=symbol,
+                bids=bids,
+                asks=asks,
+                timestamp=aggregated.timestamp or int(order_book_data["timestamp"]),
+                aggregated=True,
+                rounding=aggregated.rounding,
+                source=aggregated.source
+            )
+        else:
+            # Return raw data (legacy behavior)
+            bids = [
+                OrderBookLevel(price=float(bid[0]), amount=float(bid[1]))
+                for bid in order_book_data["bids"]
+            ]
 
-        asks = [
-            OrderBookLevel(price=float(ask[0]), amount=float(ask[1]))
-            for ask in order_book_data["asks"]
-        ]
+            asks = [
+                OrderBookLevel(price=float(ask[0]), amount=float(ask[1]))
+                for ask in order_book_data["asks"]
+            ]
 
-        return OrderBook(
-            symbol=symbol,
-            bids=bids,
-            asks=asks,
-            timestamp=int(
-                order_book_data["timestamp"]
-            ),  # Keep as Unix timestamp in milliseconds
-        )
+            return OrderBook(
+                symbol=symbol,
+                bids=bids,
+                asks=asks,
+                timestamp=int(order_book_data["timestamp"]),
+                aggregated=False
+            )
 
     except Exception as e:
         raise HTTPException(

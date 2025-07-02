@@ -33,28 +33,27 @@ else
     echo "⚠️  frontend_vanilla/package.json not found, skipping frontend dependency installation"
 fi
 
-# Configure frontend environment for dev container
-echo "🔧 Configuring frontend environment for dev container..."
-if [ -f "frontend_vanilla/.env" ]; then
-    # Update frontend .env to use relative URLs for Vite proxy (avoids CORS issues in dev container)
+# Create frontend .env file
+if [ ! -f "frontend_vanilla/.env" ]; then
+    echo "Creating frontend_vanilla/.env file..."
     cat > frontend_vanilla/.env << 'EOF'
-# Frontend Configuration
-# Environment variables must be prefixed with VITE_ to be accessible in the browser
+# =============================================================================
+# FRONTEND-SPECIFIC CONFIGURATION
+# Frontend service settings (all variables must be prefixed with VITE_)
+# =============================================================================
+
+# Backend API Configuration
 # Use relative URLs to leverage Vite's proxy configuration and avoid CORS issues
 VITE_APP_API_BASE_URL=/api/v1
 VITE_APP_WS_BASE_URL=/api/v1
+
+# Frontend Development Features
+VITE_USE_BACKEND_AGGREGATION=true
+VITE_DEBUG_LOGGING=false
 EOF
-    echo "   ✅ Updated frontend_vanilla/.env for dev container proxy configuration"
+    echo "   ✅ Created frontend_vanilla/.env for dev container proxy configuration"
 else
-    echo "⚠️  frontend_vanilla/.env not found, creating default configuration"
-    cat > frontend_vanilla/.env << 'EOF'
-# Frontend Configuration
-# Environment variables must be prefixed with VITE_ to be accessible in the browser
-# Use relative URLs to leverage Vite's proxy configuration and avoid CORS issues
-VITE_APP_API_BASE_URL=/api/v1
-VITE_APP_WS_BASE_URL=/api/v1
-EOF
-    echo "   ✅ Created frontend_vanilla/.env with dev container proxy configuration"
+    echo "   ✅ Frontend .env file already exists"
 fi
 
 # Ensure Vite config is properly set up for dev container
@@ -79,42 +78,130 @@ else
     echo "⚠️  package.json not found, skipping root dependency installation"
 fi
 
-# Create .env file if it doesn't exist
-echo "🔧 Setting up environment configuration..."
+# Create hierarchical .env files if they don't exist
+echo "🔧 Setting up hierarchical environment configuration..."
+
+# Create global .env file
 if [ ! -f ".env" ]; then
-    if [ -f ".env.docker.example" ]; then
-        cp .env.docker.example .env
-        echo "✅ Created .env from .env.docker.example"
-    elif [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo "✅ Created .env from .env.example"
-    else
-        echo "⚠️  .env.docker.example not found, creating basic .env file"
-        cat > .env << 'EOF'
-# OrderFox Development Environment
+    echo "Creating global .env file..."
+    cat > .env << 'EOF'
+# =============================================================================
+# GLOBAL PROJECT CONFIGURATION
+# Shared settings used across frontend, backend, and development tools
+# =============================================================================
+
+# Development Environment
 NODE_ENV=development
+
+# Container & Dev Container Configuration  
 DEVCONTAINER_MODE=true
-
-# Binance API Configuration (Required for trading functionality)
-BINANCE_API_KEY=your_binance_api_key_here
-BINANCE_SECRET_KEY=your_binance_secret_key_here
-
-# Development Settings
-DEBUG=true
-MAX_ORDERBOOK_LIMIT=5000
 PYTHONDONTWRITEBYTECODE=1
 PYTHONUNBUFFERED=1
-
-# Container-specific URLs
-FASTAPI_HOST=0.0.0.0
-FASTAPI_PORT=8000
-VITE_HOST=0.0.0.0
-VITE_PORT=3000
 WORKSPACE_FOLDER=/workspaces/orderfox
+PYTHONPATH=/workspaces/orderfox
+
+# Service Ports (used by both frontend and backend)
+FASTAPI_PORT=8000
+VITE_PORT=3000
+
+# Development Utilities
+WAIT_FOR_DEPS=true
 EOF
-    fi
+    echo "✅ Created global .env file"
 else
-    echo "✅ .env file already exists"
+    echo "✅ Global .env file already exists"
+fi
+
+# Create backend .env file
+if [ ! -f "backend/.env" ]; then
+    echo "Creating backend/.env file..."
+    
+    # Start with base configuration
+    cat > backend/.env << 'EOF'
+# =============================================================================
+# BACKEND-SPECIFIC CONFIGURATION
+# Backend service overrides and backend-only settings
+# =============================================================================
+
+# Server Configuration
+FASTAPI_HOST=0.0.0.0
+UVICORN_HOST=0.0.0.0
+UVICORN_RELOAD=true
+UVICORN_LOG_LEVEL=info
+
+# Development Environment (backend-specific)
+ENVIRONMENT=development
+
+# Backend Logging & Debugging
+DEBUG=false
+LOG_LEVEL=INFO
+CONSOLE_LOGGING=true
+REQUEST_LOGGING=false
+
+# Backend Features
+USE_DEPTH_CACHE_MANAGER=true
+SERVE_STATIC_FILES=true
+STATIC_FILES_PATH=../frontend_vanilla/dist
+
+# CORS Configuration
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://0.0.0.0:3000
+
+# WebSocket Configuration
+WS_HEARTBEAT_INTERVAL=30
+WS_TIMEOUT=60
+
+# Binance API Configuration (backend-specific endpoints)
+BINANCE_WS_BASE_URL=wss://fstream.binance.com
+BINANCE_API_BASE_URL=https://fapi.binance.com
+
+# Trading Configuration (backend business logic)
+PAPER_TRADING=true
+MAX_ORDERBOOK_LIMIT=5000
+
+# Firebase Configuration (backend-only)
+FIREBASE_PROJECT_ID=orderfox-dev
+FIREBASE_CONFIG_JSON=
+
+# Development/Testing API Keys (will be overridden by .env.local if it exists)
+BINANCE_API_KEY=your_binance_api_key_here
+BINANCE_SECRET_KEY=your_binance_secret_key_here
+EOF
+
+    # If backend/.env.local exists, append real API keys from it
+    if [ -f "backend/.env.local" ]; then
+        echo "🔑 Found backend/.env.local file, extracting API keys..."
+        
+        # Extract API keys from backend/.env.local and update backend/.env
+        if grep -q "BINANCE_API_KEY=" backend/.env.local; then
+            API_KEY=$(grep "^BINANCE_API_KEY=" backend/.env.local | cut -d'=' -f2-)
+            sed -i "s/BINANCE_API_KEY=.*/BINANCE_API_KEY=${API_KEY}/" backend/.env
+            echo "   ✅ Updated BINANCE_API_KEY from backend/.env.local"
+        fi
+        
+        if grep -q "BINANCE_SECRET_KEY=" backend/.env.local; then
+            SECRET_KEY=$(grep "^BINANCE_SECRET_KEY=" backend/.env.local | cut -d'=' -f2-)
+            sed -i "s/BINANCE_SECRET_KEY=.*/BINANCE_SECRET_KEY=${SECRET_KEY}/" backend/.env
+            echo "   ✅ Updated BINANCE_SECRET_KEY from backend/.env.local"
+        fi
+        
+        # Also apply any other backend overrides from backend/.env.local
+        echo "" >> backend/.env
+        echo "# Local overrides from backend/.env.local" >> backend/.env
+        while IFS= read -r line; do
+            if [[ $line =~ ^[A-Z_]+=.* ]] && [[ ! $line =~ ^BINANCE_(API_KEY|SECRET_KEY)= ]]; then
+                echo "$line" >> backend/.env
+                echo "   ✅ Applied backend override: $(echo $line | cut -d'=' -f1)"
+            fi
+        done < backend/.env.local
+        
+    else
+        echo "⚠️  backend/.env.local not found - using placeholder API keys"
+        echo "   Create backend/.env.local with real API keys (see backend/.env.local.example)"
+    fi
+    
+    echo "✅ Created backend/.env file"
+else
+    echo "✅ Backend .env file already exists"
 fi
 
 # Make scripts executable
@@ -334,13 +421,14 @@ fi
 echo "✅ Post-create setup completed successfully!"
 echo ""
 echo "🔧 Dev Container Configuration Applied:"
+echo "   • Hierarchical .env configuration: global (.env), backend (backend/.env), frontend (frontend_vanilla/.env)"
 echo "   • Frontend configured to use relative URLs (/api/v1) for Vite proxy"
 echo "   • WebSocket connections routed through Vite proxy to avoid CORS issues"
 echo "   • Environment variables set for Windows host → container connectivity"
 echo "   • HMR (Hot Module Reload) optimized for container environment"
 echo ""
 echo "📋 Next steps:"
-echo "1. Update .env file with your Binance API credentials"
+echo "1. (Optional) Create backend/.env.local with real API keys (see backend/.env.local.example)"
 echo "2. Services will start automatically via supervisord"
 echo "3. Access the application:"
 echo "   • Frontend: http://localhost:3000"
@@ -359,4 +447,10 @@ echo "   • Frontend uses Vite proxy for API calls to avoid CORS issues"
 echo "   • All requests from browser go through localhost:3000"
 echo "   • Vite automatically forwards API requests to backend (localhost:8000)"
 echo "   • WebSocket connections also proxied through Vite server"
+echo ""
+echo "🔑 API Key Management:"
+echo "   • Create backend/.env.local for real API keys (excluded from git)"
+echo "   • backend/.env.local.example shows the format"
+echo "   • Dev container automatically applies keys from backend/.env.local if present"
+echo "   • Fallback to placeholder keys if backend/.env.local doesn't exist"
 echo ""

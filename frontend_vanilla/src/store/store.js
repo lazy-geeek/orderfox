@@ -1,5 +1,6 @@
 
 import { API_BASE_URL } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 const state = {
   selectedSymbol: null,
@@ -49,7 +50,7 @@ function setState(newState) {
 // Helper functions (from marketDataSlice.ts)
 const validateAndFilterCandles = (candles) => {
   if (!Array.isArray(candles)) {
-    console.warn('Invalid candles data: not an array', candles);
+    logger.warn('Invalid candles data: not an array', candles);
     return [];
   }
 
@@ -66,7 +67,7 @@ const validateAndFilterCandles = (candles) => {
           timestamp = parseInt(candle.timestamp, 10);
         }
       } else {
-        console.warn(`Invalid timestamp format at index ${index}:`, candle.timestamp);
+        logger.warn(`Invalid timestamp format at index ${index}:`, candle.timestamp);
         return null;
       }
       
@@ -88,7 +89,7 @@ const validateAndFilterCandles = (candles) => {
         typeof parsedCandle.volume === 'number' && !isNaN(parsedCandle.volume) && parsedCandle.volume >= 0;
 
       if (!isValid) {
-        console.warn(`Skipping invalid candle data at index ${index} after parsing:`, candle, 'Parsed:', parsedCandle);
+        logger.warn(`Skipping invalid candle data at index ${index} after parsing:`, candle, 'Parsed:', parsedCandle);
         return null;
       }
       return parsedCandle;
@@ -98,7 +99,7 @@ const validateAndFilterCandles = (candles) => {
 
 const validateOrderBook = (orderBook) => {
   if (!orderBook || typeof orderBook !== 'object') {
-    console.warn('Invalid order book data: not an object', orderBook);
+    logger.warn('Invalid order book data: not an object', orderBook);
     return null;
   }
 
@@ -165,7 +166,7 @@ const validateOrderBook = (orderBook) => {
 
 const validateTicker = (ticker) => {
   if (!ticker || typeof ticker !== 'object') {
-    console.warn('Invalid ticker data: not an object', ticker);
+    logger.warn('Invalid ticker data: not an object', ticker);
     return null;
   }
 
@@ -188,7 +189,7 @@ const validateTicker = (ticker) => {
 
   const lastPrice = parseFloat(ticker.last);
   if (isNaN(lastPrice)) {
-    console.warn(`❌ Invalid ticker data: 'last' price is required but not a valid number`, ticker.last, 'Full ticker:', ticker);
+    logger.warn(`❌ Invalid ticker data: 'last' price is required but not a valid number`, ticker.last, 'Full ticker:', ticker);
     return null;
   }
 
@@ -308,10 +309,20 @@ function updateOrderBookFromWebSocket(payload) {
   const validatedOrderBook = validateOrderBook(payload);
   if (validatedOrderBook) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
+      // Additional validation: check if incoming data matches current expected parameters
+      // This prevents old WebSocket data from overriding correct data during parameter changes
+      if (validatedOrderBook.aggregated && state.selectedRounding !== null) {
+        // For aggregated data, validate rounding parameter matches current selection
+        if (validatedOrderBook.rounding && Math.abs(validatedOrderBook.rounding - state.selectedRounding) > 0.001) {
+          logger.debug(`Skipping WebSocket update with mismatched rounding: received ${validatedOrderBook.rounding}, expected ${state.selectedRounding}`);
+          return;
+        }
+      }
+      
       state.currentOrderBook = validatedOrderBook;
       notify('currentOrderBook');
     } else {
-      console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
+      logger.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
     }
   }
 }
@@ -319,14 +330,14 @@ function updateOrderBookFromWebSocket(payload) {
 function updateCandlesFromWebSocket(payload) {
   const incomingData = payload;
   if (state.selectedSymbol && incomingData.symbol && incomingData.symbol !== state.selectedSymbol) {
-    console.warn('Received candle for different symbol, skipping update:', incomingData.symbol, 'vs', state.selectedSymbol);
+    logger.warn('Received candle for different symbol, skipping update:', incomingData.symbol, 'vs', state.selectedSymbol);
     return;
   }
 
   const [newCandle] = validateAndFilterCandles([incomingData]);
   
   if (!newCandle) {
-    console.warn('Received invalid candle from WebSocket, skipping update:', incomingData);
+    logger.warn('Received invalid candle from WebSocket, skipping update:', incomingData);
     return;
   }
 
@@ -363,7 +374,7 @@ function updateTickerFromWebSocket(payload) {
       state.currentTicker = validatedTicker;
       notify('currentTicker');
     } else {
-      console.warn('Received ticker for different symbol, skipping update:', validatedTicker.symbol, 'vs', state.selectedSymbol);
+      logger.warn('Received ticker for different symbol, skipping update:', validatedTicker.symbol, 'vs', state.selectedSymbol);
     }
   }
 }
@@ -501,13 +512,33 @@ async function fetchOrderBook(symbol, limit) {
   try {
     // Use valid Binance limit if limit is provided
     const validLimit = limit ? getValidOrderBookLimit(limit) : null;
-    const params = validLimit ? `?limit=${validLimit}` : '';
-    const response = await fetch(`${API_BASE_URL}/orderbook/${symbol}${params}`);
+    
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (validLimit) {
+      params.append('limit', validLimit);
+    }
+    
+    // Check if backend aggregation is enabled
+    const { featureFlags } = await import('../services/featureFlags.js');
+    if (featureFlags.useBackendAggregation()) {
+      params.append('aggregate', 'true');
+      // Use current rounding if available, otherwise let backend use default
+      if (state.selectedRounding) {
+        params.append('rounding', state.selectedRounding);
+      }
+    }
+    
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/orderbook/${symbol}${queryString ? '?' + queryString : ''}`;
+    
+    const response = await fetch(url);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || 'Failed to fetch order book');
     }
     const data = await response.json();
+    
     const validatedOrderBook = validateOrderBook(data);
     if (validatedOrderBook) {
       state.currentOrderBook = validatedOrderBook;

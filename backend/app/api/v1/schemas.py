@@ -77,7 +77,8 @@ class OrderBook(BaseModel):
     Schema for order book data.
 
     Contains the current state of the order book for a symbol,
-    including bids, asks, and timestamp.
+    including bids, asks, and timestamp. Optionally includes
+    aggregation metadata when backend aggregation is used.
     """
 
     symbol: str = Field(..., description="Trading symbol")
@@ -90,6 +91,15 @@ class OrderBook(BaseModel):
     timestamp: int = Field(
         ...,
         description="Unix timestamp in milliseconds when the order book was captured",
+    )
+    aggregated: Optional[bool] = Field(
+        False, description="Whether this data has been aggregated by the backend"
+    )
+    rounding: Optional[float] = Field(
+        None, description="Price rounding multiple used for aggregation"
+    )
+    source: Optional[str] = Field(
+        None, description="Data source identifier (e.g., 'ccxtpro', 'depth_cache')"
     )
 
     model_config = ConfigDict(

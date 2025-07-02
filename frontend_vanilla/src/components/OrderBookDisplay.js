@@ -1,5 +1,6 @@
 
 import { featureFlags } from '../services/featureFlags.js';
+import { logger } from '../utils/logger.js';
 
 function createOrderBookDisplay() {
   const container = document.createElement('div');
@@ -94,7 +95,7 @@ function updateOrderBookDisplayNew(container, data) {
       displayAggregatedOrderBook(container, orderBook, data);
     } else if (orderBook && orderBook.asks && orderBook.bids) {
       // Fallback to legacy aggregation if backend data isn't aggregated
-      console.warn('Backend aggregation enabled but received raw data, falling back to frontend aggregation');
+      logger.warn('Backend aggregation enabled but received raw data, falling back to frontend aggregation');
       displayLegacyOrderBook(container, orderBook, data);
     } else {
       asksList.innerHTML = '<div class="empty-state">No order book data</div>';
@@ -180,33 +181,25 @@ function updateCommonUI(container, data) {
     depthSelect.value = displayDepth;
   }
 
-  // Update rounding options (only shown in legacy mode)
+  // Update rounding options (shown in both backend and legacy modes)
   const roundingSelect = container.querySelector('#rounding-select');
   if (roundingSelect) {
-    if (featureFlags.useBackendAggregation()) {
-      // Hide rounding selector in backend aggregation mode
-      const roundingContainer = container.querySelector('.rounding-selector-container');
-      if (roundingContainer) {
-        roundingContainer.style.display = 'none';
-      }
-    } else {
-      // Show and populate rounding selector in legacy mode
-      const roundingContainer = container.querySelector('.rounding-selector-container');
-      if (roundingContainer) {
-        roundingContainer.style.display = 'block';
-      }
-      
-      roundingSelect.innerHTML = '';
-      availableRoundingOptions.forEach(option => {
-        const optionEl = document.createElement('option');
-        optionEl.value = option;
-        optionEl.textContent = option;
-        if (option === selectedRounding) {
-          optionEl.selected = true;
-        }
-        roundingSelect.appendChild(optionEl);
-      });
+    // Always show rounding selector - it's needed for both modes
+    const roundingContainer = container.querySelector('.rounding-selector-container');
+    if (roundingContainer) {
+      roundingContainer.style.display = 'block';
     }
+    
+    roundingSelect.innerHTML = '';
+    availableRoundingOptions.forEach(option => {
+      const optionEl = document.createElement('option');
+      optionEl.value = option;
+      optionEl.textContent = option;
+      if (option === selectedRounding) {
+        optionEl.selected = true;
+      }
+      roundingSelect.appendChild(optionEl);
+    });
   }
 }
 
@@ -220,29 +213,49 @@ function displayAggregatedOrderBook(container, orderBook, data) {
 
   // Backend has already provided aggregated data
   const { asks, bids, rounding, source } = orderBook;
+  const { displayDepth } = data;
+  const effectiveDepth = displayDepth || 10;
 
-  // Display asks (should be pre-sorted by backend)
-  asks.forEach((ask, index) => {
+  // Filter out zero amounts just in case they slip through
+  const filteredAsks = asks.filter(ask => ask.amount > 0);
+  const filteredBids = bids.filter(bid => bid.amount > 0);
+
+  // Limit displayed levels to user's selected depth
+  const displayAsks = filteredAsks.slice(0, effectiveDepth);
+  const displayBids = filteredBids.slice(0, effectiveDepth);
+
+  // Display asks (should be pre-sorted by backend, limit to displayDepth)
+  displayAsks.forEach((ask, index) => {
+    // Calculate cumulative total for frontend display
+    const cumulativeTotal = displayAsks
+      .slice(index)
+      .reduce((sum, level) => sum + level.amount, 0);
+    
     const row = document.createElement('div');
     row.className = 'order-level ask-level';
     
     row.innerHTML = `
       <span class="price ask-price">${formatPrice(ask.price, rounding)}</span>
       <span class="amount">${formatAmount(ask.amount)}</span>
-      <span class="total">${formatTotal(ask.cumulative || ask.amount)}</span>
+      <span class="total">${formatTotal(cumulativeTotal)}</span>
     `;
     asksList.appendChild(row);
   });
 
-  // Display bids (should be pre-sorted by backend)
-  bids.forEach((bid, index) => {
+  // Display bids (should be pre-sorted by backend, limit to displayDepth)
+  displayBids.forEach((bid, index) => {
+    // Calculate cumulative total for frontend display
+    const cumulativeTotal = displayBids
+      .slice(0, index + 1)
+      .reduce((sum, level) => sum + level.amount, 0);
+    
     const row = document.createElement('div');
     row.className = 'order-level bid-level';
     
     row.innerHTML = `
       <span class="price bid-price">${formatPrice(bid.price, rounding)}</span>
       <span class="amount">${formatAmount(bid.amount)}</span>
-      <span class="total">${formatTotal(bid.cumulative || bid.amount)}</span>
+      <span class="total">${formatTotal(cumulativeTotal)}</span>
     `;
     bidsList.appendChild(row);
   });
@@ -257,7 +270,7 @@ function displayAggregatedOrderBook(container, orderBook, data) {
   infoDiv.className = 'aggregation-info';
   infoDiv.innerHTML = `
     <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
-      🚀 Backend aggregation enabled (${source || 'unknown'}, rounding: ${rounding})
+      🚀 Backend aggregation enabled (${source || 'unknown'}, ${effectiveDepth} levels, rounding: ${rounding})
     </small>
   `;
   
@@ -328,21 +341,23 @@ function displayLegacyOrderBook(container, orderBook, data) {
     const hasInsufficientData = orderBook.asks.length < minRequiredRawData || orderBook.bids.length < minRequiredRawData;
     
     if (hasInsufficientData) {
-      console.warn(`Limited market depth for ${selectedSymbol} at $${effectiveRounding} rounding.`);
-      console.warn(`Raw data: ${orderBook.asks.length} asks, ${orderBook.bids.length} bids. Recommended: ${minRequiredRawData}+`);
+      logger.debug(`Limited market depth for ${selectedSymbol} at $${effectiveRounding} rounding.`);
+      logger.debug(`Raw data: ${orderBook.asks.length} asks, ${orderBook.bids.length} bids. Recommended: ${minRequiredRawData}+`);
     }
 
     // Get exactly the needed number of levels for asks and bids
     const aggregatedAsks = getExactLevels(orderBook.asks, true);
     const aggregatedBids = getExactLevels(orderBook.bids, false);
     
-    // Smart market depth feedback and adaptive UI
+    // Check if we have data to display
+    if (aggregatedAsks.length > 0 && aggregatedBids.length > 0) {
+      // Smart market depth feedback and adaptive UI
     const actualLevels = Math.min(aggregatedAsks.length, aggregatedBids.length);
     const isMarketDepthLimited = actualLevels < effectiveDepth;
     
     if (isMarketDepthLimited) {
-      console.info(`📊 Market depth limited: ${actualLevels}/${effectiveDepth} levels for ${selectedSymbol} at $${effectiveRounding} rounding`);
-      console.info(`💡 This is normal for high rounding values - actual market orders may only exist within a narrow price range`);
+      logger.debug(`📊 Market depth limited: ${actualLevels}/${effectiveDepth} levels for ${selectedSymbol} at $${effectiveRounding} rounding`);
+      logger.debug(`💡 This is normal for high rounding values - actual market orders may only exist within a narrow price range`);
       
       // Add market depth indicator to UI
       const depthIndicator = container.querySelector('.market-depth-indicator') || (() => {
@@ -447,12 +462,10 @@ function displayLegacyOrderBook(container, orderBook, data) {
         asksSection.after(warningDiv);
       }
     }
-    
-    } else {
-      // Show empty state if no data
-      asksList.innerHTML = '<div class="empty-state">No order book data</div>';
-      bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
-    }
+  } else {
+    // Show empty state if no data
+    asksList.innerHTML = '<div class="empty-state">No order book data</div>';
+    bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
   }
 
 

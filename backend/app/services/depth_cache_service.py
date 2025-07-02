@@ -12,6 +12,7 @@ from binance import AsyncClient, DepthCacheManager
 
 from app.core.config import settings
 from app.core.logging_config import get_logger
+from app.services.symbol_service import symbol_service
 
 logger = get_logger("depth_cache_service")
 
@@ -113,10 +114,18 @@ class DepthCacheService:
         retry_delay = 5
         retry_count = 0
         
+        # Convert symbol from exchange format (BTC/USDT:USDT) to Binance format (BTCUSDT)
+        binance_symbol = symbol_service.resolve_exchange_to_id_format(symbol)
+        if not binance_symbol:
+            logger.error(f"Could not convert symbol {symbol} to Binance format")
+            return
+        
+        logger.info(f"Using Binance symbol '{binance_symbol}' for exchange symbol '{symbol}'")
+        
         while symbol in self.callbacks and self.callbacks[symbol]:
             try:
-                # Create DepthCacheManager for this symbol
-                dcm = DepthCacheManager(self.client, symbol)
+                # Create DepthCacheManager for this symbol using Binance format
+                dcm = DepthCacheManager(self.client, binance_symbol)
                 self.depth_caches[symbol] = dcm
                 
                 logger.info(f"Connecting to depth cache stream for {symbol}")
@@ -309,8 +318,12 @@ class DepthCacheService:
         
         # Close client connection
         if self.client:
-            await self.client.close_connection()
-            self.client = None
+            try:
+                await self.client.close_connection()
+            except Exception as e:
+                logger.warning(f"Error closing client connection: {e}")
+            finally:
+                self.client = None
             
         self._initialized = False
         logger.info("DepthCacheService shutdown complete")

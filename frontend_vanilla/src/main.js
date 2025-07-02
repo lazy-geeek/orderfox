@@ -145,20 +145,25 @@ orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) =
   const dynamicLimit = Math.max(1000, newDepth * 100);
   const validLimit = getValidOrderBookLimit(dynamicLimit);
   
+  // Immediately disconnect WebSocket to prevent race condition
+  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  
   // Clear order book to prevent old data display
   clearOrderBook();
   
   // Re-fetch order book with valid limit to get enough data for aggregation
   fetchOrderBook(state.selectedSymbol, validLimit);
   
-  // Restart WebSocket connection with new limit
-  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  // Restart WebSocket connection with new limit - reduced delay
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit, state.selectedRounding);
-  }, 500); // 500ms delay to allow cleanup
+  }, 200); // Reduced to 200ms delay
 });
 
 orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
+  // Immediately disconnect WebSocket to prevent race condition
+  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  
   setSelectedRounding(Number(e.target.value));
   // Use maximum depth for comprehensive aggregation at higher rounding values
   const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
@@ -170,11 +175,10 @@ orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e
   // Re-fetch order book with valid limit
   fetchOrderBook(state.selectedSymbol, validLimit);
   
-  // Restart WebSocket connection with current limit
-  disconnectWebSocketStream('orderbook', state.selectedSymbol);
+  // Restart WebSocket connection with current limit - reduced delay
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit, state.selectedRounding);
-  }, 500); // 500ms delay to allow cleanup
+  }, 200); // Reduced to 200ms delay
 });
 
 
