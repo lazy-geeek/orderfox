@@ -78,7 +78,7 @@ class OrderBookAggregationService:
             effective_rounding: Price rounding value
             
         Returns:
-            List of aggregated levels with exactly effective_depth items
+            List of aggregated levels with exactly effective_depth items (or fewer if not enough non-zero levels)
         """
         buckets = {}
         
@@ -108,22 +108,33 @@ class OrderBookAggregationService:
         if effective_rounding >= 1.0:
             logger.debug(f"Buckets after aggregation: {list(buckets.keys())[:10]}")  # Show first 10 prices
         
-        # Convert to list and sort, with more aggressive zero filtering
-        levels = [{'price': price, 'amount': amount} 
-                 for price, amount in buckets.items() 
-                 if amount > 1e-8]  # More aggressive zero filtering for floating point precision
+        # Convert to list with aggressive zero filtering BEFORE sorting
+        # This ensures we only work with non-zero levels
+        levels = []
+        for price, amount in buckets.items():
+            # Use a more aggressive threshold to catch floating point precision issues
+            if amount > 1e-6:  # Changed from 1e-8 to 1e-6 for even more aggressive filtering
+                levels.append({'price': price, 'amount': amount})
         
         # Sort: asks ascending (lowest first), bids descending (highest first)
         levels.sort(key=lambda x: x['price'], reverse=not is_ask)
         
-        # Take exactly effective_depth levels and ensure no zeros made it through
-        filtered_levels = [level for level in levels[:effective_depth] if level['amount'] > 1e-8]
+        # Now take exactly effective_depth levels - all are guaranteed to be non-zero
+        result_levels = levels[:effective_depth]
         
-        # Debug logging final result
-        if effective_rounding >= 1.0:
-            logger.debug(f"Final {'asks' if is_ask else 'bids'} levels: {[(l['price'], l['amount']) for l in filtered_levels[:5]]}")
+        # Final verification - ensure no zeros slipped through due to floating point issues
+        result_levels = [level for level in result_levels if level['amount'] > 1e-6]
         
-        return filtered_levels
+        # Debug logging final result only when there's an issue
+        if len(result_levels) < effective_depth:
+            # Use debug level for empty orderbooks (0 levels), warning for partial data
+            if len(result_levels) == 0:
+                logger.debug(f"[ORDERBOOK_AGGREGATION] Empty {'asks' if is_ask else 'bids'}: requested={effective_depth}, rounding={effective_rounding}")
+            else:
+                logger.warning(f"[ORDERBOOK_AGGREGATION] Insufficient {'asks' if is_ask else 'bids'} levels: requested={effective_depth}, got={len(result_levels)}, "
+                              f"rounding={effective_rounding}")
+        
+        return result_levels
     
     def calculate_cumulative_totals(self, levels: List[Dict], is_ask: bool) -> List[Dict]:
         """
@@ -251,19 +262,48 @@ class OrderBookAggregationService:
         if cached_result:
             return cached_result
         
-        # Get snapshot with more data for aggregation
-        snapshot = await orderbook.get_snapshot(limit * 50)  # 50x multiplier for aggregation
+        # Start with a reasonable multiplier and increase if needed
+        multiplier = max(100, int(rounding * 100)) if rounding >= 1 else 100
+        max_attempts = 5
+        attempt = 0
         
-        # Convert to the format expected by aggregation functions
-        raw_bids = [{'price': level.price, 'amount': level.amount} for level in snapshot.bids]
-        raw_asks = [{'price': level.price, 'amount': level.amount} for level in snapshot.asks]
+        while attempt < max_attempts:
+            # Get snapshot with current multiplier
+            snapshot = await orderbook.get_snapshot(limit * multiplier)
+            
+            # Convert to the format expected by aggregation functions
+            # Filter out any potential zeros at this stage as well
+            raw_bids = [{'price': level.price, 'amount': level.amount} 
+                       for level in snapshot.bids if level.amount > 1e-10]
+            raw_asks = [{'price': level.price, 'amount': level.amount} 
+                       for level in snapshot.asks if level.amount > 1e-10]
+            
+            # Get aggregated levels
+            aggregated_bids = self.get_exact_levels(raw_bids, False, limit, rounding)
+            aggregated_asks = self.get_exact_levels(raw_asks, True, limit, rounding)
+            
+            # Check if we have enough non-zero levels
+            if len(aggregated_bids) >= limit and len(aggregated_asks) >= limit:
+                # We have enough levels, proceed
+                break
+            else:
+                # Not enough levels, increase multiplier and try again
+                logger.debug(f"[ORDERBOOK_AGGREGATION] Fetching more data for {orderbook.symbol}: "
+                            f"current levels: bids={len(aggregated_bids)}, asks={len(aggregated_asks)}, requested={limit}")
+                multiplier *= 2
+                attempt += 1
+        
+        # If we still don't have enough levels after max attempts, log appropriately
+        if len(aggregated_bids) < limit or len(aggregated_asks) < limit:
+            # Use debug for completely empty orderbooks (initial load), warning for partial data
+            if len(aggregated_bids) == 0 and len(aggregated_asks) == 0:
+                logger.debug(f"[ORDERBOOK_AGGREGATION] Empty orderbook for {orderbook.symbol} after {max_attempts} attempts")
+            else:
+                logger.warning(f"[ORDERBOOK_AGGREGATION] Could not get {limit} levels for {orderbook.symbol} after {max_attempts} attempts. "
+                              f"Got bids={len(aggregated_bids)}, asks={len(aggregated_asks)}")
         
         # Analyze market depth
         market_depth_info = self.analyze_market_depth(raw_bids, raw_asks, limit, rounding)
-        
-        # Get aggregated levels
-        aggregated_bids = self.get_exact_levels(raw_bids, False, limit, rounding)
-        aggregated_asks = self.get_exact_levels(raw_asks, True, limit, rounding)
         
         # Calculate cumulative totals for bids (highest to lowest)
         bids_with_cumulative = self.calculate_cumulative_totals(aggregated_bids, False)
@@ -271,6 +311,9 @@ class OrderBookAggregationService:
         # For asks: reverse order first (highest price at top), then calculate cumulative
         aggregated_asks.reverse()  # Now highest price first
         asks_with_cumulative = self.calculate_cumulative_totals(aggregated_asks, True)
+        
+        # Final verification - no additional zero filtering needed since get_exact_levels already filters
+        # The backend guarantees to send only non-zero levels
         
         # Build result
         result = {
@@ -282,6 +325,13 @@ class OrderBookAggregationService:
             'rounding': rounding,
             'market_depth_info': market_depth_info
         }
+        
+        # Final verification log - check if any zeros in the result
+        zero_bids_in_result = [b for b in result['bids'] if b['amount'] <= 1e-6]
+        zero_asks_in_result = [a for a in result['asks'] if a['amount'] <= 1e-6]
+        if zero_bids_in_result or zero_asks_in_result:
+            logger.error(f"[ZERO_CHECK] CRITICAL: Zeros found in final result for {orderbook.symbol}! "
+                        f"Zero bids: {zero_bids_in_result}, Zero asks: {zero_asks_in_result}")
         
         
         # Cache the result

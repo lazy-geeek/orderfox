@@ -124,6 +124,7 @@ export const connectWebSocketStream = async (
         setCandlesWsConnected(true);
       } else if (streamType === 'orderbook') {
         setOrderBookWsConnected(true);
+        // Note: orderBookLoading will be set to false when first message arrives
       } else if (streamType === 'ticker') {
         setTickerWsConnected(true);
       }
@@ -344,30 +345,22 @@ function checkAndRefreshConnections() {
   if (staleConnections.length > 0) {
     console.log(`Found ${staleConnections.length} stale WebSocket connections, reconnecting...`);
     staleConnections.forEach(streamKey => {
-      // Parse streamKey to extract connection details
-      const parts = streamKey.split('-');
-      if (parts.length >= 2) {
-        const streamType = parts[0];
-        const symbol = parts[1];
-        const timeframe = parts.length > 2 ? parts[2] : null;
-        
-        // Clean up old connection
-        delete activeWebSockets[streamKey];
-        delete connectionAttempts[streamKey];
-        delete lastConnectionAttempt[streamKey];
-        delete connectionInProgress[streamKey];
-        delete lastMessageTime[streamKey];
-        
-        // Reconnect after a short delay using saved parameters
-        setTimeout(() => {
-          const params = connectionParams[streamKey];
-          if (params) {
-            connectWebSocketStream(params.symbol, params.streamType, params.timeframe, params.limit, params.rounding);
-          } else {
-            console.error(`Missing connection params for ${streamKey}, cannot reconnect without parameters`);
-          }
-        }, 1000);
-      }
+      // Clean up old connection
+      delete activeWebSockets[streamKey];
+      delete connectionAttempts[streamKey];
+      delete lastConnectionAttempt[streamKey];
+      delete connectionInProgress[streamKey];
+      delete lastMessageTime[streamKey];
+      
+      // Reconnect after a short delay using saved parameters
+      setTimeout(() => {
+        const params = connectionParams[streamKey];
+        if (params) {
+          connectWebSocketStream(params.symbol, params.streamType, params.timeframe, params.limit, params.rounding);
+        } else {
+          console.error(`Missing connection params for ${streamKey}, cannot reconnect without parameters`);
+        }
+      }, 1000);
     });
   }
 }

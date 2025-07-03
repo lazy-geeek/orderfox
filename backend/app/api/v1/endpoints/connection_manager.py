@@ -430,20 +430,29 @@ class ConnectionManager:
                 websocket = metadata.get('websocket')
                 
                 if websocket:
-                    # Format for frontend
-                    formatted_data = {
-                        "type": "orderbook_update",
-                        "symbol": symbol_to_send,
-                        "bids": aggregated_data['bids'],
-                        "asks": aggregated_data['asks'],
-                        "timestamp": aggregated_data['timestamp'],
-                        "rounding": aggregated_data['rounding'],
-                        "rounding_options": aggregated_data.get('rounding_options', []),
-                        "market_depth_info": aggregated_data.get('market_depth_info', {}),
-                        "aggregated": True  # Indicate this is pre-aggregated data
-                    }
+                    # Only send data if we have at least some levels
+                    # Don't send empty orderbooks during initial loading
+                    bids = aggregated_data.get('bids', [])
+                    asks = aggregated_data.get('asks', [])
                     
-                    await websocket.send_text(json.dumps(formatted_data))
+                    if len(bids) > 0 and len(asks) > 0:
+                        # Format for frontend
+                        formatted_data = {
+                            "type": "orderbook_update",
+                            "symbol": symbol_to_send,
+                            "bids": bids,
+                            "asks": asks,
+                            "timestamp": aggregated_data['timestamp'],
+                            "rounding": aggregated_data['rounding'],
+                            "rounding_options": aggregated_data.get('rounding_options', []),
+                            "market_depth_info": aggregated_data.get('market_depth_info', {}),
+                            "aggregated": True  # Indicate this is pre-aggregated data
+                        }
+                        
+                        await websocket.send_text(json.dumps(formatted_data))
+                    else:
+                        # Log once that we're waiting for data
+                        logger.debug(f"Waiting for orderbook data for {connection_id} (bids={len(bids)}, asks={len(asks)})")
             
         except Exception as e:
             logger.error(f"Error broadcasting aggregated orderbook for {connection_id}: {e}")
@@ -468,11 +477,42 @@ class ConnectionManager:
                 return
 
             try:
-                # Use a large limit to get comprehensive market data for aggregation
-                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=1000)
-                logger.info(f"Exchange connection test successful for {symbol}")
+                # Fetch initial orderbook data with large limit for aggregation
+                logger.info(f"Fetching initial orderbook data for {symbol}")
+                initial_orderbook_data = await exchange_pro.fetch_order_book(symbol, limit=1000)
+                
+                # Convert to OrderBook model format
+                bid_levels = [
+                    OrderBookLevel(price=float(bid[0]), amount=float(bid[1]))
+                    for bid in initial_orderbook_data["bids"]
+                    if float(bid[1]) > 0  # Filter zero amounts
+                ]
+                
+                ask_levels = [
+                    OrderBookLevel(price=float(ask[0]), amount=float(ask[1]))
+                    for ask in initial_orderbook_data["asks"]
+                    if float(ask[1]) > 0  # Filter zero amounts
+                ]
+                
+                # Create initial snapshot
+                import time
+                initial_snapshot = OrderBookSnapshot(
+                    symbol=symbol,
+                    bids=bid_levels,
+                    asks=ask_levels,
+                    timestamp=initial_orderbook_data.get("timestamp", int(time.time() * 1000))
+                )
+                
+                # Update orderbook with initial data
+                await orderbook.update_snapshot(initial_snapshot)
+                
+                # Immediately broadcast aggregated initial data to all connections
+                # This will apply each connection's specific limit and rounding parameters
+                await self._broadcast_to_all_symbol_connections(symbol)
+                logger.info(f"Initial orderbook populated and sent for {symbol} with {len(bid_levels)} bids and {len(ask_levels)} asks")
+                
             except Exception as e:
-                logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")
+                logger.error(f"Failed to fetch initial orderbook for {symbol}: {str(e)}")
                 logger.info(f"Falling back to mock orderbook data for {symbol}")
                 await self._stream_mock_orderbook_aggregated(symbol)
                 return
@@ -620,7 +660,7 @@ class ConnectionManager:
                 return
 
             try:
-                test_ticker = await exchange_pro.fetch_ticker(symbol)
+                initial_ticker = await exchange_pro.fetch_ticker(symbol)
                 logger.info(f"Exchange connection test successful for ticker {symbol}")
             except Exception as e:
                 logger.error(
@@ -738,7 +778,7 @@ class ConnectionManager:
                 return
 
             try:
-                test_candles = await exchange_pro.fetch_ohlcv(
+                initial_candles = await exchange_pro.fetch_ohlcv(
                     symbol, timeframe, limit=1
                 )
                 logger.info(
