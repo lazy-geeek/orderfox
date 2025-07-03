@@ -152,32 +152,28 @@ function updateOrderBookDisplay(container, data) {
       asksList.innerHTML = '';
       bidsList.innerHTML = '';
 
-      // Use pre-aggregated data from backend
-      const displayAsks = orderBook.asks.slice().reverse(); // Backend sends lowest to highest, reverse for display
-      const displayBids = orderBook.bids; // Backend sends highest to lowest
-
-      // Display asks (highest price at top) - backend provides pre-aggregated data with cumulative totals
-      displayAsks.forEach((ask) => {
+      // Display asks exactly as received from backend
+      orderBook.asks.forEach((ask) => {
         const row = document.createElement('div');
         row.className = 'order-level ask-level';
         
         row.innerHTML = `
           <span class="price ask-price">${formatPrice(ask.price)}</span>
           <span class="amount">${formatAmount(ask.amount)}</span>
-          <span class="total">${formatTotal(ask.cumulative)}</span>
+          <span class="total">${formatTotal(ask.cumulative || 0)}</span>
         `;
         asksList.appendChild(row);
       });
 
-      // Display bids (highest price first) - backend provides pre-aggregated data with cumulative totals
-      displayBids.forEach((bid) => {
+      // Display bids exactly as received from backend
+      orderBook.bids.forEach((bid) => {
         const row = document.createElement('div');
         row.className = 'order-level bid-level';
         
         row.innerHTML = `
           <span class="price bid-price">${formatPrice(bid.price)}</span>
           <span class="amount">${formatAmount(bid.amount)}</span>
-          <span class="total">${formatTotal(bid.cumulative)}</span>
+          <span class="total">${formatTotal(bid.cumulative || 0)}</span>
         `;
         bidsList.appendChild(row);
       });

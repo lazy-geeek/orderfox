@@ -144,13 +144,20 @@ export const connectWebSocketStream = async (
           updateTickerFromWebSocket(data);
         } else if (data.type === 'param_update_ack') {
           console.log('Parameter update acknowledged:', data);
+        } else if (data.type === 'params_updated') {
+          console.log('Parameter update successful:', data);
+        } else if (data.type === 'error') {
+          console.error('WebSocket error message:', data.message);
         } else {
-          if (streamType === 'candles') {
-            updateCandlesFromWebSocket(data);
-          } else if (streamType === 'orderbook') {
+          // Only process known orderbook_update messages in fallback
+          if (streamType === 'orderbook' && data.type === 'orderbook_update') {
             updateOrderBookFromWebSocket(data);
-          } else if (streamType === 'ticker') {
+          } else if (streamType === 'candles' && data.type === 'candle_update') {
+            updateCandlesFromWebSocket(data);
+          } else if (streamType === 'ticker' && data.type === 'ticker_update') {
             updateTickerFromWebSocket(data);
+          } else {
+            console.warn('Unknown WebSocket message type:', data.type, 'for stream:', streamType, data);
           }
         }
       } catch (error) {

@@ -5,7 +5,7 @@ This module provides FastAPI HTTP endpoints for fetching market data including
 symbols, order books, and candlestick data from the exchange.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, HTTPException, Query
 from app.api.v1.schemas import SymbolInfo, OrderBook, OrderBookLevel, Candle
 from app.services.exchange_service import exchange_service
@@ -108,6 +108,19 @@ async def get_symbols():
                     f"pricePrecision could not be determined for {market['symbol']}"
                 )
 
+            # Get current price from ticker for rounding calculation
+            current_price = None
+            if ticker and "last" in ticker and ticker["last"]:
+                try:
+                    current_price = float(ticker["last"])
+                except (ValueError, TypeError):
+                    current_price = None
+
+            # Get rounding options from symbol service with current price
+            symbol_info = symbol_service.get_symbol_info(market["id"], current_price)
+            rounding_options = symbol_info.get("roundingOptions", []) if symbol_info else []
+            default_rounding = symbol_info.get("defaultRounding", 0.01) if symbol_info else 0.01
+
             symbols.append(
                 SymbolInfo(
                     id=market["id"],
@@ -117,6 +130,8 @@ async def get_symbols():
                     ui_name=f"{market['base']}/{market['quote']}",
                     volume24h=volume24h,
                     pricePrecision=price_precision,
+                    roundingOptions=rounding_options,
+                    defaultRounding=default_rounding,
                 )
             )
 

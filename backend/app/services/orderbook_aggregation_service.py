@@ -82,6 +82,10 @@ class OrderBookAggregationService:
         """
         buckets = {}
         
+        # Debug logging for rounding issues
+        if effective_rounding >= 1.0:
+            logger.debug(f"Aggregating {'asks' if is_ask else 'bids'} with rounding={effective_rounding}, raw_data_count={len(raw_data)}")
+        
         # Aggregate all raw data into price buckets
         for item in raw_data:
             price = item.get('price', 0)
@@ -93,85 +97,40 @@ class OrderBookAggregationService:
             rounded_price = (self.round_up(price, effective_rounding) 
                            if is_ask else self.round_down(price, effective_rounding))
             
+            # Debug logging for rounding issues
+            if effective_rounding >= 1.0 and len(buckets) < 5:
+                logger.debug(f"Price {price} -> rounded to {rounded_price} (rounding={effective_rounding})")
+            
             existing_amount = buckets.get(rounded_price, 0)
             buckets[rounded_price] = existing_amount + amount
         
-        # Convert to list and sort
+        # Debug logging for rounding issues
+        if effective_rounding >= 1.0:
+            logger.debug(f"Buckets after aggregation: {list(buckets.keys())[:10]}")  # Show first 10 prices
+        
+        # Convert to list and sort, with more aggressive zero filtering
         levels = [{'price': price, 'amount': amount} 
                  for price, amount in buckets.items() 
-                 if amount > 0]
+                 if amount > 1e-8]  # More aggressive zero filtering for floating point precision
         
         # Sort: asks ascending (lowest first), bids descending (highest first)
         levels.sort(key=lambda x: x['price'], reverse=not is_ask)
         
-        # Take exactly effective_depth levels
-        return levels[:effective_depth]
-    
-    def calculate_rounding_options(self, symbol_id: str, price_precision: Optional[int] = None,
-                                 current_price: Optional[float] = None) -> Tuple[List[float], float]:
-        """
-        Calculate available rounding options for a symbol.
-        Ported from frontend calculateAndSetRoundingOptions function.
+        # Take exactly effective_depth levels and ensure no zeros made it through
+        filtered_levels = [level for level in levels[:effective_depth] if level['amount'] > 1e-8]
         
-        Args:
-            symbol_id: Symbol identifier
-            price_precision: Price precision for the symbol
-            current_price: Current market price
-            
-        Returns:
-            Tuple of (rounding_options, default_rounding)
-        """
-        if not symbol_id:
-            return [], 0.01
+        # Debug logging final result
+        if effective_rounding >= 1.0:
+            logger.debug(f"Final {'asks' if is_ask else 'bids'} levels: {[(l['price'], l['amount']) for l in filtered_levels[:5]]}")
         
-        # Calculate baseRounding from pricePrecision
-        base_rounding = 1 / (10 ** (price_precision or 2))
-        
-        # Generate options array starting with baseRounding
-        options = [base_rounding]
-        
-        # If no current price, use conservative estimates based on symbol name
-        if not current_price:
-            if 'BTC' in symbol_id.upper():
-                current_price = 50000
-            elif 'ETH' in symbol_id.upper():
-                current_price = 3000
-            elif 'USDT' in symbol_id.upper() or 'USDC' in symbol_id.upper():
-                current_price = 10  # Conservative for altcoins
-            else:
-                current_price = 100  # Default conservative estimate
-        
-        # Generate additional options by multiplying by 10
-        next_option = base_rounding
-        while len(options) < 7:  # Maximum 7 options
-            next_option = next_option * 10
-            
-            # Stop if rounding becomes more than 1/10th of current price
-            if next_option > current_price / 10:
-                break
-                
-            # Safety net for absolute maximum
-            if next_option > 1000:
-                break
-                
-            options.append(next_option)
-        
-        # Set default rounding (third item if available, or second, or first)
-        if len(options) >= 3:
-            default_rounding = options[2]
-        elif len(options) >= 2:
-            default_rounding = options[1]
-        else:
-            default_rounding = base_rounding
-        
-        return options, default_rounding
+        return filtered_levels
     
     def calculate_cumulative_totals(self, levels: List[Dict], is_ask: bool) -> List[Dict]:
         """
         Calculate cumulative totals for order book levels.
         
         Args:
-            levels: List of aggregated levels
+            levels: List of aggregated levels (asks should be highest-first, bids highest-first)
             is_ask: Whether this is ask data
             
         Returns:
@@ -180,16 +139,16 @@ class OrderBookAggregationService:
         result = []
         
         if is_ask:
-            # For asks, cumulative total is from current level to end
+            # For asks (highest price first), cumulative total is from top down (running total)
             for i, level in enumerate(levels):
-                cumulative_total = sum(l['amount'] for l in levels[i:])
+                cumulative_total = sum(l['amount'] for l in levels[:i+1])
                 result.append({
                     'price': level['price'],
                     'amount': level['amount'],
                     'cumulative': cumulative_total
                 })
         else:
-            # For bids, cumulative total is from top down
+            # For bids (highest price first), cumulative total is from top down
             for i, level in enumerate(levels):
                 cumulative_total = sum(l['amount'] for l in levels[:i+1])
                 result.append({
@@ -306,24 +265,12 @@ class OrderBookAggregationService:
         aggregated_bids = self.get_exact_levels(raw_bids, False, limit, rounding)
         aggregated_asks = self.get_exact_levels(raw_asks, True, limit, rounding)
         
-        # Calculate cumulative totals
+        # Calculate cumulative totals for bids (highest to lowest)
         bids_with_cumulative = self.calculate_cumulative_totals(aggregated_bids, False)
+        
+        # For asks: reverse order first (highest price at top), then calculate cumulative
+        aggregated_asks.reverse()  # Now highest price first
         asks_with_cumulative = self.calculate_cumulative_totals(aggregated_asks, True)
-        
-        # For asks display, reverse the order (highest price at top)
-        asks_with_cumulative.reverse()
-        
-        # Calculate rounding options
-        current_price = None
-        if raw_bids:
-            current_price = raw_bids[0]['price']
-        elif raw_asks:
-            current_price = raw_asks[0]['price']
-        
-        price_precision = symbol_data.get('pricePrecision') if symbol_data else None
-        rounding_options, default_rounding = self.calculate_rounding_options(
-            orderbook.symbol, price_precision, current_price
-        )
         
         # Build result
         result = {
@@ -333,10 +280,9 @@ class OrderBookAggregationService:
             'timestamp': orderbook.timestamp,
             'limit': limit,
             'rounding': rounding,
-            'rounding_options': rounding_options,
-            'default_rounding': default_rounding,
             'market_depth_info': market_depth_info
         }
+        
         
         # Cache the result
         await self._set_cache(cache_key, result)
@@ -375,18 +321,18 @@ class OrderBookAggregationService:
         
         # Calculate rounding options for this symbol
         current_price = None
-        if orderbook.latest_snapshot:
+        try:
             snapshot = await orderbook.get_snapshot(1)
             if snapshot.bids:
                 current_price = snapshot.bids[0].price
             elif snapshot.asks:
                 current_price = snapshot.asks[0].price
+        except Exception:
+            # If orderbook is empty or has issues, current_price will remain None
+            pass
         
-        price_precision = symbol_data.get('pricePrecision') if symbol_data else None
-        rounding_options, _ = self.calculate_rounding_options(symbol, price_precision, current_price)
-        
-        # Take first 3 most common rounding values for warming
-        common_roundings = rounding_options[:3] if len(rounding_options) >= 3 else rounding_options
+        # Use common rounding values for cache warming
+        common_roundings = [0.01, 0.1, 1.0]  # Standard rounding values
         
         # Pre-calculate and cache common combinations
         for limit in common_limits:

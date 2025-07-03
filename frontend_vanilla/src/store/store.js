@@ -199,10 +199,16 @@ function setSelectedSymbol(symbol) {
     state.candlesWsConnected = false;
     state.orderBookWsConnected = false;
     state.tickerWsConnected = false;
-    state.selectedRounding = null;
-    state.availableRoundingOptions = [];
     
-    // Rounding options will be provided by backend via WebSocket
+    // Set rounding options from symbol data
+    const selectedSymbolData = state.symbolsList.find(s => s.id === symbol);
+    if (selectedSymbolData && selectedSymbolData.roundingOptions) {
+      state.availableRoundingOptions = selectedSymbolData.roundingOptions;
+      state.selectedRounding = selectedSymbolData.defaultRounding || selectedSymbolData.roundingOptions[2] || selectedSymbolData.roundingOptions[0];
+    } else {
+      state.selectedRounding = null;
+      state.availableRoundingOptions = [];
+    }
   }
   notify('selectedSymbol');
   notify('currentOrderBook');
@@ -228,20 +234,7 @@ function updateOrderBookFromWebSocket(payload) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
       state.currentOrderBook = validatedOrderBook;
       
-      // Update rounding options if provided by backend
-      if (validatedOrderBook.rounding_options && Array.isArray(validatedOrderBook.rounding_options)) {
-        state.availableRoundingOptions = validatedOrderBook.rounding_options;
-        
-        // Set default rounding if not already set
-        if (!state.selectedRounding && validatedOrderBook.rounding_options.length > 0) {
-          // Use middle option as default, or first if less than 3 options
-          const defaultIndex = validatedOrderBook.rounding_options.length >= 3 ? 2 : 0;
-          state.selectedRounding = validatedOrderBook.rounding_options[defaultIndex];
-          notify('selectedRounding');
-        }
-        
-        notify('availableRoundingOptions');
-      }
+      // Rounding options are now set from symbols data, not from WebSocket
       
       notify('currentOrderBook');
     } else {

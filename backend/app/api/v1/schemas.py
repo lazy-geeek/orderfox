@@ -39,6 +39,12 @@ class SymbolInfo(BaseModel):
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
     )
+    roundingOptions: Optional[List[float]] = Field(
+        None, description="Available rounding options for this symbol"
+    )
+    defaultRounding: Optional[float] = Field(
+        None, description="Default rounding value for this symbol"
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,
