@@ -9,14 +9,14 @@ const state = {
   candlesLoading: false,
   candlesError: null,
   candlesWsConnected: false,
-  currentOrderBook: { bids: [], asks: [], symbol: '', timestamp: 0 },
+  currentOrderBook: { bids: [], asks: [], symbol: '', timestamp: 0 }, // Pre-aggregated data from backend
   orderBookLoading: false,
   orderBookError: null,
   orderBookWsConnected: false,
   currentTicker: null,
   tickerWsConnected: false,
   selectedRounding: null,
-  availableRoundingOptions: [],
+  availableRoundingOptions: [], // Provided by backend
   displayDepth: 10,
   tradingMode: 'paper',
   isSubmittingTrade: false,
@@ -129,7 +129,11 @@ const validateOrderBook = (orderBook) => {
       ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
       ask.price > 0 && ask.amount > 0
     ),
-    timestamp
+    timestamp,
+    // Preserve additional fields from backend aggregation
+    rounding_options: orderBook.rounding_options || null,
+    market_depth_info: orderBook.market_depth_info || null,
+    source: orderBook.source || null
   };
 };
 
@@ -183,63 +187,7 @@ const validateTicker = (ticker) => {
 };
 
 // Mutator functions (equivalent to Redux reducers and actions)
-function calculateAndSetRoundingOptions(symbolId) {
-  if (!symbolId) {
-    setAvailableRoundingOptions([], null);
-    return;
-  }
-
-  const selectedSymbolData = state.symbolsList.find(symbol => symbol.id === symbolId);
-  if (!selectedSymbolData) {
-    setAvailableRoundingOptions([], null);
-    return;
-  }
-
-  // Calculate baseRounding from pricePrecision (same logic as React frontend)
-  const baseRounding = 1 / (10 ** (selectedSymbolData.pricePrecision || 2));
-
-  // Generate options array starting with baseRounding
-  const options = [baseRounding];
-  
-  // Get current price for stopping condition (use highest bid, ticker, or estimate from symbol data)
-  let currentPrice = state.currentOrderBook?.bids?.[0]?.price || 
-                    state.currentTicker?.last ||
-                    null;
-  
-  // If no price data available, use a conservative estimate based on symbol name patterns
-  if (!currentPrice) {
-    // For major pairs, use rough estimates to prevent excessive rounding options
-    if (symbolId.includes('BTC')) currentPrice = 50000;
-    else if (symbolId.includes('ETH')) currentPrice = 3000;
-    else if (symbolId.includes('USDT') || symbolId.includes('USDC')) currentPrice = 10; // Conservative for altcoins
-    else currentPrice = 100; // Default conservative estimate
-  }
-  
-  // Generate additional options by multiplying by 10, with stricter price-based limits
-  let nextOption = baseRounding;
-  while (options.length < 7) { // Maximum 7 options as a sensible limit
-    nextOption = nextOption * 10;
-    
-    // Much stricter condition: stop if rounding becomes more than 1/10th of current price
-    // This ensures we don't show $100 rounding for a $2.7 token
-    if (nextOption > currentPrice / 10) {
-      break;
-    }
-    
-    // Also keep the absolute maximum as a safety net
-    if (nextOption > 1000) {
-      break;
-    }
-    
-    options.push(nextOption);
-  }
-
-  // Set the calculated options with third item as default (if available), or second, or first
-  const defaultRounding = options.length >= 3 ? options[2] : 
-                          options.length >= 2 ? options[1] : 
-                          baseRounding;
-  setAvailableRoundingOptions(options, defaultRounding);
-}
+// calculateAndSetRoundingOptions removed - now handled by backend
 
 function setSelectedSymbol(symbol) {
   const previousSymbol = state.selectedSymbol;
@@ -254,7 +202,7 @@ function setSelectedSymbol(symbol) {
     state.selectedRounding = null;
     state.availableRoundingOptions = [];
     
-    // Rounding options will be calculated after fetchOrderBook provides current price data
+    // Rounding options will be provided by backend via WebSocket
   }
   notify('selectedSymbol');
   notify('currentOrderBook');
@@ -279,6 +227,22 @@ function updateOrderBookFromWebSocket(payload) {
   if (validatedOrderBook) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
       state.currentOrderBook = validatedOrderBook;
+      
+      // Update rounding options if provided by backend
+      if (validatedOrderBook.rounding_options && Array.isArray(validatedOrderBook.rounding_options)) {
+        state.availableRoundingOptions = validatedOrderBook.rounding_options;
+        
+        // Set default rounding if not already set
+        if (!state.selectedRounding && validatedOrderBook.rounding_options.length > 0) {
+          // Use middle option as default, or first if less than 3 options
+          const defaultIndex = validatedOrderBook.rounding_options.length >= 3 ? 2 : 0;
+          state.selectedRounding = validatedOrderBook.rounding_options[defaultIndex];
+          notify('selectedRounding');
+        }
+        
+        notify('availableRoundingOptions');
+      }
+      
       notify('currentOrderBook');
     } else {
       console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
@@ -415,24 +379,21 @@ function addToTradeHistory(trade) {
   notify('tradeHistory');
 }
 
-// Helper function to get valid Binance orderbook limit
+// Helper function to validate display depth limit
 function getValidOrderBookLimit(desiredLimit) {
-  // Binance API supports: 5, 10, 20, 50, 100, 500, 1000 (max for futures)
-  const validLimits = [5, 10, 20, 50, 100, 500, 1000];
+  // Backend now handles all orderbook depth logic, just return the display limit
+  // Valid display limits: 5, 10, 20, 50
+  const validLimits = [5, 10, 20, 50];
   
-  // For higher rounding values, use maximum depth (1000) to get best market coverage
-  // This helps address market depth limitations at wider price ranges
-  const minimumLimit = Math.max(100, desiredLimit * 50); // Use aggressive multiplier for depth
-  
-  // Find the smallest valid limit that's >= minimum limit
-  for (const limit of validLimits) {
-    if (limit >= minimumLimit) {
-      return limit;
-    }
+  // Return the desired limit if it's valid, otherwise return closest valid limit
+  if (validLimits.includes(desiredLimit)) {
+    return desiredLimit;
   }
   
-  // Always return maximum limit (1000) for best market depth coverage
-  return 1000;
+  // Find closest valid limit
+  return validLimits.reduce((prev, curr) => 
+    Math.abs(curr - desiredLimit) < Math.abs(prev - desiredLimit) ? curr : prev
+  );
 }
 
 // Async functions (equivalent to Redux thunks)
@@ -469,7 +430,7 @@ async function fetchOrderBook(symbol, limit) {
   notify('orderBookLoading');
   notify('orderBookError');
   try {
-    // Use valid Binance limit if limit is provided
+    // Use display limit if provided (backend handles raw data fetching)
     const validLimit = limit ? getValidOrderBookLimit(limit) : null;
     const params = validLimit ? `?limit=${validLimit}` : '';
     const response = await fetch(`${API_BASE_URL}/orderbook/${symbol}${params}`);
@@ -482,12 +443,7 @@ async function fetchOrderBook(symbol, limit) {
     if (validatedOrderBook) {
       state.currentOrderBook = validatedOrderBook;
       
-      // Calculate rounding options now that we have current price data from orderbook
-      if (symbol === state.selectedSymbol && state.availableRoundingOptions.length === 0) {
-        calculateAndSetRoundingOptions(symbol);
-        // Notify orderbook update again so display refreshes with new rounding selection
-        notify('currentOrderBook');
-      }
+      // Rounding options are now provided by backend via WebSocket
     } else {
       state.orderBookError = 'Received invalid order book data from server';
     }

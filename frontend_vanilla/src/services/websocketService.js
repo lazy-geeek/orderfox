@@ -15,6 +15,7 @@ const connectionAttempts = {};
 const lastConnectionAttempt = {};
 const connectionInProgress = {};
 const lastMessageTime = {};
+const connectionParams = {};
 let isPageVisible = !document.hidden;
 
 
@@ -22,9 +23,12 @@ export const connectWebSocketStream = async (
   symbol,
   streamType,
   timeframe,
-  limit
+  limit,
+  rounding = null
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
+  
+  connectionParams[streamKey] = { symbol, streamType, timeframe, limit, rounding };
   
   const cleanWsBaseUrl = WS_BASE_URL.replace(/\/$/, '');
   
@@ -35,6 +39,9 @@ export const connectWebSocketStream = async (
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
     if (streamType === 'orderbook' && limit) {
       wsUrl += `?limit=${limit}`;
+      if (rounding) {
+        wsUrl += `&rounding=${rounding}`;
+      }
     }
   }
 
@@ -135,6 +142,8 @@ export const connectWebSocketStream = async (
           updateOrderBookFromWebSocket(data);
         } else if (data.type === 'ticker_update') {
           updateTickerFromWebSocket(data);
+        } else if (data.type === 'param_update_ack') {
+          console.log('Parameter update acknowledged:', data);
         } else {
           if (streamType === 'candles') {
             updateCandlesFromWebSocket(data);
@@ -189,7 +198,12 @@ export const connectWebSocketStream = async (
           console.log(`Attempting to reconnect WebSocket for ${streamKey} in ${reconnectDelay}ms...`);
           setTimeout(() => {
             if (!activeWebSockets[streamKey]) {
-              connectWebSocketStream(symbol, streamType, timeframe);
+              const params = connectionParams[streamKey];
+              if (params) {
+                connectWebSocketStream(params.symbol, params.streamType, params.timeframe, params.limit, params.rounding);
+              } else {
+                console.error(`Missing connection params for ${streamKey}, cannot reconnect without parameters`);
+              }
             }
           }, reconnectDelay);
         } else if (event.code === 1006) {
@@ -210,6 +224,29 @@ export const connectWebSocketStream = async (
       setOrderBookWsConnected(false);
     }
   }
+};
+
+export const sendWebSocketMessage = (streamType, symbol, timeframe, message) => {
+  const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
+  const ws = activeWebSockets[streamKey];
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message));
+    console.log(`Sent WebSocket message for ${streamKey}:`, message);
+    return true;
+  } else {
+    console.warn(`Cannot send message to ${streamKey}: WebSocket not open`);
+    return false;
+  }
+};
+
+export const updateOrderBookParameters = (symbol, limit, rounding) => {
+  const message = {
+    type: 'update_params',
+    limit: limit,
+    rounding: rounding
+  };
+  return sendWebSocketMessage('orderbook', symbol, null, message);
 };
 
 export const disconnectWebSocketStream = (
@@ -234,6 +271,7 @@ export const disconnectWebSocketStream = (
   delete lastConnectionAttempt[streamKey];
   delete connectionInProgress[streamKey];
   delete lastMessageTime[streamKey];
+  delete connectionParams[streamKey];
 };
 
 export const disconnectAllWebSockets = () => {
@@ -249,6 +287,7 @@ export const disconnectAllWebSockets = () => {
   Object.keys(lastConnectionAttempt).forEach(key => delete lastConnectionAttempt[key]);
   Object.keys(connectionInProgress).forEach(key => delete connectionInProgress[key]);
   Object.keys(lastMessageTime).forEach(key => delete lastMessageTime[key]);
+  Object.keys(connectionParams).forEach(key => delete connectionParams[key]);
 };
 
 // Handle page visibility changes to manage WebSocket connections when tab is not focused
@@ -312,9 +351,14 @@ function checkAndRefreshConnections() {
         delete connectionInProgress[streamKey];
         delete lastMessageTime[streamKey];
         
-        // Reconnect after a short delay
+        // Reconnect after a short delay using saved parameters
         setTimeout(() => {
-          connectWebSocketStream(symbol, streamType, timeframe);
+          const params = connectionParams[streamKey];
+          if (params) {
+            connectWebSocketStream(params.symbol, params.streamType, params.timeframe, params.limit, params.rounding);
+          } else {
+            console.error(`Missing connection params for ${streamKey}, cannot reconnect without parameters`);
+          }
         }, 1000);
       }
     });

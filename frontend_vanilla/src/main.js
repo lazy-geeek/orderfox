@@ -29,13 +29,13 @@ import {
   setCandlesWsConnected,
   setOrderBookWsConnected,
   setTickerWsConnected,
-  getValidOrderBookLimit,
 } from './store/store.js';
 
 import {
   connectWebSocketStream,
   disconnectWebSocketStream,
   disconnectAllWebSockets,
+  updateOrderBookParameters,
 } from './services/websocketService.js';
 
 // Initialize theme before rendering
@@ -113,16 +113,13 @@ symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
   // Re-fetch data and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-  // Use maximum depth (5000) to get deepest possible market coverage for aggregation
-  const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
-  const validLimit = getValidOrderBookLimit(dynamicLimit);
-  fetchOrderBook(state.selectedSymbol, validLimit);
+  fetchOrderBook(state.selectedSymbol, state.displayDepth);
   disconnectAllWebSockets(); // Disconnect all old streams
   
   // Introduce a delay to allow old WebSockets to fully close
   setTimeout(() => {
     connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
+    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
   }, 500); // 500ms delay
 });
 
@@ -140,41 +137,30 @@ candlestickChartContainer.prepend(timeframeSelector);
 
 orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
   const newDepth = Number(e.target.value);
-  setDisplayDepth(newDepth);
-  // Use maximum depth for comprehensive market coverage
-  const dynamicLimit = Math.max(1000, newDepth * 100);
-  const validLimit = getValidOrderBookLimit(dynamicLimit);
   
-  // Clear order book to prevent old data display
-  clearOrderBook();
-  
-  // Re-fetch order book with valid limit to get enough data for aggregation
-  fetchOrderBook(state.selectedSymbol, validLimit);
-  
-  // Restart WebSocket connection with new limit
-  disconnectWebSocketStream('orderbook', state.selectedSymbol);
-  setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
-  }, 500); // 500ms delay to allow cleanup
+  // Send parameter update via WebSocket first
+  const success = updateOrderBookParameters(state.selectedSymbol, newDepth, state.selectedRounding);
+  if (success) {
+    setDisplayDepth(newDepth);
+  } else {
+    console.error('Failed to update orderbook depth - WebSocket not connected');
+    // Reset selector to previous value
+    e.target.value = state.displayDepth;
+  }
 });
 
 orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
-  setSelectedRounding(Number(e.target.value));
-  // Use maximum depth for comprehensive aggregation at higher rounding values
-  const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
-  const validLimit = getValidOrderBookLimit(dynamicLimit);
+  const newRounding = Number(e.target.value);
   
-  // Clear order book to prevent old data display
-  clearOrderBook();
-  
-  // Re-fetch order book with valid limit
-  fetchOrderBook(state.selectedSymbol, validLimit);
-  
-  // Restart WebSocket connection with current limit
-  disconnectWebSocketStream('orderbook', state.selectedSymbol);
-  setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, validLimit);
-  }, 500); // 500ms delay to allow cleanup
+  // Send parameter update via WebSocket first  
+  const success = updateOrderBookParameters(state.selectedSymbol, state.displayDepth, newRounding);
+  if (success) {
+    setSelectedRounding(newRounding);
+  } else {
+    console.error('Failed to update orderbook rounding - WebSocket not connected');
+    // Reset selector to previous value
+    e.target.value = state.selectedRounding;
+  }
 });
 
 
@@ -192,14 +178,12 @@ fetchSymbols().then(() => {
     
     // Fetch initial data for the selected symbol
     fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
-    const dynamicLimit = Math.max(1000, (state.displayDepth || 10) * 100);
-    const validLimit = getValidOrderBookLimit(dynamicLimit);
-    fetchOrderBook(firstSymbol.id, validLimit);
+    fetchOrderBook(firstSymbol.id, state.displayDepth);
     
     // Start WebSocket connections for the selected symbol
     setTimeout(() => {
       connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
-      connectWebSocketStream(firstSymbol.id, 'orderbook', null, validLimit);
+      connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);
     }, 500);
   }
 });
