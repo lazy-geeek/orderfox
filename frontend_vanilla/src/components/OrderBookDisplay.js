@@ -107,20 +107,7 @@ function updateOrderBookDisplay(container, data) {
     });
   }
 
-  // Helper functions for rounding and formatting
-  const roundDown = (value, multiple) => {
-    if (multiple <= 0) return value;
-    // Handle floating point precision by scaling up, rounding, then scaling down
-    const scale = 1 / multiple;
-    return Math.floor(value * scale) / scale;
-  };
-
-  const roundUp = (value, multiple) => {
-    if (multiple <= 0) return value;
-    // Handle floating point precision by scaling up, rounding, then scaling down
-    const scale = 1 / multiple;
-    return Math.ceil(value * scale) / scale;
-  };
+  // Helper functions for formatting
 
   const formatPrice = (price) => {
     if (selectedRounding && selectedRounding > 0) {
@@ -165,163 +152,56 @@ function updateOrderBookDisplay(container, data) {
       asksList.innerHTML = '';
       bidsList.innerHTML = '';
 
-    // Get current market price (use highest bid or lowest ask)
-    const currentPrice = orderBook.bids?.[0]?.price || orderBook.asks?.[0]?.price;
-    
-    if (!currentPrice) {
-      return; // No price data available
-    }
+      // Use pre-aggregated data from backend
+      const displayAsks = orderBook.asks.slice().reverse(); // Backend sends lowest to highest, reverse for display
+      const displayBids = orderBook.bids; // Backend sends highest to lowest
 
-    const effectiveDepth = displayDepth || 10;
-    const effectiveRounding = selectedRounding || 0.01;
+      // Display asks (highest price at top) - backend provides pre-aggregated data with cumulative totals
+      displayAsks.forEach((ask) => {
+        const row = document.createElement('div');
+        row.className = 'order-level ask-level';
+        
+        row.innerHTML = `
+          <span class="price ask-price">${formatPrice(ask.price)}</span>
+          <span class="amount">${formatAmount(ask.amount)}</span>
+          <span class="total">${formatTotal(ask.cumulative)}</span>
+        `;
+        asksList.appendChild(row);
+      });
 
-    // Helper function to get exactly the needed number of levels with volume
-    const getExactLevels = (rawData, isAsk) => {
-      const buckets = new Map();
-      
-      // Aggregate all raw data into price buckets
-      rawData.forEach((item) => {
-        const roundedPrice = isAsk 
-          ? roundUp(item.price, effectiveRounding)
-          : roundDown(item.price, effectiveRounding);
-        const existingAmount = buckets.get(roundedPrice) || 0;
-        buckets.set(roundedPrice, existingAmount + item.amount);
+      // Display bids (highest price first) - backend provides pre-aggregated data with cumulative totals
+      displayBids.forEach((bid) => {
+        const row = document.createElement('div');
+        row.className = 'order-level bid-level';
+        
+        row.innerHTML = `
+          <span class="price bid-price">${formatPrice(bid.price)}</span>
+          <span class="amount">${formatAmount(bid.amount)}</span>
+          <span class="total">${formatTotal(bid.cumulative)}</span>
+        `;
+        bidsList.appendChild(row);
       });
       
-      // Convert to array and sort
-      const sortedLevels = Array.from(buckets.entries())
-        .map(([price, amount]) => ({ price, amount }))
-        .filter(level => level.amount > 0)
-        .sort((a, b) => isAsk ? a.price - b.price : b.price - a.price);
+      // Handle market depth information from backend
+      const existingInfo = container.querySelector('.market-depth-info');
+      if (existingInfo) {
+        existingInfo.remove();
+      }
+      
+      if (orderBook.market_depth_info && orderBook.market_depth_info.insufficient_levels) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'market-depth-info';
+        infoDiv.innerHTML = `
+          <small style="color: #f39c12; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
+            ⚠️ ${orderBook.market_depth_info.message || 'Limited market depth at current rounding'}
+          </small>
+        `;
         
-      // Take exactly effectiveDepth levels
-      return sortedLevels.slice(0, effectiveDepth);
-    };
-
-    // Enhanced market depth validation and user feedback
-    const minRequiredRawData = effectiveDepth * 10; // Reasonable multiplier for aggregation
-    const hasInsufficientData = orderBook.asks.length < minRequiredRawData || orderBook.bids.length < minRequiredRawData;
-    
-    if (hasInsufficientData) {
-      console.warn(`Limited market depth for ${selectedSymbol} at $${effectiveRounding} rounding.`);
-      console.warn(`Raw data: ${orderBook.asks.length} asks, ${orderBook.bids.length} bids. Recommended: ${minRequiredRawData}+`);
-    }
-
-    // Get exactly the needed number of levels for asks and bids
-    const aggregatedAsks = getExactLevels(orderBook.asks, true);
-    const aggregatedBids = getExactLevels(orderBook.bids, false);
-    
-    // Smart market depth feedback and adaptive UI
-    const actualLevels = Math.min(aggregatedAsks.length, aggregatedBids.length);
-    const isMarketDepthLimited = actualLevels < effectiveDepth;
-    
-    if (isMarketDepthLimited) {
-      console.info(`📊 Market depth limited: ${actualLevels}/${effectiveDepth} levels for ${selectedSymbol} at $${effectiveRounding} rounding`);
-      console.info(`💡 This is normal for high rounding values - actual market orders may only exist within a narrow price range`);
-      
-      // Add market depth indicator to UI
-      const depthIndicator = container.querySelector('.market-depth-indicator') || (() => {
-        const indicator = document.createElement('div');
-        indicator.className = 'market-depth-indicator';
-        const depthSelector = container.querySelector('.depth-selector');
-        if (depthSelector) {
-          depthSelector.appendChild(indicator);
+        const asksSection = container.querySelector('.asks-section');
+        if (asksSection) {
+          asksSection.after(infoDiv);
         }
-        return indicator;
-      })();
-      
-      depthIndicator.innerHTML = `
-        <span class="depth-warning">⚠️ Limited market depth: ${actualLevels}/${effectiveDepth} levels</span>
-        <span class="depth-hint">Try smaller rounding for more levels</span>
-      `;
-      depthIndicator.style.display = 'block';
-    } else {
-      // Remove depth indicator if we have sufficient levels
-      const depthIndicator = container.querySelector('.market-depth-indicator');
-      if (depthIndicator) {
-        depthIndicator.style.display = 'none';
       }
-    }
-
-    // Prepare for display
-    const displayAsks = aggregatedAsks.reverse(); // Reverse so highest price is at top
-    const displayBids = aggregatedBids; // Already sorted highest to lowest
-
-    // Display asks (reverse order for display, highest price at top)
-    displayAsks.forEach((ask, index) => {
-      // Calculate cumulative total from current index to end
-      const cumulativeTotal = displayAsks
-        .slice(index)
-        .reduce((sum, level) => sum + level.amount, 0);
-      
-      const row = document.createElement('div');
-      row.className = 'order-level ask-level';
-      
-      row.innerHTML = `
-        <span class="price ask-price">${formatPrice(ask.price)}</span>
-        <span class="amount">${formatAmount(ask.amount)}</span>
-        <span class="total">${formatTotal(cumulativeTotal)}</span>
-      `;
-      asksList.appendChild(row);
-    });
-
-    // Display bids (highest price first)
-    displayBids.forEach((bid, index) => {
-      // Calculate cumulative total from top down
-      const cumulativeTotal = displayBids
-        .slice(0, index + 1)
-        .reduce((sum, level) => sum + level.amount, 0);
-      
-      const row = document.createElement('div');
-      row.className = 'order-level bid-level';
-      
-      row.innerHTML = `
-        <span class="price bid-price">${formatPrice(bid.price)}</span>
-        <span class="amount">${formatAmount(bid.amount)}</span>
-        <span class="total">${formatTotal(cumulativeTotal)}</span>
-      `;
-      bidsList.appendChild(row);
-    });
-    
-    // Remove any existing info message
-    const existingInfo = container.querySelector('.market-depth-info');
-    if (existingInfo) {
-      existingInfo.remove();
-    }
-    
-    // Show info when using Binance partial depth streams
-    if (orderBook.source === 'binance_partial_depth') {
-      const infoDiv = document.createElement('div');
-      infoDiv.className = 'market-depth-info';
-      infoDiv.innerHTML = `
-        <small style="color: #28a745; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
-          📊 Using Binance partial depth stream (${orderBook.depth_level} levels) for optimal aggregation
-        </small>
-      `;
-      
-      // Insert info after the asks section
-      const asksSection = container.querySelector('.asks-section');
-      if (asksSection) {
-        asksSection.after(infoDiv);
-      }
-    }
-    
-    // Show warning only if we have very few levels (which should now be rare)
-    else if (aggregatedAsks.length < Math.min(5, effectiveDepth) || aggregatedBids.length < Math.min(5, effectiveDepth)) {
-      const warningDiv = document.createElement('div');
-      warningDiv.className = 'market-depth-info';
-      warningDiv.innerHTML = `
-        <small style="color: #f39c12; font-style: italic; padding: 4px 8px; display: block; text-align: center;">
-          ⚠️ Limited levels: ${Math.min(aggregatedAsks.length, aggregatedBids.length)} levels at $${effectiveRounding} rounding
-        </small>
-      `;
-      
-      // Insert warning after the asks section
-      const asksSection = container.querySelector('.asks-section');
-      if (asksSection) {
-        asksSection.after(warningDiv);
-      }
-    }
     
     } else {
       // Show empty state if no data
