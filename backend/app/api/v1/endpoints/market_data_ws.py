@@ -20,22 +20,39 @@ router = APIRouter()
 
 
 @router.websocket("/ws/orderbook/{symbol}")
-async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Query(default=20, ge=5, le=5000)):
+async def websocket_orderbook(
+    websocket: WebSocket, 
+    symbol: str, 
+    limit: int = Query(default=20, ge=5, le=5000),
+    rounding: float = Query(default=0.01, gt=0)
+):
     """
-    WebSocket endpoint for real-time order book updates.
+    WebSocket endpoint for real-time aggregated order book updates.
 
     Args:
         websocket: WebSocket connection
         symbol: Trading symbol (e.g., 'BTCUSDT')
         limit: Number of order book levels to stream (default: 20, max: 5000)
+        rounding: Price rounding value for aggregation (default: 0.01, must be > 0)
 
     The WebSocket will send JSON messages with the following format:
     {
         "type": "orderbook_update",
         "symbol": "BTCUSDT",
-        "bids": [{"price": 50000.0, "amount": 1.5}, ...],
-        "asks": [{"price": 50100.0, "amount": 2.0}, ...],
-        "timestamp": 1640995200000
+        "bids": [{"price": 50000.0, "amount": 1.5, "cumulative": 1.5}, ...],
+        "asks": [{"price": 50100.0, "amount": 2.0, "cumulative": 2.0}, ...],
+        "timestamp": 1640995200000,
+        "rounding": 0.01,
+        "rounding_options": [0.01, 0.1, 1, 10, 100],
+        "market_depth_info": {"actual_levels": 20, "requested_levels": 20},
+        "aggregated": true
+    }
+
+    Parameter update messages can be sent:
+    {
+        "type": "update_params",
+        "limit": 50,
+        "rounding": 1.0
     }
 
     Error messages have the format:
@@ -73,11 +90,35 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
             f"Using exchange symbol: {exchange_symbol} for WebSocket symbol: {symbol}"
         )
 
-        # Validate and clamp limit parameter
-        limit = max(5, min(limit, 1000))  # Ensure limit is between 5 and 1000
+        # Validate and clamp limit parameter (handle Query object in tests)
+        limit_value = limit if isinstance(limit, int) else (limit.default if hasattr(limit, 'default') else 20)
+        limit = max(5, min(limit_value, 1000))  # Ensure limit is between 5 and 1000
         
-        # Connect to the connection manager using the exchange symbol and limit
-        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol, limit)
+        # Validate rounding parameter (handle Query object in tests)
+        rounding_value = rounding if isinstance(rounding, (int, float)) else (rounding.default if hasattr(rounding, 'default') else 0.01)
+        rounding = max(0.0001, rounding_value)  # Ensure minimum rounding value
+        
+        # Populate symbol data for optimal aggregation
+        try:
+            symbol_info = symbol_service.get_symbol_info(exchange_symbol)
+            if symbol_info and hasattr(symbol_info, 'pricePrecision') and symbol_info.pricePrecision is not None:
+                # Import here to avoid circular imports
+                from app.services.orderbook_manager import orderbook_manager
+                
+                symbol_data = {
+                    'pricePrecision': symbol_info.pricePrecision,
+                    'symbol': symbol_info.symbol,
+                    'base_asset': getattr(symbol_info, 'base_asset', None),
+                    'quote_asset': getattr(symbol_info, 'quote_asset', None)
+                }
+                await orderbook_manager.update_symbol_data(exchange_symbol, symbol_data)
+                logger.info(f"Updated symbol data for {exchange_symbol} with pricePrecision={symbol_info.pricePrecision}")
+        except Exception as e:
+            logger.warning(f"Could not populate symbol data for {exchange_symbol}: {e}")
+            # Continue without symbol data - fallbacks will handle this
+
+        # Connect to the connection manager using the exchange symbol, limit, and rounding
+        await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol, limit, rounding)
         logger.info(
             f"WebSocket orderbook streaming started for {symbol} (exchange: {exchange_symbol})"
         )
@@ -101,9 +142,20 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
                         if "text" in message:
                             try:
                                 data = json.loads(message["text"])
-                                if data.get("type") == "ping":
+                                message_type = data.get("type")
+                                
+                                if message_type == "ping":
                                     await websocket.send_text(
                                         json.dumps({"type": "pong"})
+                                    )
+                                elif message_type == "update_params":
+                                    # Handle parameter updates
+                                    await connection_manager.handle_websocket_message(
+                                        websocket, exchange_symbol, data
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Unknown message type '{message_type}' received from client for {symbol}"
                                     )
                             except json.JSONDecodeError:
                                 logger.warning(
@@ -122,7 +174,7 @@ async def websocket_orderbook(websocket: WebSocket, symbol: str, limit: int = Qu
         except WebSocketDisconnect:
             logger.debug(f"WebSocket orderbook client disconnected for {symbol}")
         finally:
-            connection_manager.disconnect_orderbook(websocket, exchange_symbol)
+            await connection_manager.disconnect_orderbook(websocket, exchange_symbol)
             logger.debug(f"WebSocket orderbook connection cleaned up for {symbol}")
 
     except Exception as e:

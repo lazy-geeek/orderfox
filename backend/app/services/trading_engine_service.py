@@ -42,10 +42,6 @@ class TradingEngineService:
                 if order_book_data["asks"] and order_book_data["bids"]:
                     # A very naive signal: if best ask is much higher than best bid (wide spread)
                     # This is not a trading strategy, just a placeholder for a signal.
-                    # best_ask = order_book_data['asks'][0][0]
-                    # best_bid = order_book_data['bids'][0][0]
-                    # if best_ask > best_bid * 1.01: # e.g. 1% spread
-                    #     return "long" # Or "short" based on some other condition
                     pass  # Keep it simple for now
 
             return None
@@ -71,11 +67,6 @@ class TradingEngineService:
             logger.info("Managing positions - checking for trading opportunities")
 
             # Example:
-            # for symbol_of_interest in self.get_monitored_symbols():
-            #     order_book = await self.exchange_service.fetch_order_book(symbol_of_interest)
-            #     signal = await self.determine_signal(symbol_of_interest, order_book)
-            #     if signal:
-            #         await self.execute_trade(symbol_of_interest, signal, amount=0.01) # example amount
 
             logger.debug("Position management cycle completed (placeholder)")
 
@@ -199,17 +190,6 @@ class TradingEngineService:
             elif self.current_trading_mode == "live":
                 # Placeholder for live trading logic using ccxt
                 logger.warning(f"Live trading not implemented yet for {symbol}")
-                # exchange = self.exchange_service.get_exchange_instance() # Assuming exchange_service is available
-                # try:
-                #     if trade_type.lower() == "market":
-                #         order = await exchange.create_market_order(symbol, side, amount)
-                #     elif trade_type.lower() == "limit" and price is not None:
-                #         order = await exchange.create_limit_order(symbol, side, amount, price)
-                #     else:
-                #         return {"status": "error", "message": "Invalid trade type or missing price for limit order"}
-                #     return {"status": "success", "message": "Live trade placed", "orderId": order['id'], "positionInfo": order}
-                # except Exception as e:
-                #     return {"status": "error", "message": str(e)}
                 return {
                     "status": "pending",
                     "message": "Live trade logic not implemented.",
@@ -249,21 +229,6 @@ class TradingEngineService:
                 # A real system would aggregate positions, calculate P&L, etc.
                 # For now, just return the list of paper "trades" as positions.
                 # You'll need to map this to the `Position` schema.
-                # Example:
-                # open_positions_schema = []
-                # for p in self.paper_positions:
-                #     if p.get("status") == "filled": # or some logic to determine if it's "open"
-                #         open_positions_schema.append(
-                #             Position(
-                #                 symbol=p["symbol"],
-                #                 side=p["side"],
-                #                 size=p["amount"],
-                #                 entryPrice=p["entry_price"],
-                #                 markPrice=p["entry_price"] * 1.01, # Simulate mark price
-                #                 unrealizedPnl=(p["entry_price"] * 1.01 - p["entry_price"]) * p["amount"] # Simulate PnL
-                #             )
-                #         )
-                # return open_positions_schema
 
                 logger.debug(f"Returning {len(self.paper_positions)} paper positions")
                 return (
@@ -273,13 +238,6 @@ class TradingEngineService:
             elif self.current_trading_mode == "live":
                 # Placeholder for fetching live positions using ccxt
                 logger.warning("Live mode position fetching not implemented")
-                # exchange = self.exchange_service.get_exchange_instance()
-                # try:
-                #     # positions = await exchange.fetch_positions() # Method might vary by exchange
-                #     # return [Position(**p) for p in positions] # Map to your schema
-                # except Exception as e:
-                #     logger.error(f"Error fetching live positions: {e}")
-                # return []
                 return []
 
             logger.warning(f"Unknown trading mode: {self.current_trading_mode}")

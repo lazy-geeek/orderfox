@@ -192,4 +192,4 @@ async def load_paper_trade_history(
 
 
 # Example of how you might call this from your main app startup if not at module load:
-# app.add_event_handler("startup", initialize_firebase)
+# initialize_firebase() can be called explicitly from main.py startup

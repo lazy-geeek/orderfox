@@ -5,12 +5,14 @@ This module provides the ConnectionManager class that handles WebSocket connecti
 for real-time market data streaming including order books, tickers, and candles.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import asyncio
 import json
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
 from app.services.trading_engine_service import TradingEngineService
+from app.services.orderbook_manager import orderbook_manager
+from app.models.orderbook import OrderBookSnapshot, OrderBookLevel
 from app.core.logging_config import get_logger
 from app.core.config import settings
 
@@ -292,121 +294,216 @@ class ConnectionManager:
                 f"Attempted to stop streaming task for {stream_key}, but it was not found in streaming_tasks (possibly already stopped)."
             )
 
-    # Keep backward compatibility for existing orderbook methods
+    # Enhanced orderbook connection with aggregation support
     async def connect_orderbook(
-        self, websocket: WebSocket, symbol: str, display_symbol: str = None, limit: int = 20
+        self, websocket: WebSocket, symbol: str, display_symbol: str = None, 
+        limit: int = 20, rounding: float = 0.01
     ):
-        """Accept a new WebSocket connection for orderbook (backward compatibility)."""
-        # Store the limit for this symbol stream
-        if not hasattr(self, '_stream_limits'):
-            self._stream_limits = {}
+        """Accept a new WebSocket connection for orderbook with aggregation parameters."""
+        # Generate unique connection ID
+        connection_id = f"{symbol}:{id(websocket)}"
         
-        # If this symbol already has an active stream with a different limit, update it
-        current_limit = self._stream_limits.get(symbol)
-        if current_limit != limit and symbol in self.active_connections:
-            logger.info(f"Updating orderbook limit for {symbol} from {current_limit} to {limit}")
-            self._stream_limits[symbol] = limit
-            # Signal the streaming task to restart with new limit
-            await self._restart_orderbook_stream(symbol)
-        else:
-            self._stream_limits[symbol] = limit
+        # Register connection with OrderBook Manager
+        try:
+            orderbook = await orderbook_manager.register_connection(
+                connection_id, symbol, limit, rounding
+            )
+            logger.info(f"Registered orderbook connection {connection_id} with limit={limit}, rounding={rounding}")
+        except Exception as e:
+            logger.error(f"Failed to register orderbook connection {connection_id}: {e}")
+            await websocket.close(code=1011, reason="Failed to initialize orderbook")
+            return
+        
+        # Store connection metadata for message handling
+        if not hasattr(self, '_connection_metadata'):
+            self._connection_metadata = {}
+        
+        self._connection_metadata[connection_id] = {
+            'websocket': websocket,
+            'symbol': symbol,
+            'display_symbol': display_symbol,
+            'limit': limit,
+            'rounding': rounding,
+            'type': 'orderbook'
+        }
             
         await self.connect(websocket, symbol, "orderbook", display_symbol)
 
-    def disconnect_orderbook(self, websocket: WebSocket, symbol: str):
-        """Remove a WebSocket connection for orderbook (backward compatibility)."""
+    async def disconnect_orderbook(self, websocket: WebSocket, symbol: str):
+        """Remove a WebSocket connection for orderbook with proper cleanup."""
+        # Find and cleanup connection metadata
+        connection_id = f"{symbol}:{id(websocket)}"
+        
+        if hasattr(self, '_connection_metadata') and connection_id in self._connection_metadata:
+            del self._connection_metadata[connection_id]
+            
+        # Unregister from OrderBook Manager
+        try:
+            await orderbook_manager.unregister_connection(connection_id)
+            logger.info(f"Unregistered orderbook connection {connection_id}")
+        except Exception as e:
+            logger.error(f"Failed to unregister orderbook connection {connection_id}: {e}")
+        
+        # Standard disconnect
         self.disconnect(websocket, symbol)
 
     async def broadcast_to_symbol(self, symbol: str, data: dict):
         """Broadcast data to all connections for a symbol (backward compatibility)."""
         await self.broadcast_to_stream(symbol, data)
+    
+    async def handle_websocket_message(self, websocket: WebSocket, symbol: str, message: dict):
+        """Handle incoming WebSocket messages for parameter updates."""
+        try:
+            message_type = message.get("type")
+            
+            if message_type == "update_params":
+                connection_id = f"{symbol}:{id(websocket)}"
+                limit = message.get("limit")
+                rounding = message.get("rounding")
+                
+                logger.info(f"Received parameter update for {connection_id}: limit={limit}, rounding={rounding}")
+                
+                # Update OrderBook Manager
+                success = await orderbook_manager.update_connection_params(
+                    connection_id, limit, rounding
+                )
+                
+                if success:
+                    # Update local metadata
+                    if hasattr(self, '_connection_metadata') and connection_id in self._connection_metadata:
+                        if limit is not None:
+                            self._connection_metadata[connection_id]['limit'] = limit
+                        if rounding is not None:
+                            self._connection_metadata[connection_id]['rounding'] = rounding
+                    
+                    # Send acknowledgment and updated data
+                    ack_message = {
+                        "type": "params_updated",
+                        "limit": limit,
+                        "rounding": rounding,
+                        "success": True
+                    }
+                    await websocket.send_text(json.dumps(ack_message))
+                    
+                    # Broadcast updated aggregated data
+                    await self._broadcast_aggregated_orderbook(connection_id)
+                    
+                else:
+                    error_message = {
+                        "type": "error",
+                        "message": f"Failed to update parameters for connection {connection_id}"
+                    }
+                    await websocket.send_text(json.dumps(error_message))
+            else:
+                logger.warning(f"Unknown message type received: {message_type}")
+                
+        except Exception as e:
+            logger.error(f"Error handling WebSocket message: {e}")
+            error_message = {
+                "type": "error", 
+                "message": f"Error processing message: {str(e)}"
+            }
+            await websocket.send_text(json.dumps(error_message))
+    
+    async def _broadcast_aggregated_orderbook(self, connection_id: str):
+        """Broadcast aggregated orderbook data to a specific connection."""
+        try:
+            # Get aggregated data from OrderBook Manager
+            aggregated_data = await orderbook_manager.get_aggregated_orderbook(connection_id)
+            
+            if aggregated_data:
+                # Get connection metadata for display symbol
+                metadata = getattr(self, '_connection_metadata', {}).get(connection_id, {})
+                display_symbol = metadata.get('display_symbol') or aggregated_data['symbol']
+                websocket = metadata.get('websocket')
+                
+                if websocket:
+                    # Format for frontend
+                    formatted_data = {
+                        "type": "orderbook_update",
+                        "symbol": display_symbol,
+                        "bids": aggregated_data['bids'],
+                        "asks": aggregated_data['asks'],
+                        "timestamp": aggregated_data['timestamp'],
+                        "rounding": aggregated_data['rounding'],
+                        "rounding_options": aggregated_data.get('rounding_options', []),
+                        "market_depth_info": aggregated_data.get('market_depth_info', {}),
+                        "aggregated": True  # Indicate this is pre-aggregated data
+                    }
+                    
+                    await websocket.send_text(json.dumps(formatted_data))
+            
+        except Exception as e:
+            logger.error(f"Error broadcasting aggregated orderbook for {connection_id}: {e}")
 
     async def _stream_orderbook(self, symbol: str):
-        """Stream order book updates using ccxtpro or Binance partial depth streams."""
+        """Stream order book updates through OrderBook Manager with aggregation."""
         exchange_pro = None
         try:
-            logger.info(f"Initializing orderbook stream for {symbol}")
+            logger.info(f"Initializing aggregated orderbook stream for {symbol}")
             exchange_pro = exchange_service.get_exchange_pro()
 
-            # Get the dynamic limit for this symbol, default to 20
-            limit = getattr(self, '_stream_limits', {}).get(symbol, 20)
-            logger.info(f"Using limit {limit} for orderbook stream {symbol}")
-            
-            # Validate and clamp limit parameter (same as WebSocket endpoint)
-            limit = max(5, min(limit, 5000))
-
-            # Check if we should use Binance partial depth streams for better coverage
-            use_partial_depth = self._should_use_partial_depth_stream(limit)
-            logger.debug(f"Evaluating partial depth stream for {symbol}: limit={limit}, use_partial_depth={use_partial_depth}")
-            
-            if use_partial_depth:
-                logger.debug(f"✅ Using Binance partial depth stream for {symbol} with limit {limit}")
-                await self._stream_partial_depth_orderbook(symbol, limit)
+            # Get OrderBook instance from manager
+            orderbook = await orderbook_manager.get_orderbook(symbol)
+            if not orderbook:
+                logger.error(f"No OrderBook instance found for {symbol}")
                 return
-            else:
-                logger.debug(f"➡️ Using standard CCXT stream for {symbol} with limit {limit}")
 
             # Test connection before starting stream
             if exchange_pro is None:
                 logger.warning(f"CCXT Pro not available for {symbol}, using mock data")
-                await self._stream_mock_orderbook(symbol)
+                await self._stream_mock_orderbook_aggregated(symbol)
                 return
 
             try:
-                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=limit)
+                # Use a large limit to get comprehensive market data for aggregation
+                test_orderbook = await exchange_pro.fetch_order_book(symbol, limit=1000)
                 logger.info(f"Exchange connection test successful for {symbol}")
             except Exception as e:
                 logger.error(f"Exchange connection test failed for {symbol}: {str(e)}")
                 logger.info(f"Falling back to mock orderbook data for {symbol}")
-                await self._stream_mock_orderbook(symbol)
+                await self._stream_mock_orderbook_aggregated(symbol)
                 return
 
             while symbol in self.active_connections and self.active_connections[symbol]:
                 try:
-                    # Watch order book updates
+                    # Watch order book updates with large limit for aggregation
                     order_book_data = await exchange_pro.watch_order_book(symbol)
 
-                    # Convert to our schema format using dynamic limit
-                    bids = [
-                        {"price": float(bid[0]), "amount": float(bid[1])}
-                        for bid in order_book_data["bids"][:limit]  # Use dynamic limit
+                    # Convert to OrderBook model format
+                    bid_levels = [
+                        OrderBookLevel(price=float(bid[0]), amount=float(bid[1]))
+                        for bid in order_book_data["bids"]
+                        if float(bid[1]) > 0  # Filter zero amounts
                     ]
 
-                    asks = [
-                        {"price": float(ask[0]), "amount": float(ask[1])}
-                        for ask in order_book_data["asks"][:limit]  # Use dynamic limit
+                    ask_levels = [
+                        OrderBookLevel(price=float(ask[0]), amount=float(ask[1]))
+                        for ask in order_book_data["asks"]
+                        if float(ask[1]) > 0  # Filter zero amounts
                     ]
 
-                    # Use display symbol if available, otherwise use the stream symbol
-                    display_symbol = getattr(self, "_display_symbols", {}).get(
-                        symbol, symbol
+                    # Create snapshot and update OrderBook
+                    snapshot = OrderBookSnapshot(
+                        symbol=symbol,
+                        bids=bid_levels,
+                        asks=ask_levels,
+                        timestamp=order_book_data["timestamp"]
                     )
-                    formatted_data = {
-                        "type": "orderbook_update",
-                        "symbol": display_symbol,
-                        "bids": bids,
-                        "asks": asks,
-                        "timestamp": order_book_data["timestamp"],
-                    }
+                    
+                    await orderbook.update_snapshot(snapshot)
 
-                    # Broadcast to all connected clients for this symbol
-                    await self.broadcast_to_symbol(symbol, formatted_data)
+                    # Broadcast aggregated data to all connections for this symbol
+                    await self._broadcast_to_all_symbol_connections(symbol)
 
                     # Pass order book update to trading engine service
                     try:
-                        # Import the shared trading engine service instance
-                        from app.api.v1.endpoints.trading import (
-                            trading_engine_service_instance,
-                        )
-
+                        from app.api.v1.endpoints.trading import trading_engine_service_instance
                         await trading_engine_service_instance.process_order_book_update(
                             symbol, order_book_data
                         )
                     except Exception as e:
-                        # Log error but don't interrupt the streaming
-                        print(
-                            f"Error processing order book update in trading engine for {symbol}: {str(e)}"
-                        )
+                        logger.warning(f"Error processing order book update in trading engine for {symbol}: {str(e)}")
 
                 except Exception as e:
                     error_data = {
@@ -425,140 +522,77 @@ class ConnectionManager:
         finally:
             # Do NOT close exchange_pro here. It should be managed globally.
             pass
-
-    def _should_use_partial_depth_stream(self, limit: int) -> bool:
-        """Determine if we should use Binance partial depth streams instead of full orderbook."""
-        # Temporarily disable partial depth streams to fix real-time updates
-        # The partial depth implementation needs to be reworked to properly integrate with FastAPI WebSocket
-        return False  # Disable partial depth streams for now
-
-    def _get_partial_depth_level(self, limit: int) -> int:
-        """Get the appropriate Binance partial depth level (5, 10, or 20) for the given limit."""
-        if limit <= 5:
-            return 5
-        elif limit <= 10:
-            return 10
-        else:
-            return 20  # For limits 11-100, use 20 levels
-
-    async def _stream_partial_depth_orderbook(self, symbol: str, requested_limit: int):
-        """Stream order book updates using Binance USDT-M Futures partial depth streams."""
+    
+    async def _broadcast_to_all_symbol_connections(self, symbol: str):
+        """Broadcast aggregated orderbook data to all connections for a symbol."""
         try:
-            import websockets
-            import json
-        except ImportError as e:
-            logger.error(f"Failed to import websockets: {e}")
-            await self._stream_mock_orderbook(symbol)
-            return
-        
-        try:
-            # Get the appropriate depth level for Binance partial depth streams
-            depth_level = self._get_partial_depth_level(requested_limit)
+            # Get all connection IDs for this symbol
+            connection_ids = await orderbook_manager.get_connections_for_symbol(symbol)
             
-            # Convert symbol to lowercase for Binance WebSocket
-            ws_symbol = symbol.lower()
-            
-            # Binance USDT-M Futures partial depth stream URL
-            # Format: {base_url}/ws/<symbol>@depth<levels>
-            ws_url = f"{settings.BINANCE_WS_BASE_URL}/ws/{ws_symbol}@depth{depth_level}"
-            
-            logger.info(f"Connecting to Binance partial depth stream: {ws_url}")
-            
-            while symbol in self.active_connections and self.active_connections[symbol]:
-                try:
-                    async with websockets.connect(ws_url) as websocket:
-                        logger.info(f"Connected to Binance partial depth stream for {symbol}")
-                        
-                        async for message in websocket:
-                            # Check if we should still be streaming
-                            if symbol not in self.active_connections or not self.active_connections[symbol]:
-                                logger.info(f"Stopping partial depth stream for {symbol} - no active connections")
-                                break
-                                
-                            try:
-                                data = json.loads(message)
-                                
-                                # Binance partial depth stream format:
-                                # {
-                                #   "e": "depthUpdate",
-                                #   "E": 1640995200000,
-                                #   "s": "BTCUSDT", 
-                                #   "b": [["7403.89", "0.002"]],
-                                #   "a": [["7405.96", "3.340"]]
-                                # }
-                                
-                                if data.get("e") == "depthUpdate":
-                                    # Convert Binance format to our format
-                                    bids = [
-                                        {"price": float(bid[0]), "amount": float(bid[1])}
-                                        for bid in data.get("b", [])
-                                        if float(bid[1]) > 0  # Filter out zero quantities
-                                    ]
-                                    
-                                    asks = [
-                                        {"price": float(ask[0]), "amount": float(ask[1])}
-                                        for ask in data.get("a", [])
-                                        if float(ask[1]) > 0  # Filter out zero quantities
-                                    ]
-                                    
-                                    # Use display symbol if available, otherwise use the stream symbol
-                                    display_symbol = getattr(self, "_display_symbols", {}).get(symbol, symbol)
-                                    
-                                    formatted_data = {
-                                        "type": "orderbook_update",
-                                        "symbol": display_symbol,
-                                        "bids": bids,
-                                        "asks": asks,
-                                        "timestamp": data.get("E"),
-                                        "source": "binance_partial_depth",
-                                        "depth_level": depth_level
-                                    }
-                                    
-                                    # Broadcast to all connected clients for this symbol
-                                    await self.broadcast_to_symbol(symbol, formatted_data)
-                                    
-                                    # Pass order book update to trading engine service
-                                    try:
-                                        from app.api.v1.endpoints.trading import trading_engine_service_instance
-                                        
-                                        # Convert to ccxt format for trading engine compatibility
-                                        ccxt_format = {
-                                            "symbol": symbol,
-                                            "bids": [[float(bid["price"]), float(bid["amount"])] for bid in bids],
-                                            "asks": [[float(ask["price"]), float(ask["amount"])] for ask in asks],
-                                            "timestamp": data.get("E")
-                                        }
-                                        
-                                        await trading_engine_service_instance.process_order_book_update(symbol, ccxt_format)
-                                    except Exception as e:
-                                        logger.warning(f"Error processing order book update in trading engine for {symbol}: {str(e)}")
-                                        
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"Invalid JSON received from Binance for {symbol}: {str(e)}")
-                            except Exception as e:
-                                logger.error(f"Error processing Binance partial depth message for {symbol}: {str(e)}")
-                                
-                except websockets.exceptions.ConnectionClosed:
-                    logger.warning(f"Binance partial depth WebSocket connection closed for {symbol}, reconnecting...")
-                    await asyncio.sleep(1)  # Wait before reconnecting
-                except Exception as e:
-                    logger.error(f"Error in Binance partial depth stream for {symbol}: {str(e)}")
-                    
-                    # Send error to clients
-                    error_data = {
-                        "type": "error",
-                        "message": f"Error in partial depth stream for {symbol}: {str(e)}",
-                    }
-                    await self.broadcast_to_symbol(symbol, error_data)
-                    await asyncio.sleep(5)  # Wait before retrying
-                    
+            # Broadcast to each connection with their specific aggregation parameters
+            for connection_id in connection_ids:
+                await self._broadcast_aggregated_orderbook(connection_id)
+                
         except Exception as e:
-            logger.error(f"Failed to initialize Binance partial depth stream for {symbol}: {str(e)}")
-            error_data = {
-                "type": "error", 
-                "message": f"Failed to initialize partial depth streaming for {symbol}: {str(e)}",
-            }
-            await self.broadcast_to_symbol(symbol, error_data)
+            logger.error(f"Error broadcasting to all connections for {symbol}: {e}")
+    
+    async def _stream_mock_orderbook_aggregated(self, symbol: str):
+        """Stream mock order book data through OrderBook Manager when CCXT Pro is not available."""
+        logger.info(f"Starting mock aggregated orderbook stream for {symbol}")
+        import random
+        import time
+
+        base_price = 50000.0  # Base price for mock data
+
+        # Get OrderBook instance from manager
+        orderbook = await orderbook_manager.get_orderbook(symbol)
+        if not orderbook:
+            logger.error(f"No OrderBook instance found for {symbol} in mock stream")
+            return
+
+        while symbol in self.active_connections and self.active_connections[symbol]:
+            try:
+                # Generate mock orderbook data
+                current_time = int(time.time() * 1000)
+                price_variation = random.uniform(-0.01, 0.01)  # ±1% variation
+                current_price = base_price * (1 + price_variation)
+
+                # Generate comprehensive mock data for aggregation
+                bid_levels = []
+                ask_levels = []
+
+                for i in range(100):  # Generate 100 levels for aggregation
+                    bid_price = current_price - (i + 1) * random.uniform(0.1, 2.0)
+                    ask_price = current_price + (i + 1) * random.uniform(0.1, 2.0)
+                    bid_amount = random.uniform(0.1, 5.0)
+                    ask_amount = random.uniform(0.1, 5.0)
+
+                    bid_levels.append(OrderBookLevel(price=bid_price, amount=bid_amount))
+                    ask_levels.append(OrderBookLevel(price=ask_price, amount=ask_amount))
+
+                # Create snapshot and update OrderBook
+                snapshot = OrderBookSnapshot(
+                    symbol=symbol,
+                    bids=bid_levels,
+                    asks=ask_levels,
+                    timestamp=current_time
+                )
+                
+                await orderbook.update_snapshot(snapshot)
+
+                # Broadcast aggregated data to all connections for this symbol
+                await self._broadcast_to_all_symbol_connections(symbol)
+
+                # Wait before next update (simulate real-time updates)
+                await asyncio.sleep(1.0)
+
+            except Exception as e:
+                logger.error(f"Error in mock aggregated orderbook stream for {symbol}: {str(e)}")
+                await asyncio.sleep(5)  # Wait before retrying
+
+        logger.info(f"Mock aggregated orderbook stream ended for {symbol}")
+
+
 
     async def _stream_ticker(self, symbol: str):
         """Stream ticker updates using ccxtpro."""

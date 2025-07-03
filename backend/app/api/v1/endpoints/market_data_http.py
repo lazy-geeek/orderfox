@@ -5,9 +5,7 @@ This module provides FastAPI HTTP endpoints for fetching market data including
 symbols, order books, and candlestick data from the exchange.
 """
 
-import re
 from typing import List, Optional
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from app.api.v1.schemas import SymbolInfo, OrderBook, OrderBookLevel, Candle
 from app.services.exchange_service import exchange_service
