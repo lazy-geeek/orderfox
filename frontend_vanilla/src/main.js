@@ -13,7 +13,6 @@ import {
   subscribe,
   setState,
   fetchSymbols,
-  fetchOrderBook,
   fetchCandles,
   fetchOpenPositions,
   executePaperTrade,
@@ -94,6 +93,7 @@ subscribe((key) => {
     case 'selectedRounding':
     case 'availableRoundingOptions':
     case 'displayDepth':
+    case 'orderBookLoading':
       updateOrderBookDisplay(orderBookDisplay, state);
       break;
     case 'tradingMode':
@@ -111,9 +111,10 @@ subscribe((key) => {
 // Event Listeners
 symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
-  // Re-fetch data and restart websockets for new symbol
+  // Clear orderbook to show loading state
+  clearOrderBook();
+  // Re-fetch candles and restart websockets for new symbol
   fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-  fetchOrderBook(state.selectedSymbol, state.displayDepth);
   disconnectAllWebSockets(); // Disconnect all old streams
   
   // Introduce a delay to allow old WebSockets to fully close
@@ -176,11 +177,14 @@ fetchSymbols().then(() => {
     const firstSymbol = state.symbolsList[0];
     setSelectedSymbol(firstSymbol.id);
     
-    // Fetch initial data for the selected symbol
+    // Clear orderbook to show loading state
+    clearOrderBook();
+    
+    // Fetch initial candles for the selected symbol
     fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
-    fetchOrderBook(firstSymbol.id, state.displayDepth);
     
     // Start WebSocket connections for the selected symbol
+    // The orderbook WebSocket will send initial data immediately
     setTimeout(() => {
       connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
       connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);

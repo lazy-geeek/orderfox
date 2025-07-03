@@ -121,14 +121,8 @@ const validateOrderBook = (orderBook) => {
 
   return {
     symbol: orderBook.symbol || '',
-    bids: bids.filter((bid) =>
-      bid && typeof bid.price === 'number' && typeof bid.amount === 'number' &&
-      bid.price > 0 && bid.amount > 0
-    ),
-    asks: asks.filter((ask) =>
-      ask && typeof ask.price === 'number' && typeof ask.amount === 'number' &&
-      ask.price > 0 && ask.amount > 0
-    ),
+    bids: bids,  // No filtering - trust the backend to provide clean data
+    asks: asks,  // No filtering - trust the backend to provide clean data
     timestamp,
     // Preserve additional fields from backend aggregation
     rounding_options: orderBook.rounding_options || null,
@@ -233,10 +227,12 @@ function updateOrderBookFromWebSocket(payload) {
   if (validatedOrderBook) {
     if (state.selectedSymbol && validatedOrderBook.symbol === state.selectedSymbol) {
       state.currentOrderBook = validatedOrderBook;
+      state.orderBookLoading = false; // Clear loading state when data arrives
       
       // Rounding options are now set from symbols data, not from WebSocket
       
       notify('currentOrderBook');
+      notify('orderBookLoading');
     } else {
       console.warn('Received order book for different symbol, skipping update:', validatedOrderBook.symbol, 'vs', state.selectedSymbol);
     }
