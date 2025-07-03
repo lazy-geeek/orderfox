@@ -414,14 +414,26 @@ class ConnectionManager:
             if aggregated_data:
                 # Get connection metadata for display symbol
                 metadata = getattr(self, '_connection_metadata', {}).get(connection_id, {})
-                display_symbol = metadata.get('display_symbol') or aggregated_data['symbol']
+                display_symbol = metadata.get('display_symbol')
+                aggregated_symbol = aggregated_data.get('symbol', '')
+                
+                
+                # Use display_symbol if it's non-empty, otherwise use the aggregated data symbol
+                symbol_to_send = display_symbol if display_symbol else aggregated_symbol
+                
+                # Ensure we always have a symbol to send
+                if not symbol_to_send:
+                    logger.warning(f"No symbol available for connection {connection_id}, using connection metadata")
+                    # Extract symbol from connection_id as fallback
+                    symbol_to_send = connection_id.split(':')[0] if ':' in connection_id else 'UNKNOWN'
+                
                 websocket = metadata.get('websocket')
                 
                 if websocket:
                     # Format for frontend
                     formatted_data = {
                         "type": "orderbook_update",
-                        "symbol": display_symbol,
+                        "symbol": symbol_to_send,
                         "bids": aggregated_data['bids'],
                         "asks": aggregated_data['asks'],
                         "timestamp": aggregated_data['timestamp'],
@@ -791,62 +803,6 @@ class ConnectionManager:
             # Do NOT close exchange_pro here. It should be managed globally.
             pass
 
-    async def _stream_mock_orderbook(self, symbol: str):
-        """Stream mock order book data when CCXT Pro is not available."""
-        logger.info(f"Starting mock orderbook stream for {symbol}")
-        import random
-        import time
-
-        base_price = 50000.0  # Base price for mock data
-
-        while symbol in self.active_connections and self.active_connections[symbol]:
-            try:
-                # Generate mock orderbook data
-                current_time = int(time.time() * 1000)
-                price_variation = random.uniform(-0.01, 0.01)  # ±1% variation
-                current_price = base_price * (1 + price_variation)
-
-                # Generate mock bids and asks
-                bids = []
-                asks = []
-
-                for i in range(10):  # 10 levels each side
-                    bid_price = current_price - (i + 1) * random.uniform(0.5, 2.0)
-                    ask_price = current_price + (i + 1) * random.uniform(0.5, 2.0)
-                    bid_amount = random.uniform(0.1, 5.0)
-                    ask_amount = random.uniform(0.1, 5.0)
-
-                    bids.append(
-                        {"price": round(bid_price, 2), "amount": round(bid_amount, 4)}
-                    )
-                    asks.append(
-                        {"price": round(ask_price, 2), "amount": round(ask_amount, 4)}
-                    )
-
-                # Use display symbol if available, otherwise use the stream symbol
-                display_symbol = getattr(self, "_display_symbols", {}).get(
-                    symbol, symbol
-                )
-                formatted_data = {
-                    "type": "orderbook_update",
-                    "symbol": display_symbol,
-                    "bids": bids,
-                    "asks": asks,
-                    "timestamp": current_time,
-                    "mock": True,  # Indicate this is mock data
-                }
-
-                # Broadcast to all connected clients for this symbol
-                await self.broadcast_to_symbol(symbol, formatted_data)
-
-                # Wait before next update (simulate real-time updates)
-                await asyncio.sleep(1.0)
-
-            except Exception as e:
-                logger.error(f"Error in mock orderbook stream for {symbol}: {str(e)}")
-                await asyncio.sleep(5)  # Wait before retrying
-
-        logger.info(f"Mock orderbook stream ended for {symbol}")
 
     async def _stream_mock_candles(self, symbol: str, timeframe: str, stream_key: str):
         """Stream mock candle data when CCXT Pro is not available."""

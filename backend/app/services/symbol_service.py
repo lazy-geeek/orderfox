@@ -6,7 +6,7 @@ validating symbols, and providing suggestions for invalid symbols.
 """
 
 import re
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from app.services.exchange_service import exchange_service
 from app.core.logging_config import get_logger
 
@@ -155,12 +155,59 @@ class SymbolService:
         exchange_symbol = self.resolve_symbol_to_exchange_format(symbol_id)
         return exchange_symbol is not None
 
-    def get_symbol_info(self, symbol_id: str) -> Optional[Dict[str, Any]]:
+    def calculate_rounding_options(self, price_precision: Optional[int] = None, 
+                                  current_price: Optional[float] = None) -> Tuple[List[float], float]:
+        """
+        Calculate available rounding options for a symbol.
+        Based on price precision and optional current price.
+        
+        Args:
+            price_precision: Number of decimal places for price accuracy
+            current_price: Current market price (optional)
+            
+        Returns:
+            Tuple of (rounding_options, default_rounding)
+        """
+        if price_precision is None:
+            return [], 0.01
+        
+        # Calculate baseRounding from pricePrecision
+        base_rounding = 1 / (10 ** price_precision)
+        
+        # Generate options array starting with baseRounding
+        options = [base_rounding]
+        
+        # If current_price is available, limit options to 1/10th of price
+        max_rounding = current_price / 10 if current_price else 1000
+        
+        # Generate additional options by multiplying by 10
+        next_option = base_rounding
+        while len(options) < 7:  # Maximum 7 options
+            next_option = next_option * 10
+            
+            # Stop if rounding becomes more than max_rounding
+            if next_option > max_rounding:
+                break
+                
+            options.append(next_option)
+        
+        # Set default rounding (third item if available, or second, or first)
+        if len(options) >= 3:
+            default_rounding = options[2]  # Third option as default
+        elif len(options) >= 2:
+            default_rounding = options[1]
+        else:
+            default_rounding = base_rounding
+        
+        return options, default_rounding
+
+    def get_symbol_info(self, symbol_id: str, current_price: Optional[float] = None) -> Optional[Dict[str, Any]]:
         """
         Get detailed symbol information.
 
         Args:
             symbol_id: Symbol ID to get info for
+            current_price: Current market price for rounding limit calculation
 
         Returns:
             Symbol information dict or None if not found
@@ -175,6 +222,42 @@ class SymbolService:
         if not market_info:
             return None
 
+        # Extract price precision from market info
+        price_precision = None
+        try:
+            if (
+                market_info.get("precision")
+                and market_info["precision"].get("price") is not None
+            ):
+                precision_value = market_info["precision"]["price"]
+                if isinstance(precision_value, (int, float)):
+                    # If it's already an integer, use it directly
+                    if isinstance(precision_value, int):
+                        price_precision = precision_value
+                    else:
+                        # If it's a float like 1e-8, calculate decimal places
+                        if precision_value > 0 and precision_value < 1:
+                            # Convert scientific notation to decimal places
+                            price_precision = abs(
+                                int(
+                                    round(
+                                        float(
+                                            f"{precision_value:.10e}".split("e")[1]
+                                        )
+                                    )
+                                )
+                            )
+                        else:
+                            # If it's a regular float, convert to int
+                            price_precision = int(precision_value)
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning(
+                f"Could not extract pricePrecision for {exchange_symbol}: {e}"
+            )
+
+        # Calculate rounding options based on price precision and current price
+        rounding_options, default_rounding = self.calculate_rounding_options(price_precision, current_price)
+
         return {
             "id": market_info.get("id"),
             "symbol": exchange_symbol,
@@ -185,6 +268,9 @@ class SymbolService:
             "spot": market_info.get("spot", False),
             "swap": market_info.get("type") == "swap",
             "future": market_info.get("future", False),
+            "pricePrecision": price_precision,
+            "roundingOptions": rounding_options,
+            "defaultRounding": default_rounding,
         }
 
     def get_symbol_suggestions(

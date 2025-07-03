@@ -141,6 +141,17 @@ python test_paper_trading.py
   - **Enhanced WebSocket Protocol**: Message-based parameter updates with acknowledgments
   - **Comprehensive Testing**: Unit tests, integration tests, and load tests for all order book components
   - **Code Cleanup**: Removed legacy code including unused imports, commented blocks, and deprecated packages
+- **Rounding Options Architecture**: Moved rounding calculations from orderbook aggregation to symbol service
+  - **Symbol Service Enhancement**: Added `calculate_rounding_options` method with price precision and current price integration
+  - **Backend Schema Updates**: Added `roundingOptions` and `defaultRounding` fields to `SymbolInfo`
+  - **Frontend State Management**: Updated to use symbol-provided rounding options instead of WebSocket-derived options
+  - **Proper Architecture Separation**: Symbol metadata handled at symbol level, aggregation focused on processing
+- **Legacy Code Removal**: Eliminated outdated mock orderbook streaming methods that bypassed aggregation system
+- **WebSocket Message Handling**: Enhanced frontend message routing to properly handle all message types
+  - **Parameter Update Acknowledgments**: Added explicit handling for `params_updated` messages
+  - **Message Type Safety**: Improved fallback routing to prevent incorrect message processing
+  - **Error Message Handling**: Added proper handling for WebSocket error messages
+  - **Debug Improvements**: Enhanced logging for unknown message types to aid development
 - **WebSocket Parameter Handling**: Fixed backend Query parameter validation for WebSocket endpoints
 - **Dynamic Limit Updates**: Connection manager now supports updating orderbook limits without full reconnection
 - **Race Condition Prevention**: Frontend properly sequences disconnect → clear → fetch → reconnect operations
