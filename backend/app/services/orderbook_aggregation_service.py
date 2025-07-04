@@ -42,9 +42,9 @@ class OrderBookAggregationService:
         if multiple <= 0:
             return value
         
-        # Handle floating point precision by scaling up, rounding, then scaling down
-        scale = 1 / multiple
-        return math.floor(value * scale) / scale
+        # Use centralized decimal utilities for precise calculations
+        from app.utils.decimal_utils import DecimalUtils
+        return DecimalUtils.round_down(value, multiple)
     
     @staticmethod
     def round_up(value: float, multiple: float) -> float:
@@ -62,9 +62,9 @@ class OrderBookAggregationService:
         if multiple <= 0:
             return value
         
-        # Handle floating point precision by scaling up, rounding, then scaling down
-        scale = 1 / multiple
-        return math.ceil(value * scale) / scale
+        # Use centralized decimal utilities for precise calculations
+        from app.utils.decimal_utils import DecimalUtils
+        return DecimalUtils.round_up(value, multiple)
     
     def get_exact_levels(self, raw_data: List[Dict], is_ask: bool, 
                         effective_depth: int, effective_rounding: float) -> List[Dict]:
@@ -317,13 +317,13 @@ class OrderBookAggregationService:
         if symbol_data:
             # Format bids
             for bid in bids_with_cumulative:
-                bid['price_formatted'] = formatting_service.format_price(bid['price'], symbol_data)
+                bid['price_formatted'] = formatting_service.format_price(bid['price'], symbol_data, rounding)
                 bid['amount_formatted'] = formatting_service.format_amount(bid['amount'], symbol_data)
                 bid['cumulative_formatted'] = formatting_service.format_total(bid['cumulative'], symbol_data)
             
             # Format asks
             for ask in asks_with_cumulative:
-                ask['price_formatted'] = formatting_service.format_price(ask['price'], symbol_data)
+                ask['price_formatted'] = formatting_service.format_price(ask['price'], symbol_data, rounding)
                 ask['amount_formatted'] = formatting_service.format_amount(ask['amount'], symbol_data)
                 ask['cumulative_formatted'] = formatting_service.format_total(ask['cumulative'], symbol_data)
         
