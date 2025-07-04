@@ -93,7 +93,7 @@ class TestFormattingService:
         # ETH (6 decimal places)
         assert self.service.format_amount(0.123456, self.eth_symbol_info) == "0.123456"
         
-        # SHIB (0 decimal places for amounts)
+        # SHIB (0 decimal places for amounts) - but minimum 2 for readability
         assert self.service.format_amount(123.456, self.shib_symbol_info) == "123.46"
     
     def test_format_amount_edge_cases(self):
@@ -333,7 +333,7 @@ class TestFormattingService:
         # ETH precision (6 decimals)
         assert self.service.format_amount(value, self.eth_symbol_info) == "123.456789"
         
-        # SHIB precision (0 decimals for amounts)
+        # SHIB precision (0 decimals for amounts) - but minimum 2 for readability
         assert self.service.format_amount(value, self.shib_symbol_info) == "123.46"
         
         # Test rounding edge cases

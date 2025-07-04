@@ -181,7 +181,7 @@ class FormattingService:
     
     def format_amount(self, value: float, symbol_info: Optional[Dict] = None) -> str:
         """
-        Format amount value with dynamic precision based on amount size.
+        Format amount value with consistent precision per symbol.
         
         Args:
             value: Amount value to format
@@ -207,19 +207,13 @@ class FormattingService:
             if abs(value) < 0.00001:
                 result = f"{value:.2e}"
             
-            # Handle small amounts with higher precision
-            elif abs(value) < 0.01:
-                # Use 4-6 decimal places for small amounts
-                decimal_places = max(4, amount_precision)
-                result = f"{value:.{decimal_places}f}"
-            
-            # Handle large amounts with compact notation
+            # Handle large amounts with compact notation (use 2 decimals for readability)
             elif abs(value) >= 1000000:
                 result = f"{value / 1000000:.2f}M"
             elif abs(value) >= 1000:
                 result = f"{value / 1000:.2f}K"
             
-            # Regular amounts - use symbol precision or default to 2
+            # All other amounts - use consistent symbol precision (minimum 2 for readability)
             else:
                 decimal_places = max(2, amount_precision)
                 result = f"{value:.{decimal_places}f}"
