@@ -255,6 +255,39 @@ class SymbolService:
                 f"Could not extract pricePrecision for {exchange_symbol}: {e}"
             )
 
+        # Extract amount precision from market info
+        amount_precision = None
+        try:
+            if (
+                market_info.get("precision")
+                and market_info["precision"].get("amount") is not None
+            ):
+                precision_value = market_info["precision"]["amount"]
+                if isinstance(precision_value, (int, float)):
+                    # If it's already an integer, use it directly
+                    if isinstance(precision_value, int):
+                        amount_precision = precision_value
+                    else:
+                        # If it's a float like 1e-8, calculate decimal places
+                        if precision_value > 0 and precision_value < 1:
+                            # Convert scientific notation to decimal places
+                            amount_precision = abs(
+                                int(
+                                    round(
+                                        float(
+                                            f"{precision_value:.10e}".split("e")[1]
+                                        )
+                                    )
+                                )
+                            )
+                        else:
+                            # If it's a regular float, convert to int
+                            amount_precision = int(precision_value)
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning(
+                f"Could not extract amountPrecision for {exchange_symbol}: {e}"
+            )
+
         # Calculate rounding options based on price precision and current price
         rounding_options, default_rounding = self.calculate_rounding_options(price_precision, current_price)
 
@@ -269,6 +302,7 @@ class SymbolService:
             "swap": market_info.get("type") == "swap",
             "future": market_info.get("future", False),
             "pricePrecision": price_precision,
+            "amountPrecision": amount_precision,
             "roundingOptions": rounding_options,
             "defaultRounding": default_rounding,
         }

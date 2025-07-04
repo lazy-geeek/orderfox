@@ -595,3 +595,123 @@ class TestOrderBookAggregationService:
             assert result[0]['cumulative'] == 0.0
             assert result[1]['cumulative'] == 2.0
             assert result[2]['cumulative'] == 2.0
+
+    class TestFormattingIntegration:
+        """Test formatting integration in order book aggregation."""
+        
+        @pytest.mark.asyncio
+        async def test_aggregate_orderbook_with_formatting(self):
+            """Test that aggregation includes formatted fields when symbol_data is provided."""
+            service = OrderBookAggregationService()
+            
+            # Create mock orderbook
+            mock_orderbook = AsyncMock(spec=OrderBook)
+            mock_orderbook.symbol = "BTCUSDT"
+            mock_orderbook.timestamp = 1640995200000
+            
+            # Mock the orderbook snapshot
+            mock_snapshot = MagicMock()
+            mock_snapshot.bids = [
+                MagicMock(price=50000.12, amount=0.001234),
+                MagicMock(price=49999.50, amount=0.002500)
+            ]
+            mock_snapshot.asks = [
+                MagicMock(price=50001.25, amount=0.003456),
+                MagicMock(price=50002.00, amount=0.001000)
+            ]
+            mock_orderbook.get_snapshot.return_value = mock_snapshot
+            
+            # Symbol data with precision info
+            symbol_data = {
+                'pricePrecision': 2,
+                'amountPrecision': 8
+            }
+            
+            # Test aggregation with formatting
+            result = await service.aggregate_orderbook(
+                mock_orderbook, 
+                limit=2, 
+                rounding=0.5,
+                symbol_data=symbol_data
+            )
+            
+            # Verify basic structure
+            assert result['symbol'] == "BTCUSDT"
+            assert result['limit'] == 2
+            assert result['rounding'] == 0.5
+            assert 'bids' in result
+            assert 'asks' in result
+            
+            # Verify formatted fields are present in bids
+            for bid in result['bids']:
+                assert 'price' in bid
+                assert 'amount' in bid
+                assert 'cumulative' in bid
+                assert 'price_formatted' in bid
+                assert 'amount_formatted' in bid
+                assert 'cumulative_formatted' in bid
+                
+                # Verify formatting is applied correctly
+                assert isinstance(bid['price_formatted'], str)
+                assert isinstance(bid['amount_formatted'], str)
+                assert isinstance(bid['cumulative_formatted'], str)
+            
+            # Verify formatted fields are present in asks
+            for ask in result['asks']:
+                assert 'price' in ask
+                assert 'amount' in ask
+                assert 'cumulative' in ask
+                assert 'price_formatted' in ask
+                assert 'amount_formatted' in ask
+                assert 'cumulative_formatted' in ask
+                
+                # Verify formatting is applied correctly
+                assert isinstance(ask['price_formatted'], str)
+                assert isinstance(ask['amount_formatted'], str)
+                assert isinstance(ask['cumulative_formatted'], str)
+        
+        @pytest.mark.asyncio
+        async def test_aggregate_orderbook_without_symbol_data(self):
+            """Test that aggregation works without formatting when symbol_data is None."""
+            service = OrderBookAggregationService()
+            
+            # Create mock orderbook
+            mock_orderbook = AsyncMock(spec=OrderBook)
+            mock_orderbook.symbol = "ETHUSDT"
+            mock_orderbook.timestamp = 1640995200000
+            
+            # Mock the orderbook snapshot
+            mock_snapshot = MagicMock()
+            mock_snapshot.bids = [MagicMock(price=3000.0, amount=1.5)]
+            mock_snapshot.asks = [MagicMock(price=3001.0, amount=2.0)]
+            mock_orderbook.get_snapshot.return_value = mock_snapshot
+            
+            # Test aggregation without symbol_data
+            result = await service.aggregate_orderbook(
+                mock_orderbook, 
+                limit=1, 
+                rounding=1.0,
+                symbol_data=None
+            )
+            
+            # Verify basic structure
+            assert result['symbol'] == "ETHUSDT"
+            assert 'bids' in result
+            assert 'asks' in result
+            
+            # Verify formatted fields are NOT present
+            for bid in result['bids']:
+                assert 'price' in bid
+                assert 'amount' in bid
+                assert 'cumulative' in bid
+                assert 'price_formatted' not in bid
+                assert 'amount_formatted' not in bid
+                assert 'cumulative_formatted' not in bid
+            
+            for ask in result['asks']:
+                assert 'price' in ask
+                assert 'amount' in ask
+                assert 'cumulative' in ask
+                assert 'price_formatted' not in ask
+                assert 'amount_formatted' not in ask
+                assert 'cumulative_formatted' not in ask
