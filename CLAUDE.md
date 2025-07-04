@@ -531,6 +531,41 @@ else:
 - **A/B Testing**: Different format styles for user experience optimization
 - **Performance Monitoring**: Formatting performance metrics and optimization
 
+### Decimal Arithmetic and Precision
+
+The application uses centralized decimal utilities to avoid floating-point precision issues common in financial applications:
+
+#### DecimalUtils Class (`backend/app/utils/decimal_utils.py`)
+- **Purpose**: Centralized precise decimal arithmetic operations
+- **Key Methods**:
+  - `round_down(value, multiple)`: Round value down to nearest multiple using decimal arithmetic
+  - `round_up(value, multiple)`: Round value up to nearest multiple using decimal arithmetic  
+  - `generate_power_of_10_options(base_precision, max_options, max_value)`: Generate clean rounding options without floating-point errors
+- **Integration**: Used by symbol service for rounding options and aggregation service for price rounding
+- **Benefits**: Eliminates floating-point precision errors like `9.999999999999999e-06` → clean `0.00001`
+
+#### Rounding-Aware Price Formatting
+- **FormattingService Enhancement**: `format_price()` method now accepts optional `rounding` parameter
+- **Logic**: Formats prices according to selected rounding level rather than just symbol precision
+- **Examples**:
+  - `108980.0` with `rounding=10` → `"108980"` (clean integer)
+  - `108983.45` with `rounding=0.1` → `"108983.4"` (appropriate decimals)
+  - Fallback to symbol precision when no rounding provided
+- **Cache Integration**: Cache keys include rounding parameter for proper cache separation
+- **Backward Compatibility**: Existing calls without rounding parameter continue to work
+
+#### Architecture Integration
+- **Symbol Service**: Uses `DecimalUtils.generate_power_of_10_options()` for clean rounding option generation
+- **Aggregation Service**: Uses `DecimalUtils` rounding functions and passes rounding to formatting
+- **Frontend Display**: Receives properly formatted prices that match selected rounding level
+- **Performance**: Caching system enhanced to handle rounding-specific formatting
+
+#### Common Issues Resolved
+- **Floating-Point Precision**: High-precision symbols (SHIBUSDT, etc.) now show clean rounding options
+- **Display Consistency**: Price formatting matches user-selected rounding level
+- **Professional Appearance**: No more unnecessary decimals in large rounding scenarios
+- **Maintainability**: Single source of truth for decimal arithmetic operations
+
 ### MCP Server
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.
 

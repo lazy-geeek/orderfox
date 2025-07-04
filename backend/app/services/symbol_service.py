@@ -171,25 +171,18 @@ class SymbolService:
         if price_precision is None:
             return [], 0.01
         
-        # Calculate baseRounding from pricePrecision
-        base_rounding = 1 / (10 ** price_precision)
-        
-        # Generate options array starting with baseRounding
-        options = [base_rounding]
+        # Import decimal utilities for precise calculations
+        from app.utils.decimal_utils import DecimalUtils
         
         # If current_price is available, limit options to 1/10th of price
         max_rounding = current_price / 10 if current_price else 1000
         
-        # Generate additional options by multiplying by 10
-        next_option = base_rounding
-        while len(options) < 7:  # Maximum 7 options
-            next_option = next_option * 10
-            
-            # Stop if rounding becomes more than max_rounding
-            if next_option > max_rounding:
-                break
-                
-            options.append(next_option)
+        # Generate options using decimal arithmetic to avoid floating-point precision issues
+        options = DecimalUtils.generate_power_of_10_options(
+            base_precision=price_precision,
+            max_options=7,
+            max_value=max_rounding
+        )
         
         # Set default rounding (third item if available, or second, or first)
         if len(options) >= 3:
@@ -197,7 +190,7 @@ class SymbolService:
         elif len(options) >= 2:
             default_rounding = options[1]
         else:
-            default_rounding = base_rounding
+            default_rounding = options[0] if options else 0.01
         
         return options, default_rounding
 

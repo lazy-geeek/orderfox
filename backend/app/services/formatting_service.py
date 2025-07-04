@@ -72,7 +72,7 @@ class FormattingService:
         logger.info(f"FormattingService initialized (cache_enabled={enable_cache}, "
                    f"cache_ttl={cache_ttl}s, max_size={max_cache_size})")
     
-    def _generate_cache_key(self, method: str, value: float, symbol_info: Optional[Dict]) -> str:
+    def _generate_cache_key(self, method: str, value: float, symbol_info: Optional[Dict], rounding: Optional[float] = None) -> str:
         """Generate a cache key for the given parameters."""
         symbol = symbol_info.get('symbol', 'DEFAULT') if symbol_info else 'DEFAULT'
         precision_key = ''
@@ -82,7 +82,8 @@ class FormattingService:
             amount_precision = symbol_info.get('amountPrecision', 8)
             precision_key = f"{price_precision}:{amount_precision}"
         
-        return f"{method}:{symbol}:{precision_key}:{value}"
+        rounding_key = f"{rounding}" if rounding is not None else "default"
+        return f"{method}:{symbol}:{precision_key}:{rounding_key}:{value}"
     
     def _get_from_cache(self, cache_key: str) -> Optional[str]:
         """Get value from cache if it exists and is not expired."""
@@ -137,13 +138,57 @@ class FormattingService:
         for key in expired_keys:
             del self._cache[key]
     
-    def format_price(self, value: float, symbol_info: Optional[Dict] = None) -> str:
+    def _format_price_with_rounding(self, value: float, rounding: float) -> str:
         """
-        Format price value based on symbol precision.
+        Format price based on the rounding level used in orderbook aggregation.
+        
+        Args:
+            value: Price value to format
+            rounding: Rounding level (e.g., 0.01, 0.1, 1.0, 10.0)
+            
+        Returns:
+            Formatted price string appropriate for the rounding level
+        """
+        # Handle very small numbers with scientific notation when appropriate
+        if abs(value) < 0.00001 and (rounding is None or rounding >= 0.0001 or abs(value) < rounding / 2):
+            return f"{value:.2e}"
+        
+        # Determine decimal places based on rounding level
+        if rounding >= 1.0:
+            # For rounding >= 1, show as integer if value is whole number
+            if value == int(value):
+                return str(int(value))
+            else:
+                # Show minimal decimal places for non-whole numbers
+                return f"{value:.0f}" if rounding >= 10 else f"{value:.1f}"
+        elif rounding >= 0.1:
+            # For rounding like 0.1, show 1 decimal place
+            return f"{value:.1f}"
+        elif rounding >= 0.01:
+            # For rounding like 0.01, show 2 decimal places
+            return f"{value:.2f}"
+        elif rounding >= 0.001:
+            # For rounding like 0.001, show 3 decimal places
+            return f"{value:.3f}"
+        else:
+            # For very small rounding, determine decimal places from rounding value
+            import math
+            if rounding > 0:
+                # Calculate decimal places needed based on rounding precision
+                # e.g., 0.00001 needs 5 decimal places
+                decimal_places = max(2, -int(math.floor(math.log10(rounding))))
+            else:
+                decimal_places = 8  # Default for very high precision
+            return f"{value:.{decimal_places}f}"
+    
+    def format_price(self, value: float, symbol_info: Optional[Dict] = None, rounding: Optional[float] = None) -> str:
+        """
+        Format price value based on symbol precision and rounding level.
         
         Args:
             value: Price value to format
             symbol_info: Symbol information containing precision data
+            rounding: Rounding level used for orderbook aggregation
             
         Returns:
             Formatted price string
@@ -152,24 +197,28 @@ class FormattingService:
             return "0.00"
         
         # Check cache first (prices change frequently, so cache may have lower hit rate)
-        cache_key = self._generate_cache_key('price', value, symbol_info)
+        cache_key = self._generate_cache_key('price', value, symbol_info, rounding)
         cached_result = self._get_from_cache(cache_key)
         if cached_result is not None:
             return cached_result
         
         try:
-            # Get price precision from symbol info
-            price_precision = 2  # Default fallback
-            if symbol_info and 'pricePrecision' in symbol_info:
-                price_precision = symbol_info['pricePrecision']
-            
-            # Handle very small numbers with scientific notation
-            if abs(value) < 0.00001:
-                result = f"{value:.2e}"
+            # If rounding is provided, format according to the rounding level
+            if rounding is not None and rounding > 0:
+                result = self._format_price_with_rounding(value, rounding)
             else:
-                # For prices, we want to show the actual value, not compact notation
-                # Prices need to be precise for trading decisions
-                result = f"{value:.{price_precision}f}"
+                # Get price precision from symbol info
+                price_precision = 2  # Default fallback
+                if symbol_info and 'pricePrecision' in symbol_info:
+                    price_precision = symbol_info['pricePrecision']
+                
+                # Handle very small numbers with scientific notation
+                if abs(value) < 0.00001:
+                    result = f"{value:.2e}"
+                else:
+                    # For prices, we want to show the actual value, not compact notation
+                    # Prices need to be precise for trading decisions
+                    result = f"{value:.{price_precision}f}"
             
             # Cache the result
             self._set_cache(cache_key, result)
