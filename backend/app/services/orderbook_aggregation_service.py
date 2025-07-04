@@ -150,9 +150,9 @@ class OrderBookAggregationService:
         result = []
         
         if is_ask:
-            # For asks (highest price first), cumulative total is from top down (running total)
+            # For asks (highest price first), cumulative total is from current level to end (all better prices)
             for i, level in enumerate(levels):
-                cumulative_total = sum(l['amount'] for l in levels[:i+1])
+                cumulative_total = sum(l['amount'] for l in levels[i:])
                 result.append({
                     'price': level['price'],
                     'amount': level['amount'],
