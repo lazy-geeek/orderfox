@@ -390,11 +390,11 @@ The backend formatting system handles all number formatting for order book displ
 - Example: `50000.12345` → `"50000.12"` (2 decimal places for BTCUSDT)
 
 **Amount Formatting**: `format_amount(value, symbol_info)`
-- Dynamic precision based on amount size and symbol precision
+- Consistent precision per symbol based on symbol's amountPrecision (minimum 2 decimals for readability)
 - Scientific notation for very small amounts (< 0.00001): `0.000001` → `"1.00e-06"`
-- High precision for small amounts (< 0.01): `0.001234` → `"0.00123400"`
-- Compact notation for large amounts: `1500000` → `"1.50M"`, `2500` → `"2.50K"`
-- Regular precision for normal amounts: `12.345` → `"12.35"`
+- Compact notation for large amounts (fixed 2 decimals): `1500000` → `"1.50M"`, `2500` → `"2.50K"`
+- All other amounts use consistent symbol precision: ETHUSDT (6 decimals) → `12.345678` → `"12.345678"`
+- Zero precision symbols get minimum 2 decimals: SHIB (0 precision) → `123.456` → `"123.46"`
 
 **Total Formatting**: `format_total(value, symbol_info)`
 - Optimized for cumulative totals display
@@ -513,14 +513,15 @@ else:
 
 ##### Problem Solved
 - **Original Issue**: Small amounts (0.001234) displayed as "0.00" due to frontend 2-decimal limitation
-- **Solution**: Backend dynamic precision shows "0.00123400" correctly
+- **Secondary Issue**: Inconsistent decimal places within same symbol (3 vs 4 decimals for different amounts)
+- **Solution**: Backend consistent precision per symbol eliminates visual inconsistency
 - **Architecture**: Complete elimination of frontend formatting logic
-- **Consistency**: All clients receive identical formatted data
+- **Consistency**: All clients receive identical formatted data with consistent decimal places per symbol
 
 ##### Key Improvements
-- **Precision**: Dynamic precision based on amount size and symbol characteristics
+- **Precision**: Consistent decimal places per symbol based on exchange precision data
 - **Performance**: Backend pre-formatting eliminates client-side processing
-- **Consistency**: Single source of truth for all formatting logic
+- **Visual Consistency**: Same number of decimal places for all amounts within a symbol
 - **Maintainability**: Centralized formatting rules and thresholds
 - **Scalability**: Singleton pattern supports multiple concurrent clients
 
