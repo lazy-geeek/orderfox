@@ -5,6 +5,7 @@ import asyncio
 import logging
 
 from ..models.orderbook import OrderBook
+from .formatting_service import formatting_service
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +313,19 @@ class OrderBookAggregationService:
         aggregated_asks.reverse()  # Now highest price first
         asks_with_cumulative = self.calculate_cumulative_totals(aggregated_asks, True)
         
-        # Final verification - no additional zero filtering needed since get_exact_levels already filters
-        # The backend guarantees to send only non-zero levels
+        # Apply formatting to all levels if symbol_data is available
+        if symbol_data:
+            # Format bids
+            for bid in bids_with_cumulative:
+                bid['price_formatted'] = formatting_service.format_price(bid['price'], symbol_data)
+                bid['amount_formatted'] = formatting_service.format_amount(bid['amount'], symbol_data)
+                bid['cumulative_formatted'] = formatting_service.format_total(bid['cumulative'], symbol_data)
+            
+            # Format asks
+            for ask in asks_with_cumulative:
+                ask['price_formatted'] = formatting_service.format_price(ask['price'], symbol_data)
+                ask['amount_formatted'] = formatting_service.format_amount(ask['amount'], symbol_data)
+                ask['cumulative_formatted'] = formatting_service.format_total(ask['cumulative'], symbol_data)
         
         # Build result
         result = {

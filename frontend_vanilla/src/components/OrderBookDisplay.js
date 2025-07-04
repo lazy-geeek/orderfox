@@ -107,34 +107,8 @@ function updateOrderBookDisplay(container, data) {
     });
   }
 
-  // Helper functions for formatting
-
-  const formatPrice = (price) => {
-    if (selectedRounding && selectedRounding > 0) {
-      // Calculate decimal places from rounding value
-      const decimalPlaces = Math.max(0, -Math.floor(Math.log10(selectedRounding)));
-      return price.toFixed(decimalPlaces);
-    }
-    return price.toFixed(2);
-  };
-
-  const formatAmount = (amount) => {
-    if (amount >= 1000000) {
-      return (amount / 1000000).toFixed(2) + 'M';
-    } else if (amount >= 1000) {
-      return (amount / 1000).toFixed(2) + 'K';
-    }
-    return amount.toFixed(2);
-  };
-
-  const formatTotal = (total) => {
-    if (total >= 1000000) {
-      return (total / 1000000).toFixed(2) + 'M';
-    } else if (total >= 1000) {
-      return (total / 1000).toFixed(2) + 'K';
-    }
-    return total.toFixed(2);
-  };
+  // Note: All formatting is now handled by the backend
+  // Frontend only displays pre-formatted strings from backend
 
   // Update asks and bids with cumulative totals
   const asksList = container.querySelector('.asks-list');
@@ -158,9 +132,9 @@ function updateOrderBookDisplay(container, data) {
         row.className = 'order-level ask-level';
         
         row.innerHTML = `
-          <span class="price ask-price">${formatPrice(ask.price)}</span>
-          <span class="amount">${formatAmount(ask.amount)}</span>
-          <span class="total">${formatTotal(ask.cumulative || 0)}</span>
+          <span class="price ask-price">${ask.price_formatted}</span>
+          <span class="amount">${ask.amount_formatted}</span>
+          <span class="total">${ask.cumulative_formatted}</span>
         `;
         asksList.appendChild(row);
       });
@@ -171,9 +145,9 @@ function updateOrderBookDisplay(container, data) {
         row.className = 'order-level bid-level';
         
         row.innerHTML = `
-          <span class="price bid-price">${formatPrice(bid.price)}</span>
-          <span class="amount">${formatAmount(bid.amount)}</span>
-          <span class="total">${formatTotal(bid.cumulative || 0)}</span>
+          <span class="price bid-price">${bid.price_formatted}</span>
+          <span class="amount">${bid.amount_formatted}</span>
+          <span class="total">${bid.cumulative_formatted}</span>
         `;
         bidsList.appendChild(row);
       });

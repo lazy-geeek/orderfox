@@ -39,14 +39,36 @@ async def websocket_orderbook(
     {
         "type": "orderbook_update",
         "symbol": "BTCUSDT",
-        "bids": [{"price": 50000.0, "amount": 1.5, "cumulative": 1.5}, ...],
-        "asks": [{"price": 50100.0, "amount": 2.0, "cumulative": 2.0}, ...],
+        "bids": [
+            {
+                "price": 50000.0, 
+                "amount": 1.5, 
+                "cumulative": 1.5,
+                "price_formatted": "50000.00",
+                "amount_formatted": "1.50000000",
+                "cumulative_formatted": "1.50000000"
+            }, ...
+        ],
+        "asks": [
+            {
+                "price": 50100.0, 
+                "amount": 2.0, 
+                "cumulative": 2.0,
+                "price_formatted": "50100.00",
+                "amount_formatted": "2.00000000", 
+                "cumulative_formatted": "2.00000000"
+            }, ...
+        ],
         "timestamp": 1640995200000,
         "rounding": 0.01,
         "rounding_options": [0.01, 0.1, 1, 10, 100],
         "market_depth_info": {"actual_levels": 20, "requested_levels": 20},
         "aggregated": true
     }
+    
+    Note: Formatted fields (price_formatted, amount_formatted, cumulative_formatted) 
+    are included when symbol precision data is available. These fields provide 
+    backend-formatted strings optimized for display, eliminating frontend formatting.
 
     Parameter update messages can be sent:
     {
@@ -101,18 +123,19 @@ async def websocket_orderbook(
         # Populate symbol data for optimal aggregation
         try:
             symbol_info = symbol_service.get_symbol_info(exchange_symbol)
-            if symbol_info and hasattr(symbol_info, 'pricePrecision') and symbol_info.pricePrecision is not None:
+            if symbol_info and symbol_info.get('pricePrecision') is not None:
                 # Import here to avoid circular imports
                 from app.services.orderbook_manager import orderbook_manager
                 
                 symbol_data = {
-                    'pricePrecision': symbol_info.pricePrecision,
-                    'symbol': symbol_info.symbol,
-                    'base_asset': getattr(symbol_info, 'base_asset', None),
-                    'quote_asset': getattr(symbol_info, 'quote_asset', None)
+                    'pricePrecision': symbol_info['pricePrecision'],
+                    'amountPrecision': symbol_info.get('amountPrecision', 2),
+                    'symbol': symbol_info['symbol'],
+                    'base_asset': symbol_info.get('base_asset'),
+                    'quote_asset': symbol_info.get('quote_asset')
                 }
                 await orderbook_manager.update_symbol_data(exchange_symbol, symbol_data)
-                logger.info(f"Updated symbol data for {exchange_symbol} with pricePrecision={symbol_info.pricePrecision}")
+                logger.info(f"Updated symbol data for {exchange_symbol} with pricePrecision={symbol_info['pricePrecision']}, amountPrecision={symbol_info.get('amountPrecision', 2)}")
         except Exception as e:
             logger.warning(f"Could not populate symbol data for {exchange_symbol}: {e}")
             # Continue without symbol data - fallbacks will handle this

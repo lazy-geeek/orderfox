@@ -122,9 +122,14 @@ class TestSymbolService:
     @patch("app.services.symbol_service.exchange_service")
     def test_get_symbol_info_success(self, mock_exchange_service):
         """Test getting symbol information for existing symbol."""
-        # Mock exchange service
+        # Mock exchange service with precision data
         mock_exchange = Mock()
-        mock_exchange.load_markets.return_value = self.mock_markets
+        mock_markets_with_precision = self.mock_markets.copy()
+        mock_markets_with_precision["BTC/USDT"]["precision"] = {
+            "price": 0.01,
+            "amount": 0.00001
+        }
+        mock_exchange.load_markets.return_value = mock_markets_with_precision
         mock_exchange_service.get_exchange.return_value = mock_exchange
 
         # Test getting symbol info
@@ -137,6 +142,9 @@ class TestSymbolService:
         assert result["quote_asset"] == "USDT"
         assert result["active"] is True
         assert result["type"] == "swap"
+        # Verify precision fields are included
+        assert "pricePrecision" in result
+        assert "amountPrecision" in result
 
     @patch("app.services.symbol_service.exchange_service")
     def test_get_symbol_info_not_found(self, mock_exchange_service):

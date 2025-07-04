@@ -186,3 +186,297 @@ class TestConnectionManagerExtended:
                 mock_websocket in self.connection_manager.active_connections[stream_key]
             )
             mock_start_streaming.assert_called_once_with(stream_key, "candles")
+
+
+class TestConnectionManagerFormattedFields:
+    """Test cases for verifying formatted fields in WebSocket messages."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.connection_manager = ConnectionManager()
+    
+    @pytest.mark.asyncio
+    async def test_broadcast_aggregated_orderbook_with_formatted_fields(self):
+        """Test that broadcast includes formatted fields when symbol data is available."""
+        # Mock WebSocket
+        mock_websocket = AsyncMock()
+        mock_websocket.send_text = AsyncMock()
+        
+        symbol = "BTCUSDT"
+        connection_id = f"{symbol}:12345"
+        
+        # Set up connection metadata
+        self.connection_manager._connection_metadata = {
+            connection_id: {
+                'websocket': mock_websocket,
+                'symbol': symbol,
+                'display_symbol': symbol
+            }
+        }
+        
+        # Mock aggregated orderbook data with formatted fields
+        aggregated_data = {
+            'symbol': symbol,
+            'bids': [
+                {
+                    'price': 50000.12,
+                    'amount': 0.001234,
+                    'cumulative': 1.456789,
+                    'price_formatted': '50000.12',
+                    'amount_formatted': '0.00123400',
+                    'cumulative_formatted': '1.46'
+                },
+                {
+                    'price': 49999.50,
+                    'amount': 0.002500,
+                    'cumulative': 3.956789,
+                    'price_formatted': '49999.50',
+                    'amount_formatted': '0.00250000',
+                    'cumulative_formatted': '3.96'
+                }
+            ],
+            'asks': [
+                {
+                    'price': 50001.25,
+                    'amount': 0.003456,
+                    'cumulative': 2.123456,
+                    'price_formatted': '50001.25',
+                    'amount_formatted': '0.00345600',
+                    'cumulative_formatted': '2.12'
+                },
+                {
+                    'price': 50002.00,
+                    'amount': 0.001000,
+                    'cumulative': 3.123456,
+                    'price_formatted': '50002.00',
+                    'amount_formatted': '0.00100000',
+                    'cumulative_formatted': '3.12'
+                }
+            ],
+            'timestamp': 1640995200000,
+            'rounding': 0.5,
+            'limit': 2,
+            'rounding_options': [0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
+            'market_depth_info': {
+                'sufficient_data': True,
+                'raw_levels_count': 100
+            }
+        }
+        
+        # Mock orderbook manager
+        with patch('app.api.v1.endpoints.connection_manager.orderbook_manager') as mock_orderbook_manager:
+            mock_orderbook_manager.get_aggregated_orderbook = AsyncMock(return_value=aggregated_data)
+            
+            # Test broadcast
+            await self.connection_manager._broadcast_aggregated_orderbook(connection_id)
+            
+            # Verify WebSocket received data
+            mock_websocket.send_text.assert_called_once()
+            sent_data = json.loads(mock_websocket.send_text.call_args[0][0])
+            
+            # Verify message structure
+            assert sent_data['type'] == 'orderbook_update'
+            assert sent_data['symbol'] == symbol
+            assert 'bids' in sent_data
+            assert 'asks' in sent_data
+            assert 'timestamp' in sent_data
+            assert 'rounding' in sent_data
+            assert 'rounding_options' in sent_data
+            
+            # Verify formatted fields are present in bids
+            for bid in sent_data['bids']:
+                assert 'price' in bid
+                assert 'amount' in bid
+                assert 'cumulative' in bid
+                assert 'price_formatted' in bid
+                assert 'amount_formatted' in bid
+                assert 'cumulative_formatted' in bid
+                
+                # Verify formatted fields are strings
+                assert isinstance(bid['price_formatted'], str)
+                assert isinstance(bid['amount_formatted'], str)
+                assert isinstance(bid['cumulative_formatted'], str)
+            
+            # Verify formatted fields are present in asks
+            for ask in sent_data['asks']:
+                assert 'price' in ask
+                assert 'amount' in ask
+                assert 'cumulative' in ask
+                assert 'price_formatted' in ask
+                assert 'amount_formatted' in ask
+                assert 'cumulative_formatted' in ask
+                
+                # Verify formatted fields are strings
+                assert isinstance(ask['price_formatted'], str)
+                assert isinstance(ask['amount_formatted'], str)
+                assert isinstance(ask['cumulative_formatted'], str)
+            
+            # Verify specific formatting for small amounts
+            bid_with_small_amount = next((b for b in sent_data['bids'] if float(b['amount']) < 0.01), None)
+            if bid_with_small_amount:
+                # Small amounts should have more precision than "0.00"
+                assert len(bid_with_small_amount['amount_formatted'].split('.')[1]) > 2
+                assert bid_with_small_amount['amount_formatted'] != "0.00"
+    
+    @pytest.mark.asyncio 
+    async def test_broadcast_aggregated_orderbook_without_formatted_fields(self):
+        """Test that broadcast works when formatted fields are not present."""
+        # Mock WebSocket
+        mock_websocket = AsyncMock()
+        mock_websocket.send_text = AsyncMock()
+        
+        symbol = "ETHUSDT"
+        connection_id = f"{symbol}:67890"
+        
+        # Set up connection metadata
+        self.connection_manager._connection_metadata = {
+            connection_id: {
+                'websocket': mock_websocket,
+                'symbol': symbol,
+                'display_symbol': symbol
+            }
+        }
+        
+        # Mock aggregated orderbook data WITHOUT formatted fields
+        aggregated_data = {
+            'symbol': symbol,
+            'bids': [
+                {
+                    'price': 3000.12,
+                    'amount': 1.234567,
+                    'cumulative': 5.123456
+                }
+            ],
+            'asks': [
+                {
+                    'price': 3001.25,
+                    'amount': 2.345678,
+                    'cumulative': 7.234567
+                }
+            ],
+            'timestamp': 1640995200000,
+            'rounding': 1.0,
+            'limit': 1,
+            'rounding_options': [0.01, 0.1, 1.0, 10.0],
+            'market_depth_info': {
+                'sufficient_data': True,
+                'raw_levels_count': 50
+            }
+        }
+        
+        # Mock orderbook manager
+        with patch('app.api.v1.endpoints.connection_manager.orderbook_manager') as mock_orderbook_manager:
+            mock_orderbook_manager.get_aggregated_orderbook = AsyncMock(return_value=aggregated_data)
+            
+            # Test broadcast
+            await self.connection_manager._broadcast_aggregated_orderbook(connection_id)
+            
+            # Verify WebSocket received data
+            mock_websocket.send_text.assert_called_once()
+            sent_data = json.loads(mock_websocket.send_text.call_args[0][0])
+            
+            # Verify message structure
+            assert sent_data['type'] == 'orderbook_update'
+            assert sent_data['symbol'] == symbol
+            assert 'bids' in sent_data
+            assert 'asks' in sent_data
+            
+            # Verify formatted fields are NOT present when not provided
+            for bid in sent_data['bids']:
+                assert 'price' in bid
+                assert 'amount' in bid
+                assert 'cumulative' in bid
+                assert 'price_formatted' not in bid
+                assert 'amount_formatted' not in bid
+                assert 'cumulative_formatted' not in bid
+            
+            for ask in sent_data['asks']:
+                assert 'price' in ask
+                assert 'amount' in ask
+                assert 'cumulative' in ask
+                assert 'price_formatted' not in ask
+                assert 'amount_formatted' not in ask
+                assert 'cumulative_formatted' not in ask
+    
+    @pytest.mark.asyncio
+    async def test_formatted_fields_pass_through_to_websocket(self):
+        """Test that formatted fields are correctly passed through to WebSocket messages."""
+        # Mock WebSocket
+        mock_websocket = AsyncMock()
+        mock_websocket.send_text = AsyncMock()
+        
+        symbol = "BTCUSDT"
+        connection_id = f"{symbol}:test123"
+        
+        # Set up connection metadata
+        self.connection_manager._connection_metadata = {
+            connection_id: {
+                'websocket': mock_websocket,
+                'symbol': symbol,
+                'display_symbol': symbol
+            }
+        }
+        
+        # Mock aggregated data with formatted fields (simulating what the aggregation service returns)
+        mock_aggregated_data = {
+            'symbol': symbol,
+            'bids': [
+                {
+                    'price': 50000.0,
+                    'amount': 0.00123456,
+                    'cumulative': 0.00123456,
+                    'price_formatted': '50000.00',
+                    'amount_formatted': '0.00123456',
+                    'cumulative_formatted': '0.0012'
+                }
+            ],
+            'asks': [
+                {
+                    'price': 50001.0,
+                    'amount': 0.00234567,
+                    'cumulative': 0.00234567,
+                    'price_formatted': '50001.00',
+                    'amount_formatted': '0.00234567', 
+                    'cumulative_formatted': '0.0023'
+                }
+            ],
+            'timestamp': 1640995200000,
+            'rounding': 0.1,
+            'limit': 10,
+            'rounding_options': [0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
+            'market_depth_info': {
+                'sufficient_data': True,
+                'raw_levels_count': 100
+            }
+        }
+        
+        # Mock orderbook manager to return our test data
+        with patch('app.api.v1.endpoints.connection_manager.orderbook_manager') as mock_orderbook_manager:
+            mock_orderbook_manager.get_aggregated_orderbook = AsyncMock(return_value=mock_aggregated_data)
+            
+            # Test the broadcast
+            await self.connection_manager._broadcast_aggregated_orderbook(connection_id)
+            
+            # Verify WebSocket was called
+            mock_websocket.send_text.assert_called_once()
+            sent_data = json.loads(mock_websocket.send_text.call_args[0][0])
+            
+            # Verify message structure and that formatted fields are preserved
+            assert sent_data['type'] == 'orderbook_update'
+            assert sent_data['symbol'] == symbol
+            
+            # Check that formatted fields are present and correct
+            bid = sent_data['bids'][0]
+            assert bid['price_formatted'] == '50000.00'
+            assert bid['amount_formatted'] == '0.00123456'
+            assert bid['cumulative_formatted'] == '0.0012'
+            
+            ask = sent_data['asks'][0]
+            assert ask['price_formatted'] == '50001.00'
+            assert ask['amount_formatted'] == '0.00234567'
+            assert ask['cumulative_formatted'] == '0.0023'
+            
+            # Verify that the connection manager doesn't modify the formatted fields
+            # They should be passed through exactly as received from the aggregation service
+            assert sent_data['bids'] == mock_aggregated_data['bids']
+            assert sent_data['asks'] == mock_aggregated_data['asks']

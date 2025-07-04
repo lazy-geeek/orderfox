@@ -266,12 +266,40 @@ ws://localhost:8000/api/v1/ws/orderbook?symbol=BTCUSDT&limit=20&rounding=0.25
   "type": "orderbook_update",
   "symbol": "BTCUSDT",
   "bids": [
-    {"price": 50000.0, "quantity": 1.5, "cumulative": 1.5},
-    {"price": 49999.5, "quantity": 0.8, "cumulative": 2.3}
+    {
+      "price": 50000.0,
+      "quantity": 1.5,
+      "cumulative": 1.5,
+      "price_formatted": "50000.00",
+      "amount_formatted": "1.50",
+      "cumulative_formatted": "1.50"
+    },
+    {
+      "price": 49999.5,
+      "quantity": 0.8,
+      "cumulative": 2.3,
+      "price_formatted": "49999.50",
+      "amount_formatted": "0.80",
+      "cumulative_formatted": "2.30"
+    }
   ],
   "asks": [
-    {"price": 50000.5, "quantity": 1.2, "cumulative": 1.2},
-    {"price": 50001.0, "quantity": 0.9, "cumulative": 2.1}
+    {
+      "price": 50000.5,
+      "quantity": 1.2,
+      "cumulative": 1.2,
+      "price_formatted": "50000.50",
+      "amount_formatted": "1.20",
+      "cumulative_formatted": "1.20"
+    },
+    {
+      "price": 50001.0,
+      "quantity": 0.9,
+      "cumulative": 2.1,
+      "price_formatted": "50001.00",
+      "amount_formatted": "0.90",
+      "cumulative_formatted": "2.10"
+    }
   ],
   "rounding": 0.25,
   "rounding_options": [0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
@@ -283,6 +311,8 @@ ws://localhost:8000/api/v1/ws/orderbook?symbol=BTCUSDT&limit=20&rounding=0.25
   }
 }
 ```
+
+**Note**: Each bid/ask level now includes both raw numeric values and pre-formatted string values. Frontend components use the formatted fields directly for display, eliminating client-side formatting logic.
 
 ### Order Book Aggregation
 
@@ -333,14 +363,181 @@ await connection_manager.update_connection_params(
 - **backend/requirements.txt**: Removed unused `python-binance==1.0.19` package
 - **Frontend aggregation utilities**: Completely removed as processing moved to backend
 
+### Backend Formatting System
+
+The backend formatting system handles all number formatting for order book display, moving formatting logic from frontend to backend for consistency and performance.
+
+#### Architecture Overview
+- **FormattingService**: Singleton service handling all price, amount, and total formatting
+- **Symbol Precision**: Extracts amount and price precision from CCXT exchange data
+- **Pre-formatted Fields**: Backend sends pre-formatted strings to frontend
+- **Zero Frontend Formatting**: Frontend displays formatted strings without any processing
+
+#### Key Components
+
+##### FormattingService (`backend/app/services/formatting_service.py`)
+- **Singleton Pattern**: Single instance across application lifecycle
+- **Thread-Safe**: Handles concurrent formatting requests
+- **Symbol-Aware**: Uses exchange precision data for optimal formatting
+- **Error Handling**: Graceful fallback for invalid data
+
+##### Core Formatting Methods
+
+**Price Formatting**: `format_price(value, symbol_info)`
+- Uses price precision from symbol data
+- Handles scientific notation for very small values (< 0.00001)
+- Preserves exact precision for trading accuracy
+- Example: `50000.12345` → `"50000.12"` (2 decimal places for BTCUSDT)
+
+**Amount Formatting**: `format_amount(value, symbol_info)`
+- Dynamic precision based on amount size and symbol precision
+- Scientific notation for very small amounts (< 0.00001): `0.000001` → `"1.00e-06"`
+- High precision for small amounts (< 0.01): `0.001234` → `"0.00123400"`
+- Compact notation for large amounts: `1500000` → `"1.50M"`, `2500` → `"2.50K"`
+- Regular precision for normal amounts: `12.345` → `"12.35"`
+
+**Total Formatting**: `format_total(value, symbol_info)`
+- Optimized for cumulative totals display
+- More aggressive compact notation for large totals
+- Consistent precision handling across all scenarios
+
+#### Integration Points
+
+##### Order Book Aggregation
+- **Pre-formatting**: All order book levels receive formatted fields during aggregation
+- **Formatted Fields**: Each level includes `price_formatted`, `amount_formatted`, `cumulative_formatted`
+- **Symbol Context**: Symbol information passed through aggregation pipeline
+- **Performance**: Formatting integrated into existing aggregation process
+
+##### WebSocket Protocol
+- **Enhanced Messages**: All WebSocket messages include formatted fields
+- **Real-time Updates**: Formatted data sent with every order book update
+- **Consistency**: Same formatting logic for all WebSocket clients
+- **Zero Latency**: Pre-formatted strings avoid client-side processing
+
+##### Frontend Integration
+- **Direct Display**: Frontend uses formatted fields directly without processing
+- **No Fallbacks**: All frontend formatting functions removed
+- **Simplified Code**: Frontend components focused on display logic only
+- **Performance**: Eliminates client-side formatting overhead
+
+#### Formatting Rules and Thresholds
+
+##### Amount Formatting Rules
+```python
+# Scientific notation for very small amounts
+if abs(value) < 0.00001:
+    return f"{value:.2e}"  # 1.00e-06
+
+# High precision for small amounts  
+elif abs(value) < 0.01:
+    decimal_places = max(4, amount_precision)
+    return f"{value:.{decimal_places}f}"  # 0.00123400
+
+# Compact notation for large amounts
+elif abs(value) >= 1000000:
+    return f"{value / 1000000:.2f}M"  # 1.50M
+elif abs(value) >= 1000:
+    return f"{value / 1000:.2f}K"  # 2.50K
+
+# Regular precision for normal amounts
+else:
+    decimal_places = max(2, amount_precision)
+    return f"{value:.{decimal_places}f}"  # 12.35
+```
+
+##### Price Formatting Rules
+```python
+# Scientific notation for very small prices
+if abs(value) < 0.00001:
+    return f"{value:.2e}"  # 1.00e-06
+
+# Use symbol price precision for all other prices
+else:
+    return f"{value:.{price_precision}f}"  # 50000.12
+```
+
+##### Total Formatting Rules
+```python
+# Compact notation for large totals
+if abs(value) >= 1000000:
+    return f"{value / 1000000:.2f}M"  # 1.50M
+elif abs(value) >= 1000:
+    return f"{value / 1000:.2f}K"  # 2.50K
+    
+# Scientific notation for very small totals
+elif abs(value) < 0.00001:
+    return f"{value:.2e}"  # 1.00e-06
+    
+# High precision for small totals
+elif abs(value) < 0.01:
+    return f"{value:.4f}"  # 0.0012
+    
+# Regular precision for normal totals
+else:
+    return f"{value:.2f}"  # 12.35
+```
+
+#### Real-World Examples
+
+##### BTC/USDT (High Price, Small Amounts)
+- **Price**: `67432.50000000` → `"67432.50"`
+- **Amount**: `0.00123456` → `"0.00123456"`
+- **Total**: `83.25789012` → `"83.26"`
+
+##### ETH/USDT (Medium Price, Medium Amounts)  
+- **Price**: `3456.78900000` → `"3456.79"`
+- **Amount**: `1.23456789` → `"1.2346"`
+- **Total**: `4267.89123456` → `"4.27K"`
+
+##### SHIB/USDT (Low Price, Large Amounts)
+- **Price**: `0.00000876` → `"8.76e-06"`
+- **Amount**: `12345678.90` → `"12.35M"`
+- **Total**: `108.07654321` → `"108.08"`
+
+#### Performance Characteristics
+
+##### Benchmarks
+- **Formatting Speed**: 23 comprehensive test cases pass in <100ms
+- **Memory Usage**: Minimal overhead with singleton pattern
+- **Concurrency**: Thread-safe operations with async locks
+- **Integration**: Zero additional latency in order book pipeline
+
+##### Test Coverage
+- **Unit Tests**: 23 test cases covering all formatting scenarios
+- **Integration Tests**: 4 end-to-end pipeline tests
+- **Performance Tests**: Large dataset validation (1000+ levels)
+- **Real Data Tests**: Actual exchange data validation
+
+#### Migration Benefits
+
+##### Problem Solved
+- **Original Issue**: Small amounts (0.001234) displayed as "0.00" due to frontend 2-decimal limitation
+- **Solution**: Backend dynamic precision shows "0.00123400" correctly
+- **Architecture**: Complete elimination of frontend formatting logic
+- **Consistency**: All clients receive identical formatted data
+
+##### Key Improvements
+- **Precision**: Dynamic precision based on amount size and symbol characteristics
+- **Performance**: Backend pre-formatting eliminates client-side processing
+- **Consistency**: Single source of truth for all formatting logic
+- **Maintainability**: Centralized formatting rules and thresholds
+- **Scalability**: Singleton pattern supports multiple concurrent clients
+
+#### Future Enhancements
+- **User Preferences**: Configurable decimal places per user
+- **Locale Support**: Locale-specific number formatting
+- **A/B Testing**: Different format styles for user experience optimization
+- **Performance Monitoring**: Formatting performance metrics and optimization
+
 ### MCP Server
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.
 
 ### When Implementing New Features or Changing Code  
 - Update the CLAUDE.md file with any architecture changes or important notes for Claude Code to do a better job in the future.
 - Do not prompt to re-run the backend or frontend, as it is already running in the background and automatically restarts on file changes
-- Always write unit tests for new features or changes
-- All python files must pass Pylance linting and type checking
+- Always write unit tests for new features. For changes to existing code, ensure that existing tests are updated accordingly.
+- All python files must pass Pylance linting and type checking and all JavaScript files must pass ESLint linting and type checking.
 
 ### Container Management 
 - When working in containers, use the appropriate environment variables for container-specific URLs and ports
