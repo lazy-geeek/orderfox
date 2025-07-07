@@ -13,7 +13,6 @@ import {
   subscribe,
   setState,
   fetchSymbols,
-  fetchCandles,
   fetchOpenPositions,
   executePaperTrade,
   executeLiveTrade,
@@ -145,28 +144,23 @@ symbolSelector.addEventListener('change', (e) => {
   resetZoomState();
   // Clear orderbook to show loading state
   clearOrderBook();
-  // Re-fetch candles and restart websockets for new symbol
-  fetchCandles(state.selectedSymbol, state.selectedTimeframe, getOptimalCandleCount());
+  // Restart websockets for new symbol (WebSocket will provide historical data)
   disconnectAllWebSockets(); // Disconnect all old streams
   
-  // Introduce a delay to allow old WebSockets to fully close
-  setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
-    connectWebSocketStream(state.selectedSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
-  }, 500); // 500ms delay
+  // Connect new WebSocket streams immediately (no delay needed)
+  connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
+  connectWebSocketStream(state.selectedSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
 });
 
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {
   setSelectedTimeframe(newTimeframe);
   // Reset zoom state when timeframe changes  
   resetZoomState();
-  fetchCandles(state.selectedSymbol, newTimeframe, getOptimalCandleCount());
+  // WebSocket will provide historical data on reconnection
   disconnectWebSocketStream('candles', state.selectedSymbol, state.selectedTimeframe);
   
-  // Introduce a delay to allow old WebSocket to fully close
-  setTimeout(() => {
-    connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe);
-  }, 500); // 500ms delay
+  // Connect new WebSocket stream immediately (no delay needed)
+  connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe);
 });
 candlestickChartContainer.prepend(timeframeSelector);
 
@@ -217,15 +211,10 @@ fetchSymbols().then(() => {
     // Clear orderbook to show loading state
     clearOrderBook();
     
-    // Fetch initial candles for the selected symbol
-    fetchCandles(firstSymbol.id, state.selectedTimeframe, getOptimalCandleCount());
-    
     // Start WebSocket connections for the selected symbol
-    // The orderbook WebSocket will send initial data immediately
-    setTimeout(() => {
-      connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
-      connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);
-    }, 500);
+    // The WebSocket will send initial historical chart data immediately
+    connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
+    connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);
   }
 });
 

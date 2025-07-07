@@ -6,6 +6,7 @@ optimized data handling for Lightweight Charts frontend integration.
 """
 
 import logging
+import time
 from typing import Dict, List, Any, Optional
 from app.services.exchange_service import exchange_service
 
@@ -48,8 +49,8 @@ class ChartDataService:
             logger.info(f"Fetching initial chart data for {symbol} {timeframe}, limit={limit}")
             
             # Fetch from exchange service
-            exchange = await self.exchange_service.get_exchange()
-            raw_data = await exchange.fetch_ohlcv(symbol, timeframe, limit)
+            exchange = self.exchange_service.get_exchange()
+            raw_data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
             
             if not raw_data:
                 logger.warning(f"No data received for {symbol} {timeframe}")

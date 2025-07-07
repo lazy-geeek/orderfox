@@ -4,12 +4,13 @@
   "description": "Root package for OrderFox application",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\" \"cd frontend_vanilla && npm run dev\""
+    "dev": "npx kill-port 3000 8000 && concurrently \"cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\" \"cd frontend_vanilla && npm run dev\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "kill-port": "^2.0.1"
   }
 }

@@ -1,6 +1,7 @@
 
 import { 
   updateCandlesFromWebSocket,
+  updateCandlesFromHistoricalData,
   updateOrderBookFromWebSocket,
   updateTickerFromWebSocket,
   setCandlesWsConnected,
@@ -137,7 +138,9 @@ export const connectWebSocketStream = async (
         
         const data = JSON.parse(event.data);
         
-        if (data.type === 'candle_update') {
+        if (data.type === 'historical_candles') {
+          updateCandlesFromHistoricalData(data);
+        } else if (data.type === 'candle_update') {
           updateCandlesFromWebSocket(data);
         } else if (data.type === 'orderbook_update') {
           updateOrderBookFromWebSocket(data);
@@ -149,6 +152,13 @@ export const connectWebSocketStream = async (
           console.log('Parameter update successful:', data);
         } else if (data.type === 'error') {
           console.error('WebSocket error message:', data.message);
+          // Handle chart data errors specifically
+          if (data.code === 'CHART_DATA_ERROR' && streamType === 'candles') {
+            // Show error to user for chart data failures
+            console.error('Chart data error:', data.message);
+            // Note: In a real app, you might want to show this in the UI
+            // For now, we log it clearly for debugging
+          }
         } else {
           // Only process known orderbook_update messages in fallback
           if (streamType === 'orderbook' && data.type === 'orderbook_update') {
@@ -367,7 +377,7 @@ function checkAndRefreshConnections() {
 
 // Force refresh data by fetching latest from API when page becomes visible
 async function forceDataRefresh() {
-  const { state, fetchOrderBook, fetchCandles } = await import('../store/store.js');
+  const { state, fetchOrderBook } = await import('../store/store.js');
   
   if (state.selectedSymbol) {
     console.log('Forcing data refresh for symbol:', state.selectedSymbol);
@@ -379,9 +389,6 @@ async function forceDataRefresh() {
       await fetchOrderBook(state.selectedSymbol, limit);
     }
     
-    // Refresh candle data
-    if (state.selectedTimeframe) {
-      await fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
-    }
+    // Chart data will be refreshed automatically through WebSocket reconnection
   }
 }

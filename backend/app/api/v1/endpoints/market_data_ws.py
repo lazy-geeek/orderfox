@@ -425,6 +425,8 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
             historical_data = await chart_data_service.get_initial_chart_data(
                 exchange_symbol, timeframe, limit=100
             )
+            # Override the symbol in the response to use the frontend format
+            historical_data['symbol'] = symbol  # Use original frontend symbol, not exchange symbol
             await websocket.send_text(json.dumps(historical_data))
             logger.info(f"Sent initial historical data for {symbol}/{timeframe}: {historical_data.get('count', 0)} candles")
         except Exception as e:
@@ -432,7 +434,7 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
             # Continue with real-time stream even if historical data fails
 
         # Connect to the connection manager for real-time updates
-        await connection_manager.connect(websocket, stream_key, "candles", symbol)
+        await connection_manager.connect(websocket, stream_key, "candles", display_symbol=symbol)
         logger.info(
             f"WebSocket candles streaming started for {symbol}/{timeframe} (exchange: {exchange_symbol})"
         )

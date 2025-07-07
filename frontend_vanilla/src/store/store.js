@@ -277,6 +277,36 @@ function updateCandlesFromWebSocket(payload) {
   }
 }
 
+function updateCandlesFromHistoricalData(payload) {
+  if (!payload || !payload.data || !Array.isArray(payload.data)) {
+    console.warn('Invalid historical candles data: missing or invalid data array', payload);
+    return;
+  }
+
+  if (state.selectedSymbol && payload.symbol && payload.symbol !== state.selectedSymbol) {
+    console.warn('Received historical candles for different symbol, skipping update:', payload.symbol, 'vs', state.selectedSymbol);
+    return;
+  }
+
+  // Use existing validation function to ensure data consistency
+  const validatedCandles = validateAndFilterCandles(payload.data);
+  
+  if (validatedCandles.length === 0) {
+    console.warn('No valid candles found in historical data:', payload);
+    state.currentCandles = [];
+  } else {
+    // Replace the entire candles array with historical data
+    state.currentCandles = validatedCandles;
+    console.log(`Updated candles with ${validatedCandles.length} historical candles for ${payload.symbol} ${payload.timeframe}`);
+  }
+
+  // Clear loading state when historical data arrives
+  state.candlesLoading = false;
+  
+  notify('currentCandles');
+  notify('candlesLoading');
+}
+
 function setCandlesWsConnected(connected) {
   state.candlesWsConnected = connected;
   notify('candlesWsConnected');
@@ -456,29 +486,6 @@ async function fetchOrderBook(symbol, limit) {
   }
 }
 
-async function fetchCandles(symbol, timeframe = '1m', limit = 100) {
-  state.candlesLoading = true;
-  state.candlesError = null;
-  notify('candlesLoading');
-  notify('candlesError');
-  try {
-    const response = await fetch(`${API_BASE_URL}/candles/${symbol}?timeframe=${timeframe}&limit=${limit}`);
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || errorData.message || 'Failed to fetch candles');
-    }
-    const data = await response.json();
-    state.currentCandles = validateAndFilterCandles(data);
-    state.candlesLoading = false;
-    notify('currentCandles');
-    notify('candlesLoading');
-  } catch (error) {
-    state.candlesLoading = false;
-    state.candlesError = error.message;
-    notify('candlesLoading');
-    notify('candlesError');
-  }
-}
 
 async function fetchOpenPositions() {
   state.positionsLoading = true;
@@ -571,6 +578,7 @@ export {
   setSelectedTimeframe,
   updateOrderBookFromWebSocket,
   updateCandlesFromWebSocket,
+  updateCandlesFromHistoricalData,
   setCandlesWsConnected,
   setOrderBookWsConnected,
   updateTickerFromWebSocket,
@@ -583,7 +591,6 @@ export {
   clearOrderBook,
   fetchSymbols,
   fetchOrderBook,
-  fetchCandles,
   setTradingMode,
   clearTradeError,
   clearPositionsError,
