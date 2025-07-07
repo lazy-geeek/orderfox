@@ -45,7 +45,9 @@ orderfox/
 └── frontend_vanilla/
     ├── src/
     │   ├── components/          # UI components
-    │   ├── services/            # API & WebSocket
+    │   ├── services/            # API, WebSocket & centralized managers
+    │   │   ├── websocketManager.js  # Centralized WebSocket connection logic
+    │   │   └── websocketService.js  # Low-level WebSocket operations
     │   └── store/               # State management
     └── main.js                  # App entry point
 ```
@@ -86,6 +88,12 @@ Optional settings:
 - `CORS_ORIGINS`: Allowed CORS origins
 
 ## Architecture Highlights
+
+### WebSocket Connection Management
+- **Centralized Manager**: `WebSocketManager` class eliminates duplicate connection logic across UI components
+- **DRY Principle**: Single source of truth for connection patterns (symbol switching, timeframe changes, initialization)
+- **Optimal Candle Count**: Dynamic calculation based on chart viewport width (200-1000 range)
+- **State Integration**: Seamless integration with state management and UI reset patterns
 
 ### Order Book System
 - **Backend Aggregation**: All order book processing happens server-side
@@ -140,9 +148,10 @@ Update parameters without reconnecting:
 - **Smart Auto-fitting**: Only calls `fitContent()` on initial load or symbol/timeframe changes
 
 ### Working with WebSockets
-- Connection management: `connection_manager.py`
-- Frontend WebSocket service: `websocketService.js`
-- Dynamic updates supported without reconnection
+- **Backend**: Connection management in `connection_manager.py`
+- **Frontend**: Centralized WebSocket management via `WebSocketManager` class
+- **Low-level operations**: `websocketService.js` handles message processing
+- Dynamic parameter updates supported without reconnection
 
 ## Testing
 

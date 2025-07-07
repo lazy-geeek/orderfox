@@ -17,24 +17,21 @@ import {
   executePaperTrade,
   executeLiveTrade,
   setTradingModeApi,
-  setSelectedSymbol,
-  setSelectedTimeframe,
   setSelectedRounding,
   setAvailableRoundingOptions,
   setShouldRestartWebSocketAfterFetch,
   setDisplayDepth,
-  clearOrderBook,
   setCandlesWsConnected,
   setOrderBookWsConnected,
   setTickerWsConnected,
 } from './store/store.js';
 
 import {
-  connectWebSocketStream,
-  disconnectWebSocketStream,
   disconnectAllWebSockets,
   updateOrderBookParameters,
 } from './services/websocketService.js';
+
+import { WebSocketManager } from './services/websocketManager.js';
 
 // Initialize theme before rendering
 initializeTheme();
@@ -73,27 +70,7 @@ themeSwitcherPlaceholder.replaceWith(themeSwitcher);
 // Set up global function for direct chart updates from WebSocket
 window.updateLatestCandleDirectly = updateLatestCandle;
 
-// Calculate optimal number of candles to fetch based on chart viewport size
-// This ensures the chart viewport is always fully populated with data
-function getOptimalCandleCount() {
-  // Get chart container width (fallback to reasonable default if not available)
-  const chartContainer = document.querySelector('.chart-container');
-  const containerWidth = chartContainer ? chartContainer.clientWidth : 800; // Default 800px
-  
-  // Lightweight Charts default bar spacing is ~6 pixels per candle
-  const barSpacing = 6;
-  
-  // Calculate how many candles fit in viewport
-  const candlesInViewport = Math.floor(containerWidth / barSpacing);
-  
-  // Add buffer for smooth scrolling and zooming (3x viewport)
-  // Minimum 200, maximum 1000 for performance
-  const optimalCount = Math.min(Math.max(candlesInViewport * 3, 200), 1000);
-  
-  console.log(`Chart width: ${containerWidth}px, Candles in viewport: ${candlesInViewport}, Fetching: ${optimalCount} candles`);
-  
-  return optimalCount;
-}
+// Note: getOptimalCandleCount() function moved to WebSocketManager for centralization
 
 // Initial renders
 updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
@@ -139,30 +116,11 @@ subscribe((key) => {
 
 // Event Listeners
 symbolSelector.addEventListener('change', (e) => {
-  setSelectedSymbol(e.target.value);
-  // Reset zoom state when symbol changes
-  resetZoomState();
-  // Clear orderbook to show loading state
-  clearOrderBook();
-  // Restart websockets for new symbol (WebSocket will provide historical data)
-  disconnectAllWebSockets(); // Disconnect all old streams
-  
-  // Connect new WebSocket streams immediately (no delay needed)
-  const optimalCandleCount = getOptimalCandleCount();
-  connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe, optimalCandleCount);
-  connectWebSocketStream(state.selectedSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
+  WebSocketManager.switchSymbol(e.target.value);
 });
 
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {
-  setSelectedTimeframe(newTimeframe);
-  // Reset zoom state when timeframe changes  
-  resetZoomState();
-  // WebSocket will provide historical data on reconnection
-  disconnectWebSocketStream('candles', state.selectedSymbol, state.selectedTimeframe);
-  
-  // Connect new WebSocket stream immediately (no delay needed)
-  const optimalCandleCount = getOptimalCandleCount();
-  connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, optimalCandleCount);
+  WebSocketManager.switchTimeframe(newTimeframe);
 });
 candlestickChartContainer.prepend(timeframeSelector);
 
@@ -205,19 +163,7 @@ fetchSymbols().then(() => {
   // Automatically select the first symbol (highest volume) after symbols are fetched
   if (state.symbolsList.length > 0) {
     const firstSymbol = state.symbolsList[0];
-    setSelectedSymbol(firstSymbol.id);
-    
-    // Reset zoom state for initial symbol load
-    resetZoomState();
-    
-    // Clear orderbook to show loading state
-    clearOrderBook();
-    
-    // Start WebSocket connections for the selected symbol
-    // The WebSocket will send initial historical chart data immediately
-    const optimalCandleCount = getOptimalCandleCount();
-    connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe, optimalCandleCount);
-    connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);
+    WebSocketManager.initializeConnections(firstSymbol.id);
   }
 });
 
