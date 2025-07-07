@@ -3,7 +3,7 @@ import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
 import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
-import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart } from './components/LightweightChart.js';
+import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
@@ -71,9 +71,34 @@ tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
 const themeSwitcher = createThemeSwitcher();
 themeSwitcherPlaceholder.replaceWith(themeSwitcher);
 
+// Set up global function for direct chart updates from WebSocket
+window.updateLatestCandleDirectly = updateLatestCandle;
+
+// Calculate optimal number of candles to fetch based on chart viewport size
+// This ensures the chart viewport is always fully populated with data
+function getOptimalCandleCount() {
+  // Get chart container width (fallback to reasonable default if not available)
+  const chartContainer = document.querySelector('.chart-container');
+  const containerWidth = chartContainer ? chartContainer.clientWidth : 800; // Default 800px
+  
+  // Lightweight Charts default bar spacing is ~6 pixels per candle
+  const barSpacing = 6;
+  
+  // Calculate how many candles fit in viewport
+  const candlesInViewport = Math.floor(containerWidth / barSpacing);
+  
+  // Add buffer for smooth scrolling and zooming (3x viewport)
+  // Minimum 200, maximum 1000 for performance
+  const optimalCount = Math.min(Math.max(candlesInViewport * 3, 200), 1000);
+  
+  console.log(`Chart width: ${containerWidth}px, Candles in viewport: ${candlesInViewport}, Fetching: ${optimalCount} candles`);
+  
+  return optimalCount;
+}
+
 // Initial renders
 updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
-updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe);
+updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
 updateOrderBookDisplay(orderBookDisplay, state);
 updateTradingModeToggle(tradingModeToggle, state);
 
@@ -85,8 +110,13 @@ subscribe((key) => {
       updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
       break;
     case 'currentCandles':
+      // Real-time updates - don't reset zoom
+      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, false); // isInitialLoad = false
+      break;
     case 'selectedTimeframe':
-      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe);
+      // Timeframe change - reset zoom and treat as initial load
+      resetZoomState();
+      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
       break;
     case 'currentOrderBook':
     case 'orderBookWsConnected':
@@ -100,8 +130,8 @@ subscribe((key) => {
       updateTradingModeToggle(tradingModeToggle, state);
       break;
     case 'candlesWsConnected':
-      // Update chart to reflect connection status
-      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe);
+      // Update chart to reflect connection status - don't reset zoom
+      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, false); // isInitialLoad = false
       break;
     default:
       break;
@@ -111,10 +141,12 @@ subscribe((key) => {
 // Event Listeners
 symbolSelector.addEventListener('change', (e) => {
   setSelectedSymbol(e.target.value);
+  // Reset zoom state when symbol changes
+  resetZoomState();
   // Clear orderbook to show loading state
   clearOrderBook();
   // Re-fetch candles and restart websockets for new symbol
-  fetchCandles(state.selectedSymbol, state.selectedTimeframe, 100);
+  fetchCandles(state.selectedSymbol, state.selectedTimeframe, getOptimalCandleCount());
   disconnectAllWebSockets(); // Disconnect all old streams
   
   // Introduce a delay to allow old WebSockets to fully close
@@ -126,7 +158,9 @@ symbolSelector.addEventListener('change', (e) => {
 
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {
   setSelectedTimeframe(newTimeframe);
-  fetchCandles(state.selectedSymbol, newTimeframe, 100);
+  // Reset zoom state when timeframe changes  
+  resetZoomState();
+  fetchCandles(state.selectedSymbol, newTimeframe, getOptimalCandleCount());
   disconnectWebSocketStream('candles', state.selectedSymbol, state.selectedTimeframe);
   
   // Introduce a delay to allow old WebSocket to fully close
@@ -177,11 +211,14 @@ fetchSymbols().then(() => {
     const firstSymbol = state.symbolsList[0];
     setSelectedSymbol(firstSymbol.id);
     
+    // Reset zoom state for initial symbol load
+    resetZoomState();
+    
     // Clear orderbook to show loading state
     clearOrderBook();
     
     // Fetch initial candles for the selected symbol
-    fetchCandles(firstSymbol.id, state.selectedTimeframe, 100);
+    fetchCandles(firstSymbol.id, state.selectedTimeframe, getOptimalCandleCount());
     
     // Start WebSocket connections for the selected symbol
     // The orderbook WebSocket will send initial data immediately

@@ -266,7 +266,15 @@ function updateCandlesFromWebSocket(payload) {
     }
     state.currentCandles.sort((a, b) => a.timestamp - b.timestamp);
   }
-  notify('currentCandles');
+  
+  // Directly update the chart with the single candle instead of triggering full refresh
+  // This preserves user zoom state and is more efficient
+  if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
+    window.updateLatestCandleDirectly(newCandle);
+  } else {
+    // Fallback to full refresh if direct update isn't available
+    notify('currentCandles');
+  }
 }
 
 function setCandlesWsConnected(connected) {

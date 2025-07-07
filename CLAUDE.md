@@ -133,6 +133,12 @@ Update parameters without reconnecting:
 3. Frontend: Update chart component in `LightweightChart.js`
 4. Note: Uses TradingView Lightweight Charts API, not ECharts
 
+### Chart Performance & UX Features
+- **Zoom Preservation**: User zoom/pan state is preserved during real-time updates
+- **Viewport-Based Data Loading**: Automatically calculates optimal candle count based on chart size
+- **Efficient Real-time Updates**: Uses `series.update()` for single candle updates to maintain performance
+- **Smart Auto-fitting**: Only calls `fitContent()` on initial load or symbol/timeframe changes
+
 ### Working with WebSockets
 - Connection management: `connection_manager.py`
 - Frontend WebSocket service: `websocketService.js`
@@ -146,6 +152,9 @@ cd backend && python -m pytest tests/ -v
 
 # Specific test file
 python -m pytest tests/services/test_orderbook_aggregation_service.py -v
+
+# Chart data service tests
+python -m pytest tests/services/test_chart_data_service.py -v
 
 # Integration tests
 python -m pytest tests/integration/ -v

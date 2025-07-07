@@ -16,6 +16,7 @@ let lastSymbol = null;
 let lastTimeframe = null;
 let resizeObserver = null;
 let currentTheme = 'dark';
+let userHasZoomed = false;
 
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
@@ -35,10 +36,15 @@ function createLightweightChart(container) {
   chartInstance = createChart(chartContainer, chartOptions);
   
   // Add candlestick series
-  candlestickSeries = chartInstance.addCandlestickSeries(getCandlestickOptions(currentTheme));
+  candlestickSeries = chartInstance.addCandlestickSeries(getCandlestickOptions());
 
   // Setup responsive sizing with ResizeObserver
   setupResizeObserver(chartContainer);
+
+  // Track user zoom/pan interactions
+  chartInstance.timeScale().subscribeVisibleTimeRangeChange(() => {
+    userHasZoomed = true;
+  });
 
   // Listen for theme changes
   window.addEventListener('themechange', (e) => {
@@ -75,7 +81,7 @@ function getChartOptions(theme) {
   };
 }
 
-function getCandlestickOptions(theme) {
+function getCandlestickOptions() {
   return {
     upColor: '#0ECB81',
     downColor: '#F6465D',
@@ -145,7 +151,7 @@ function createTimeframeSelector(handleTimeframeChange) {
   return timeframeContainer;
 }
 
-function updateLightweightChart(data, symbol, timeframe) {
+function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false) {
   if (!chartInstance || !candlestickSeries) return;
 
   // Store the last data for theme changes
@@ -153,7 +159,7 @@ function updateLightweightChart(data, symbol, timeframe) {
   lastSymbol = symbol;
   lastTimeframe = timeframe;
 
-  const { currentCandles, candlesWsConnected } = data;
+  const { currentCandles } = data;
 
   // CRITICAL: Convert data format from ECharts to Lightweight Charts
   // ECharts: [timestamp, open, close, low, high, volume]
@@ -175,8 +181,11 @@ function updateLightweightChart(data, symbol, timeframe) {
   // Update chart title - we'll add this as a visual indicator
   updateChartTitle(symbol, timeframe);
 
-  // Fit content to visible area
-  chartInstance.timeScale().fitContent();
+  // Only fit content on initial load or when user hasn't zoomed
+  // This preserves user zoom/pan state during real-time updates
+  if (isInitialLoad || !userHasZoomed) {
+    chartInstance.timeScale().fitContent();
+  }
 }
 
 function updateChartTitle(symbol, timeframe) {
@@ -195,6 +204,7 @@ function updateLatestCandle(candleData) {
   if (!candlestickSeries) return;
 
   // CRITICAL: Use update() for real-time updates, not setData()
+  // This preserves zoom state and is more efficient for single candle updates
   const formattedCandle = {
     time: Math.floor(candleData.timestamp / 1000), // Convert milliseconds to seconds
     open: candleData.open,
@@ -204,6 +214,11 @@ function updateLatestCandle(candleData) {
   };
 
   candlestickSeries.update(formattedCandle);
+}
+
+function resetZoomState() {
+  // Reset zoom tracking when symbol or timeframe changes
+  userHasZoomed = false;
 }
 
 function disposeLightweightChart() {
@@ -219,6 +234,7 @@ function disposeLightweightChart() {
   lastChartData = null;
   lastSymbol = null;
   lastTimeframe = null;
+  userHasZoomed = false;
 }
 
 // Export functions for backward compatibility with existing code
@@ -227,5 +243,6 @@ export {
   createTimeframeSelector, 
   updateLightweightChart as updateCandlestickChart,
   updateLatestCandle,
+  resetZoomState,
   disposeLightweightChart
 };
