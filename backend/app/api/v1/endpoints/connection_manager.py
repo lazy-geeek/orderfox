@@ -10,6 +10,7 @@ import asyncio
 import json
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.exchange_service import exchange_service
+from app.services.chart_data_service import chart_data_service
 from app.services.trading_engine_service import TradingEngineService
 from app.services.orderbook_manager import orderbook_manager
 from app.models.orderbook import OrderBookSnapshot, OrderBookLevel
@@ -810,17 +811,15 @@ class ConnectionManager:
                         display_symbol = getattr(self, "_display_symbols", {}).get(
                             stream_key, symbol
                         )
-                        formatted_data = {
-                            "type": "candle_update",
-                            "symbol": display_symbol,
-                            "timeframe": timeframe,
-                            "timestamp": latest_candle[0],
-                            "open": float(latest_candle[1]),
-                            "high": float(latest_candle[2]),
-                            "low": float(latest_candle[3]),
-                            "close": float(latest_candle[4]),
-                            "volume": float(latest_candle[5]),
-                        }
+                        
+                        # Use chart data service for consistent formatting
+                        formatted_data = await chart_data_service.prepare_websocket_message(
+                            display_symbol, timeframe, latest_candle
+                        )
+                        
+                        if not formatted_data:
+                            logger.warning(f"Invalid candle data for {symbol} {timeframe}: {latest_candle}")
+                            continue
 
                         # Broadcast to all connected clients for this stream
                         await self.broadcast_to_stream(stream_key, formatted_data)

@@ -1,23 +1,23 @@
 # OrderFox Trading Bot
 
-A full-stack trading application with React TypeScript frontend and FastAPI backend for cryptocurrency trading.
+A full-stack trading application with vanilla JavaScript frontend and FastAPI backend for cryptocurrency trading, featuring TradingView Lightweight Charts for professional-grade chart visualization.
 
 ## Prerequisites
 
 Before setting up the project, ensure you have the following installed:
 
 - **Python 3.8+** - Required for the backend FastAPI application
-- **Node.js 16+** - Required for the frontend React application
+- **Node.js 16+** - Required for the frontend vanilla JavaScript application
 - **npm** - Comes with Node.js, used for frontend package management
 - **pip** - Python package manager (usually comes with Python)
 
 ## Project Structure
 
-- `frontend/` - React TypeScript application with Redux state management
-- `backend/` - FastAPI Python backend with WebSocket support
-- `.env.example` - Example environment configuration file
+- `frontend_vanilla/` - Vanilla JavaScript application with Vite build system and TradingView Lightweight Charts
+- `backend/` - FastAPI Python backend with WebSocket support and optimized chart data streaming
+- `.env.example` - Example environment configuration file  
 - `backend/tests/` - Backend unit tests using pytest
-- `frontend/src/` - Frontend source code with components and features
+- `frontend_vanilla/src/` - Frontend source code with components, services, and chart integration
 
 ## Configuration
 
@@ -73,7 +73,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 1. **Navigate to the frontend directory:**
 ```bash
-cd frontend
+cd frontend_vanilla
 ```
 
 2. **Install Node.js dependencies:**
@@ -81,9 +81,9 @@ cd frontend
 npm install
 ```
 
-3. **Start the React development server:**
+3. **Start the Vite development server:**
 ```bash
-npm start
+npm run dev
 ```
 
 ## Running the Application
@@ -95,9 +95,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Starting the Frontend
-Navigate to the `frontend` directory and run:
+Navigate to the `frontend_vanilla` directory and run:
 ```bash
-npm start
+npm run dev
 ```
 
 ### Access URLs
@@ -112,9 +112,10 @@ npm start
 1. **Select a Trading Symbol:** Use the symbol selector to choose a cryptocurrency trading pair (e.g., BTCUSDT, ETHUSDT).
 
 2. **View Market Data:**
-   - Monitor real-time candlestick charts showing price movements
+   - Monitor professional-grade candlestick charts powered by TradingView Lightweight Charts
+   - Switch between different timeframes (1m, 5m, 15m, 1h, 4h, 1d)
    - Observe the order book with current bid/ask prices and volumes
-   - All data updates automatically via WebSocket connections
+   - All data updates automatically via optimized WebSocket connections
 
 3. **Paper Trading:**
    - The application starts in paper trading mode by default for safe testing
@@ -138,12 +139,14 @@ npm start
 
 ## Features
 
-- **Real-time Market Data:** Live candlestick charts and order book updates via WebSocket
+- **Professional Chart Visualization:** TradingView Lightweight Charts for high-performance candlestick display
+- **Real-time Market Data:** Live chart updates and order book data via optimized WebSocket streams
 - **Manual Trading Interface:** Intuitive form for placing buy/sell orders
 - **Order Book Display:** Real-time bid/ask prices with market depth visualization
 - **Position Management:** Track holdings, P&L, and portfolio performance
 - **Paper Trading Mode:** Safe testing environment with simulated funds
 - **Trading Mode Toggle:** Switch between paper and live trading
+- **Theme Support:** Dark/light mode switching with smooth chart transitions
 - **Responsive Design:** Works seamlessly on desktop and mobile devices
 - **API Documentation:** Auto-generated Swagger UI for backend endpoints
 

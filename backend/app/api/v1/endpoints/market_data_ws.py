@@ -10,6 +10,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.services.exchange_service import exchange_service
 from app.services.symbol_service import symbol_service
+from app.services.chart_data_service import chart_data_service
 from app.api.v1.endpoints.connection_manager import connection_manager
 from app.api.v1.endpoints.trading import trading_engine_service_instance
 from app.core.logging_config import get_logger
@@ -419,7 +420,18 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
         # Create stream key for this symbol:timeframe combination using exchange symbol
         stream_key = f"{exchange_symbol}:{timeframe}"
 
-        # Connect to the connection manager
+        # Send initial historical data before starting real-time stream
+        try:
+            historical_data = await chart_data_service.get_initial_chart_data(
+                exchange_symbol, timeframe, limit=100
+            )
+            await websocket.send_text(json.dumps(historical_data))
+            logger.info(f"Sent initial historical data for {symbol}/{timeframe}: {historical_data.get('count', 0)} candles")
+        except Exception as e:
+            logger.error(f"Failed to send initial historical data for {symbol}/{timeframe}: {e}")
+            # Continue with real-time stream even if historical data fails
+
+        # Connect to the connection manager for real-time updates
         await connection_manager.connect(websocket, stream_key, "candles", symbol)
         logger.info(
             f"WebSocket candles streaming started for {symbol}/{timeframe} (exchange: {exchange_symbol})"

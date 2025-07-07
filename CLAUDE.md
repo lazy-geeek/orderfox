@@ -7,10 +7,11 @@ This file provides guidance to Claude Code when working with the OrderFox codeba
 OrderFox is a cryptocurrency trading application with real-time market data and paper trading capabilities.
 
 **Tech Stack:**
-- Frontend: Vanilla JavaScript with Vite
+- Frontend: Vanilla JavaScript with Vite and TradingView Lightweight Charts
 - Backend: FastAPI + Python with WebSocket support
 - Trading: Binance API integration via ccxt
 - Real-time: WebSocket connections for live market data
+- Charts: TradingView Lightweight Charts for professional candlestick visualization
 
 ## Quick Start
 
@@ -125,6 +126,12 @@ Update parameters without reconnecting:
 1. Backend: Update aggregation in `orderbook_aggregation_service.py`
 2. Backend: Adjust formatting in `formatting_service.py`
 3. Frontend: Update display in `OrderBookDisplay.js`
+
+### Modifying Chart Display
+1. Backend: Update chart data processing in `chart_data_service.py`
+2. Backend: Adjust WebSocket data streaming in `market_data_ws.py`
+3. Frontend: Update chart component in `LightweightChart.js`
+4. Note: Uses TradingView Lightweight Charts API, not ECharts
 
 ### Working with WebSockets
 - Connection management: `connection_manager.py`

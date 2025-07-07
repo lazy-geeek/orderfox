@@ -23,7 +23,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['echarts']
+          vendor: ['lightweight-charts']
         }
       }
     }
@@ -32,6 +32,6 @@ export default defineConfig({
     devSourcemap: true
   },
   optimizeDeps: {
-    include: ['echarts']
+    include: ['lightweight-charts']
   }
 })
