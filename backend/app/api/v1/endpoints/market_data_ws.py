@@ -338,7 +338,12 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
 
 
 @router.websocket("/ws/candles/{symbol}/{timeframe}")
-async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
+async def websocket_candles(
+    websocket: WebSocket, 
+    symbol: str, 
+    timeframe: str,
+    limit: int = Query(default=100, ge=50, le=1000, description="Number of historical candles to fetch")
+):
     """
     WebSocket endpoint for real-time candle/OHLCV updates.
 
@@ -346,6 +351,7 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
         websocket: WebSocket connection
         symbol: Trading symbol (e.g., 'BTCUSDT')
         timeframe: Timeframe for candles (e.g., '1m', '5m', '1h', '1d')
+        limit: Number of historical candles to fetch (default: 100, min: 50, max: 1000)
 
     The WebSocket will send JSON messages with the following format:
     {
@@ -423,12 +429,12 @@ async def websocket_candles(websocket: WebSocket, symbol: str, timeframe: str):
         # Send initial historical data before starting real-time stream
         try:
             historical_data = await chart_data_service.get_initial_chart_data(
-                exchange_symbol, timeframe, limit=100
+                exchange_symbol, timeframe, limit=limit
             )
             # Override the symbol in the response to use the frontend format
             historical_data['symbol'] = symbol  # Use original frontend symbol, not exchange symbol
             await websocket.send_text(json.dumps(historical_data))
-            logger.info(f"Sent initial historical data for {symbol}/{timeframe}: {historical_data.get('count', 0)} candles")
+            logger.info(f"Sent initial historical data for {symbol}/{timeframe}: {historical_data.get('count', 0)} candles (requested: {limit})")
         except Exception as e:
             logger.error(f"Failed to send initial historical data for {symbol}/{timeframe}: {e}")
             # Continue with real-time stream even if historical data fails

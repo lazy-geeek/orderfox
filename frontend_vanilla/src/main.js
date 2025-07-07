@@ -148,7 +148,8 @@ symbolSelector.addEventListener('change', (e) => {
   disconnectAllWebSockets(); // Disconnect all old streams
   
   // Connect new WebSocket streams immediately (no delay needed)
-  connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe);
+  const optimalCandleCount = getOptimalCandleCount();
+  connectWebSocketStream(state.selectedSymbol, 'candles', state.selectedTimeframe, optimalCandleCount);
   connectWebSocketStream(state.selectedSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
 });
 
@@ -160,7 +161,8 @@ const timeframeSelector = createTimeframeSelector((newTimeframe) => {
   disconnectWebSocketStream('candles', state.selectedSymbol, state.selectedTimeframe);
   
   // Connect new WebSocket stream immediately (no delay needed)
-  connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe);
+  const optimalCandleCount = getOptimalCandleCount();
+  connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, optimalCandleCount);
 });
 candlestickChartContainer.prepend(timeframeSelector);
 
@@ -213,7 +215,8 @@ fetchSymbols().then(() => {
     
     // Start WebSocket connections for the selected symbol
     // The WebSocket will send initial historical chart data immediately
-    connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe);
+    const optimalCandleCount = getOptimalCandleCount();
+    connectWebSocketStream(firstSymbol.id, 'candles', state.selectedTimeframe, optimalCandleCount);
     connectWebSocketStream(firstSymbol.id, 'orderbook', null, state.displayDepth, state.selectedRounding);
   }
 });

@@ -36,6 +36,9 @@ export const connectWebSocketStream = async (
   let wsUrl;
   if (timeframe) {
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
+    if (streamType === 'candles' && limit) {
+      wsUrl += `?limit=${limit}`;
+    }
   } else {
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
     if (streamType === 'orderbook' && limit) {
