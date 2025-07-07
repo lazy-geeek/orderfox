@@ -69,11 +69,16 @@ function getChartOptions(theme) {
     },
     rightPriceScale: {
       borderColor: isDark ? '#2B3139' : '#EAECEF',
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.1,
+      },
     },
     timeScale: {
       borderColor: isDark ? '#2B3139' : '#EAECEF',
       timeVisible: true,
       secondsVisible: false,
+      rightOffset: 5, // Add space between current candle and right edge
     },
     crosshair: {
       mode: 0, // Normal crosshair mode
