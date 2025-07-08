@@ -1095,16 +1095,24 @@ class ConnectionManager:
 
             # Test connection before starting stream
             if exchange_pro is None:
-                logger.warning(
-                    f"CCXT Pro not available for {symbol}, using mock data")
-                await self._stream_mock_trades(symbol, stream_key)
+                error_msg = f"CCXT Pro not available for {symbol} trades streaming"
+                logger.error(error_msg)
+                error_data = {
+                    "type": "error",
+                    "message": error_msg
+                }
+                await self.broadcast_to_stream(stream_key, error_data)
                 return
 
             # Check if exchange supports watchTrades
             if not exchange_pro.has.get('watchTrades'):
-                logger.warning(
-                    f"Exchange does not support watchTrades for {symbol}, using mock data")
-                await self._stream_mock_trades(symbol, stream_key)
+                error_msg = f"Exchange does not support watchTrades for {symbol}"
+                logger.error(error_msg)
+                error_data = {
+                    "type": "error", 
+                    "message": error_msg
+                }
+                await self.broadcast_to_stream(stream_key, error_data)
                 return
 
             try:
@@ -1113,15 +1121,39 @@ class ConnectionManager:
                 logger.info(
                     f"Exchange connection test successful for trades {symbol}")
             except Exception as e:
-                logger.error(
-                    f"Exchange connection test failed for trades {symbol}: {str(e)}")
-                logger.info(f"Falling back to mock trades data for {symbol}")
-                await self._stream_mock_trades(symbol, stream_key)
+                error_msg = f"Exchange connection test failed for trades {symbol}: {str(e)}"
+                logger.error(error_msg)
+                error_data = {
+                    "type": "error",
+                    "message": error_msg
+                }
+                await self.broadcast_to_stream(stream_key, error_data)
                 return
 
-            # Keep last 100 trades
+            # Initialize trades cache with historical data
             from collections import deque
             trades_cache = deque(maxlen=100)
+            
+            # Fetch and populate initial historical trades from exchange
+            try:
+                from app.services.symbol_service import symbol_service
+                symbol_info = symbol_service.get_symbol_info(symbol)
+                historical_trades = await trade_service.fetch_recent_trades(symbol, limit=100)
+                
+                # Add historical trades to cache (they're already in newest-first order)
+                for trade in historical_trades:
+                    trades_cache.append(trade)
+                    
+                logger.info(f"Initialized trades cache for {symbol} with {len(historical_trades)} historical trades")
+            except Exception as e:
+                error_msg = f"Failed to load historical trades for {symbol} streaming: {e}"
+                logger.error(error_msg)
+                error_data = {
+                    "type": "error",
+                    "message": error_msg
+                }
+                await self.broadcast_to_stream(stream_key, error_data)
+                return
 
             while (
                 stream_key in self.active_connections
@@ -1197,87 +1229,6 @@ class ConnectionManager:
             # Do NOT close exchange_pro here. It should be managed globally.
             pass
 
-    async def _stream_mock_trades(self, symbol: str, stream_key: str):
-        """Stream mock trades data when CCXT Pro is not available."""
-        logger.info(f"Starting mock trades stream for {symbol}")
-        import random
-        import time
-
-        # Keep last 100 trades
-        from collections import deque
-        trades_cache = deque(maxlen=100)
-
-        # Generate initial mock trades
-        mock_trades = trade_service.generate_mock_trades(symbol, count=50)
-        for trade in mock_trades:
-            trades_cache.append(trade)
-
-        while (
-            stream_key in self.active_connections
-            and self.active_connections[stream_key]
-        ):
-            try:
-                # Generate new mock trade
-                current_time = int(time.time() * 1000)
-                base_price = 50000.0
-                price_variation = random.uniform(-0.005, 0.005)  # ±0.5% change
-                price = base_price * (1 + price_variation)
-                amount = random.uniform(0.01, 2.0)
-                side = random.choice(['buy', 'sell'])
-
-                # Create mock trade
-                mock_trade_raw = {
-                    'id': f"mock_{current_time}_{random.randint(1000, 9999)}",
-                    'price': price,
-                    'amount': amount,
-                    'side': side,
-                    'timestamp': current_time
-                }
-
-                # Format the trade
-                try:
-                    from app.services.symbol_service import symbol_service
-                    symbol_info = symbol_service.get_symbol_info(symbol) or {
-                        'pricePrecision': 2,
-                        'amountPrecision': 8
-                    }
-                    formatted_trade = trade_service.format_trade(mock_trade_raw, symbol_info)
-                    trades_cache.appendleft(formatted_trade)
-
-                    # CRITICAL: Validate stream is still active before broadcast
-                    if stream_key not in self.active_connections or not self.active_connections[stream_key]:
-                        logger.debug(f"Mock trades stream {stream_key} no longer active, stopping")
-                        break
-
-                    # Use display symbol if available, otherwise use the stream symbol
-                    display_symbol = getattr(self, "_display_symbols", {}).get(
-                        stream_key, symbol
-                    )
-
-                    # Send update
-                    update = {
-                        "type": "trades_update",
-                        "symbol": display_symbol,
-                        "trades": list(trades_cache),
-                        "initial": False,
-                        "timestamp": current_time,
-                        "mock": True  # Indicate this is mock data
-                    }
-
-                    await self.broadcast_to_stream(stream_key, update)
-
-                except Exception as e:
-                    logger.warning(f"Failed to format mock trade for {symbol}: {e}")
-
-                # Wait before next update
-                await asyncio.sleep(random.uniform(2.0, 5.0))  # 2-5 seconds between trades
-
-            except Exception as e:
-                logger.error(
-                    f"Error in mock trades stream for {symbol}: {str(e)}")
-                await asyncio.sleep(5)  # Wait before retrying
-
-        logger.info(f"Mock trades stream ended for {symbol}")
 
     async def _restart_orderbook_stream(self, symbol: str):
         """Restart orderbook stream with updated limit."""

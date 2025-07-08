@@ -83,7 +83,7 @@ async def websocket_trades(websocket: WebSocket, symbol: str):
         # Fetch initial trades data
         try:
             logger.info(f"Fetching initial trades data for {symbol}")
-            initial_trades = await trade_service.fetch_trades_with_fallback(
+            initial_trades = await trade_service.fetch_recent_trades(
                 exchange_symbol, limit=100
             )
 

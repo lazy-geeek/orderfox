@@ -150,7 +150,8 @@ Optional settings:
 - **Real-time Streaming**: Live trade data via WebSocket with CCXT Pro integration
 - **Backend Processing**: Trade data formatting and validation server-side
 - **Color-coded Display**: Buy trades (green) and sell trades (red) with proper styling
-- **Mock Data Fallback**: Comprehensive mock data generation when live data unavailable
+- **Exchange Data Only**: No mock data fallbacks - proper error handling when exchange unavailable
+- **Historical + Real-time Merge**: Backend maintains unified trade history combining historical data with live streaming
 - **Component Architecture**: Follows OrderBookDisplay patterns for consistency
 
 ### Exchange Service Patterns
