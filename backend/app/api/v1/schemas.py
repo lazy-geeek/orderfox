@@ -5,7 +5,7 @@ This module defines the data models used for API endpoints,
 particularly for market data operations.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from enum import Enum
@@ -196,6 +196,89 @@ class Ticker(BaseModel):
                 "volume": 1250.75,
                 "quote_volume": 54125000.00,
                 "timestamp": "2024-01-01T12:00:00Z",
+            }
+        }
+    )
+
+
+class Trade(BaseModel):
+    """
+    Schema for trade data.
+
+    Represents a single trade execution with price, amount, side,
+    and formatted display values.
+    """
+
+    id: str = Field(..., description="Unique trade identifier")
+    price: float = Field(..., description="Trade execution price", gt=0)
+    amount: float = Field(..., description="Trade amount/quantity", gt=0)
+    side: Literal["buy", "sell"] = Field(..., description="Trade side (buy or sell)")
+    timestamp: int = Field(
+        ..., description="Unix timestamp in milliseconds when trade occurred"
+    )
+    price_formatted: str = Field(..., description="Formatted price string for display")
+    amount_formatted: str = Field(..., description="Formatted amount string for display")
+    time_formatted: str = Field(..., description="Formatted time string (HH:MM:SS)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "12345",
+                "price": 50000.0,
+                "amount": 1.5,
+                "side": "buy",
+                "timestamp": 1640995200000,
+                "price_formatted": "50,000.00",
+                "amount_formatted": "1.50000000",
+                "time_formatted": "12:30:45"
+            }
+        }
+    )
+
+
+class TradesUpdate(BaseModel):
+    """
+    Schema for WebSocket trades update message.
+
+    Represents a real-time update containing trade data for a symbol,
+    including both historical and live trades.
+    """
+
+    type: Literal["trades_update"] = Field(
+        default="trades_update", 
+        description="Message type identifier"
+    )
+    symbol: str = Field(..., description="Trading symbol")
+    trades: List[Trade] = Field(
+        ..., description="List of trades (newest first)"
+    )
+    initial: bool = Field(
+        default=False, 
+        description="True for first batch of historical trades"
+    )
+    timestamp: int = Field(
+        ..., description="Unix timestamp when update was sent"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "type": "trades_update",
+                "symbol": "BTCUSDT",
+                "trades": [
+                    {
+                        "id": "12345",
+                        "price": 50000.0,
+                        "amount": 1.5,
+                        "side": "buy",
+                        "timestamp": 1640995200000,
+                        "price_formatted": "50,000.00",
+                        "amount_formatted": "1.50000000",
+                        "time_formatted": "12:30:45"
+                    }
+                ],
+                "initial": True,
+                "timestamp": 1640995200000
             }
         }
     )

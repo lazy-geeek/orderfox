@@ -15,6 +15,10 @@ const state = {
   orderBookWsConnected: false,
   currentTicker: null,
   tickerWsConnected: false,
+  currentTrades: [],
+  tradesLoading: false,
+  tradesError: null,
+  tradesWsConnected: false,
   selectedRounding: null,
   availableRoundingOptions: [], // Provided by backend
   displayDepth: 10,
@@ -180,6 +184,68 @@ const validateTicker = (ticker) => {
   return parsedTicker;
 };
 
+const validateTrades = (tradesArray) => {
+  if (!Array.isArray(tradesArray)) {
+    console.warn('Invalid trades data: not an array', tradesArray);
+    return [];
+  }
+
+  return tradesArray
+    .map((trade, index) => {
+      if (!trade || typeof trade !== 'object') {
+        console.warn(`Invalid trade at index ${index}: not an object`, trade);
+        return null;
+      }
+
+      // Validate required fields
+      const requiredFields = ['id', 'price', 'amount', 'side', 'timestamp'];
+      for (const field of requiredFields) {
+        if (!trade[field] && trade[field] !== 0) {
+          console.warn(`Invalid trade at index ${index}: missing ${field}`, trade);
+          return null;
+        }
+      }
+
+      // Validate numeric fields
+      const price = parseFloat(trade.price);
+      const amount = parseFloat(trade.amount);
+      const timestamp = parseInt(trade.timestamp);
+
+      if (isNaN(price) || price <= 0) {
+        console.warn(`Invalid trade at index ${index}: invalid price`, trade.price);
+        return null;
+      }
+
+      if (isNaN(amount) || amount <= 0) {
+        console.warn(`Invalid trade at index ${index}: invalid amount`, trade.amount);
+        return null;
+      }
+
+      if (isNaN(timestamp) || timestamp <= 0) {
+        console.warn(`Invalid trade at index ${index}: invalid timestamp`, trade.timestamp);
+        return null;
+      }
+
+      // Validate side
+      if (!['buy', 'sell'].includes(trade.side)) {
+        console.warn(`Invalid trade at index ${index}: invalid side`, trade.side);
+        return null;
+      }
+
+      return {
+        id: String(trade.id),
+        price: price,
+        amount: amount,
+        side: trade.side,
+        timestamp: timestamp,
+        price_formatted: trade.price_formatted || String(price),
+        amount_formatted: trade.amount_formatted || String(amount),
+        time_formatted: trade.time_formatted || new Date(timestamp).toLocaleTimeString()
+      };
+    })
+    .filter(trade => trade !== null);
+};
+
 // Mutator functions (equivalent to Redux reducers and actions)
 // calculateAndSetRoundingOptions removed - now handled by backend
 
@@ -190,9 +256,11 @@ function setSelectedSymbol(symbol) {
     state.currentOrderBook = { bids: [], asks: [], symbol: '', timestamp: 0 };
     state.currentCandles = [];
     state.currentTicker = null;
+    state.currentTrades = [];
     state.candlesWsConnected = false;
     state.orderBookWsConnected = false;
     state.tickerWsConnected = false;
+    state.tradesWsConnected = false;
     
     // Set rounding options from symbol data
     const selectedSymbolData = state.symbolsList.find(s => s.id === symbol);
@@ -208,9 +276,11 @@ function setSelectedSymbol(symbol) {
   notify('currentOrderBook');
   notify('currentCandles');
   notify('currentTicker');
+  notify('currentTrades');
   notify('candlesWsConnected');
   notify('orderBookWsConnected');
   notify('tickerWsConnected');
+  notify('tradesWsConnected');
   notify('selectedRounding');
   notify('availableRoundingOptions');
 }
@@ -379,15 +449,80 @@ function setTickerWsConnected(connected) {
   notify('tickerWsConnected');
 }
 
+function updateTradesFromWebSocket(payload) {
+  if (!payload || typeof payload !== 'object') {
+    console.warn('Invalid trades payload: not an object', payload);
+    return;
+  }
+
+  // Validate symbol matches
+  if (state.selectedSymbol && payload.symbol && payload.symbol !== state.selectedSymbol) {
+    console.warn('Received trades for different symbol, skipping update:', payload.symbol, 'vs', state.selectedSymbol);
+    return;
+  }
+
+  // Validate trades array
+  if (!payload.trades || !Array.isArray(payload.trades)) {
+    console.warn('Invalid trades payload: missing or invalid trades array', payload);
+    return;
+  }
+
+  // Validate and filter trades
+  const validatedTrades = validateTrades(payload.trades);
+  
+  if (validatedTrades.length === 0 && payload.trades.length > 0) {
+    console.warn('All trades in payload were invalid', payload.trades);
+    return;
+  }
+
+  // Update state with validated trades
+  state.currentTrades = validatedTrades;
+  state.tradesLoading = false; // Clear loading state when data arrives
+  
+  notify('currentTrades');
+  notify('tradesLoading');
+}
+
+function setTradesWsConnected(connected) {
+  state.tradesWsConnected = connected;
+  notify('tradesWsConnected');
+}
+
+function setTradesLoading(loading) {
+  state.tradesLoading = loading;
+  notify('tradesLoading');
+}
+
+function setTradesError(error) {
+  state.tradesError = error;
+  notify('tradesError');
+}
+
+function clearTradesError() {
+  state.tradesError = null;
+  notify('tradesError');
+}
+
+function clearTrades() {
+  state.currentTrades = [];
+  state.tradesWsConnected = false;
+  state.tradesLoading = true; // Indicate transition state
+  notify('currentTrades');
+  notify('tradesWsConnected');
+  notify('tradesLoading');
+}
+
 function clearError() {
   state.candlesError = null;
   state.orderBookError = null;
   state.symbolsError = null;
   state.tickerError = null;
+  state.tradesError = null;
   notify('candlesError');
   notify('orderBookError');
   notify('symbolsError');
   notify('tickerError');
+  notify('tradesError');
 }
 
 function setSelectedRounding(rounding) {
@@ -410,6 +545,14 @@ function setShouldRestartWebSocketAfterFetch(value) {
 function setDisplayDepth(depth) {
   state.displayDepth = depth;
   notify('displayDepth');
+}
+
+function getSelectedSymbolData() {
+  if (!state.selectedSymbol || !state.symbolsList) {
+    return null;
+  }
+  
+  return state.symbolsList.find(symbol => symbol.id === state.selectedSymbol) || null;
 }
 
 function clearOrderBook() {
@@ -629,11 +772,18 @@ export {
   setOrderBookWsConnected,
   updateTickerFromWebSocket,
   setTickerWsConnected,
+  updateTradesFromWebSocket,
+  setTradesWsConnected,
+  setTradesLoading,
+  setTradesError,
+  clearTradesError,
+  clearTrades,
   clearError,
   setSelectedRounding,
   setAvailableRoundingOptions,
   setShouldRestartWebSocketAfterFetch,
   setDisplayDepth,
+  getSelectedSymbolData,
   clearOrderBook,
   fetchSymbols,
   fetchOrderBook,

@@ -747,3 +747,180 @@ body {
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+
+/* Last Trades Display CSS */
+.orderfox-last-trades-display {
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  margin: 10px;
+  box-shadow: var(--shadow-light);
+  overflow: hidden;
+}
+
+.orderfox-last-trades-display .order-book-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.orderfox-last-trades-display .order-book-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.orderfox-last-trades-display .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.orderfox-last-trades-display .symbol-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.orderfox-last-trades-display .connection-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.orderfox-last-trades-display .status-indicator.connected {
+  color: var(--color-buy);
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .status-indicator.disconnected {
+  color: var(--color-sell);
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .status-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.orderfox-last-trades-display .order-book-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.orderfox-last-trades-display .trades-section {
+  flex: 1;
+}
+
+.orderfox-last-trades-display .section-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 10px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.orderfox-last-trades-display .trades-header {
+  background: rgba(14, 203, 129, 0.05);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.orderfox-last-trades-display .price-header {
+  text-align: left;
+}
+
+.orderfox-last-trades-display .amount-header {
+  text-align: right;
+}
+
+.orderfox-last-trades-display .time-header {
+  text-align: right;
+}
+
+.orderfox-last-trades-display .trades-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.orderfox-last-trades-display .trades-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.orderfox-last-trades-display .trade-level {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  transition: background-color 0.1s ease;
+}
+
+.orderfox-last-trades-display .trade-level:hover {
+  background: var(--hover-bg);
+}
+
+.orderfox-last-trades-display .trade-level .price {
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.orderfox-last-trades-display .trade-level .amount {
+  text-align: right;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .trade-level .time {
+  text-align: right;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .bid-price {
+  color: var(--color-buy) !important;
+}
+
+.orderfox-last-trades-display .ask-price {
+  color: var(--color-sell) !important;
+}
+
+.orderfox-last-trades-display .order-book-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  text-align: center;
+}
+
+.orderfox-last-trades-display .timestamp {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.orderfox-last-trades-display .loading-state,
+.orderfox-last-trades-display .empty-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.orderfox-last-trades-display .loading-state {
+  color: var(--color-info);
+}

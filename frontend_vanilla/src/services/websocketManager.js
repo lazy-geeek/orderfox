@@ -9,6 +9,7 @@
 import {
   state,
   clearOrderBook,
+  clearTrades,
   setSelectedSymbol,
   setSelectedTimeframe,
 } from '../store/store.js';
@@ -78,6 +79,7 @@ export class WebSocketManager {
     // Reset UI state
     resetZoomState();
     clearOrderBook();
+    clearTrades();
     
     // CRITICAL: Clear current candles to prevent stale data
     if (typeof window !== 'undefined' && window.state && window.state.currentCandles) {
@@ -97,6 +99,7 @@ export class WebSocketManager {
     const optimalCandleCount = getOptimalCandleCount();
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, optimalCandleCount);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
+    connectWebSocketStream(newSymbol, 'trades');
   }
 
   /**
@@ -168,11 +171,13 @@ export class WebSocketManager {
     // Reset UI state for initial load
     resetZoomState();
     clearOrderBook();
+    clearTrades();
     
     // Start WebSocket connections for the selected symbol
     const optimalCandleCount = getOptimalCandleCount();
     connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, optimalCandleCount);
     connectWebSocketStream(symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
+    connectWebSocketStream(symbol, 'trades');
   }
 
   /**

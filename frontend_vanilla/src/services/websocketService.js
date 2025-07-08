@@ -4,9 +4,11 @@ import {
   updateCandlesFromHistoricalData,
   updateOrderBookFromWebSocket,
   updateTickerFromWebSocket,
+  updateTradesFromWebSocket,
   setCandlesWsConnected,
   setOrderBookWsConnected,
   setTickerWsConnected,
+  setTradesWsConnected,
 } from '../store/store.js';
 import { WS_BASE_URL } from '../config/env.js';
 
@@ -134,6 +136,8 @@ export const connectWebSocketStream = async (
         // Note: orderBookLoading will be set to false when first message arrives
       } else if (streamType === 'ticker') {
         setTickerWsConnected(true);
+      } else if (streamType === 'trades') {
+        setTradesWsConnected(true);
       }
     };
 
@@ -152,6 +156,8 @@ export const connectWebSocketStream = async (
           updateOrderBookFromWebSocket(data);
         } else if (data.type === 'ticker_update') {
           updateTickerFromWebSocket(data);
+        } else if (data.type === 'trades_update') {
+          updateTradesFromWebSocket(data);
         } else if (data.type === 'param_update_ack') {
           console.log('Parameter update acknowledged:', data);
         } else if (data.type === 'params_updated') {
@@ -173,6 +179,8 @@ export const connectWebSocketStream = async (
             updateCandlesFromWebSocket(data);
           } else if (streamType === 'ticker' && data.type === 'ticker_update') {
             updateTickerFromWebSocket(data);
+          } else if (streamType === 'trades' && data.type === 'trades_update') {
+            updateTradesFromWebSocket(data);
           } else {
             console.warn('Unknown WebSocket message type:', data.type, 'for stream:', streamType, data);
           }
@@ -197,6 +205,8 @@ export const connectWebSocketStream = async (
           setOrderBookWsConnected(false);
         } else if (streamType === 'ticker') {
           setTickerWsConnected(false);
+        } else if (streamType === 'trades') {
+          setTradesWsConnected(false);
         }
       }
     };
@@ -217,6 +227,8 @@ export const connectWebSocketStream = async (
           setOrderBookWsConnected(false);
         } else if (streamType === 'ticker') {
           setTickerWsConnected(false);
+        } else if (streamType === 'trades') {
+          setTradesWsConnected(false);
         }
         delete activeWebSockets[streamKey];
 
@@ -250,6 +262,8 @@ export const connectWebSocketStream = async (
       setCandlesWsConnected(false);
     } else if (streamType === 'orderbook') {
       setOrderBookWsConnected(false);
+    } else if (streamType === 'trades') {
+      setTradesWsConnected(false);
     }
   }
 };

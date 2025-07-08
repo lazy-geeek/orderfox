@@ -38,19 +38,28 @@ orderfox/
 │   ├── app/
 │   │   ├── main.py              # FastAPI entry point
 │   │   ├── api/v1/endpoints/    # API endpoints
+│   │   │   ├── trades_ws.py     # Real-time trades WebSocket endpoint
+│   │   │   └── connection_manager.py # WebSocket connection management
 │   │   ├── services/            # Business logic
+│   │   │   ├── trade_service.py # Trade data processing and formatting
+│   │   │   └── orderbook_aggregation_service.py # Order book processing
 │   │   ├── models/              # Data models
 │   │   └── core/                # Config, logging
 │   └── tests/                   # Pytest test suite
+│       └── services/
+│           └── test_trade_service.py # Trade service unit tests
 └── frontend_vanilla/
     ├── src/
     │   ├── components/          # UI components
+    │   │   ├── LastTradesDisplay.js # Real-time trades display component
+    │   │   └── OrderBookDisplay.js  # Order book display component
     │   ├── services/            # API, WebSocket & centralized managers
     │   │   ├── websocketManager.js  # Centralized WebSocket connection logic
     │   │   └── websocketService.js  # Low-level WebSocket operations
     │   └── store/               # State management
     ├── tests/                   # Vitest test suite
     │   ├── components/          # Component unit tests
+    │   │   └── LastTradesDisplay.test.js # Last trades component tests
     │   ├── integration/         # Integration tests
     │   └── setup.js             # Test configuration
     └── main.js                  # App entry point
@@ -137,11 +146,23 @@ Optional settings:
 - **Caching**: TTL-based caching for performance (10x improvement)
 - **Pre-formatted Data**: Backend sends formatted strings to frontend
 
+### Last Trades System
+- **Real-time Streaming**: Live trade data via WebSocket with CCXT Pro integration
+- **Backend Processing**: Trade data formatting and validation server-side
+- **Color-coded Display**: Buy trades (green) and sell trades (red) with proper styling
+- **Mock Data Fallback**: Comprehensive mock data generation when live data unavailable
+- **Component Architecture**: Follows OrderBookDisplay patterns for consistency
+
 ### WebSocket Protocol
 
 Connect to order book:
 ```
 ws://localhost:8000/api/v1/ws/orderbook?symbol=BTCUSDT&limit=20&rounding=0.25
+```
+
+Connect to trades stream:
+```
+ws://localhost:8000/api/v1/ws/trades/BTCUSDT
 ```
 
 Update parameters without reconnecting:
@@ -170,6 +191,12 @@ Update parameters without reconnecting:
 1. Backend: Update aggregation in `orderbook_aggregation_service.py`
 2. Backend: Adjust formatting in `formatting_service.py`
 3. Frontend: Update display in `OrderBookDisplay.js`
+
+### Modifying Last Trades Display
+1. Backend: Update trade processing in `trade_service.py`
+2. Backend: Adjust WebSocket streaming in `trades_ws.py`
+3. Frontend: Update display in `LastTradesDisplay.js`
+4. Note: Follows OrderBookDisplay patterns for consistency
 
 ### Modifying Chart Display
 1. Backend: Update chart data processing in `chart_data_service.py`
@@ -204,6 +231,9 @@ python -m pytest tests/services/test_orderbook_aggregation_service.py -v
 # Chart data service tests
 python -m pytest tests/services/test_chart_data_service.py -v
 
+# Trade service tests
+python -m pytest tests/services/test_trade_service.py -v
+
 # Integration tests
 python -m pytest tests/integration/ -v
 
@@ -224,10 +254,12 @@ cd frontend_vanilla && npm run test:ui
 
 # Test specific component
 cd frontend_vanilla && npm test -- LightweightChart
+cd frontend_vanilla && npm test -- LastTradesDisplay
 ```
 
 **Frontend Test Coverage:**
 - **Price Precision Logic**: 14 unit tests covering default precision, dynamic updates, error handling, and edge cases
+- **Last Trades Component**: 14 unit tests covering component creation, trade updates, color coding, and state management
 - **Integration Tests**: 4 tests validating main.js flow and performance optimization patterns
 - **Framework**: Vitest with jsdom environment for DOM testing
 - **Test Structure**: Mirrors backend structure with `/tests/components/` and `/tests/integration/`

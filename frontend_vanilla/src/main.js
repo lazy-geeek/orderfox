@@ -5,6 +5,7 @@ import { createMainLayout } from './layouts/MainLayout.js';
 import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
 import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
+import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 
@@ -39,6 +40,7 @@ app.appendChild(mainLayout);
 const symbolSelectorPlaceholder = document.querySelector('#symbol-selector-placeholder');
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
+const lastTradesPlaceholder = document.querySelector('#last-trades-container');
 const tradingModeTogglePlaceholder = document.querySelector('#trading-mode-toggle-placeholder');
 const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 
@@ -52,6 +54,9 @@ createCandlestickChart(candlestickChartContainer);
 
 const orderBookDisplay = createOrderBookDisplay();
 orderBookPlaceholder.replaceWith(orderBookDisplay);
+
+const lastTradesDisplay = createLastTradesDisplay();
+lastTradesPlaceholder.replaceWith(lastTradesDisplay);
 
 const tradingModeToggle = createTradingModeToggle();
 tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
@@ -77,6 +82,7 @@ window.resetChartData = resetChartData;
 updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
 updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
 updateOrderBookDisplay(orderBookDisplay, state);
+updateLastTradesDisplay(lastTradesDisplay, state);
 updateTradingModeToggle(tradingModeToggle, state);
 
 // Subscribe to state changes and update UI
@@ -97,6 +103,11 @@ subscribe((key) => {
         true, // isInitialLoad
         selectedSymbolData // Pass symbol data for precision update
       );
+      
+      // Update trades headers with new symbol data
+      if (selectedSymbolData) {
+        updateTradesHeaders(selectedSymbolData);
+      }
       break;
     }
     case 'currentCandles':
@@ -115,6 +126,12 @@ subscribe((key) => {
     case 'displayDepth':
     case 'orderBookLoading':
       updateOrderBookDisplay(orderBookDisplay, state);
+      break;
+    case 'currentTrades':
+    case 'tradesWsConnected':
+    case 'tradesLoading':
+    case 'tradesError':
+      updateLastTradesDisplay(lastTradesDisplay, state);
       break;
     case 'tradingMode':
       updateTradingModeToggle(tradingModeToggle, state);

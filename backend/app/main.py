@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import ValidationError
 from app.api.v1.endpoints.market_data_http import router as market_data_http_router
 from app.api.v1.endpoints.market_data_ws import router as market_data_ws_router
+from app.api.v1.endpoints.trades_ws import router as trades_ws_router
 from app.api.v1.endpoints import trading as trading_router
 from app.core.logging_config import (
     setup_logging,
@@ -213,6 +214,10 @@ app.include_router(
     market_data_ws_router,
     prefix="/api/v1",
     tags=["market-data-ws"])
+app.include_router(
+    trades_ws_router,
+    prefix="/api/v1",
+    tags=["trades-ws"])
 app.include_router(trading_router.router, prefix="/api/v1", tags=["trading"])
 
 
