@@ -93,6 +93,11 @@ function getCandlestickOptions() {
     borderVisible: false,
     wickUpColor: '#0ECB81',
     wickDownColor: '#F6465D',
+    priceFormat: {
+      type: 'price',
+      precision: 2, // Default precision
+      minMove: 0.01, // Default minimum price movement
+    },
   };
 }
 
@@ -156,13 +161,40 @@ function createTimeframeSelector(handleTimeframeChange) {
   return timeframeContainer;
 }
 
-function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false) {
+function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, symbolData = null) {
   if (!chartInstance || !candlestickSeries) return;
 
   // Store the last data for theme changes
   lastChartData = data;
   lastSymbol = symbol;
   lastTimeframe = timeframe;
+
+  // Only update price format when symbol data is provided (symbol change or initial load)
+  if (symbolData && candlestickSeries) {
+    let precision = 2; // Default precision
+    
+    // Extract and validate precision from symbolData
+    if (symbolData.pricePrecision !== undefined && symbolData.pricePrecision !== null) {
+      // Validate precision is a non-negative integer and clamp to reasonable range (0-8)
+      const rawPrecision = symbolData.pricePrecision;
+      if (typeof rawPrecision === 'number' && !isNaN(rawPrecision) && rawPrecision >= 0) {
+        precision = Math.max(0, Math.min(8, Math.floor(rawPrecision)));
+      } else {
+        console.warn(`Invalid pricePrecision value for ${symbol}: ${rawPrecision}, using default precision: ${precision}`);
+      }
+    } else {
+      console.warn(`Missing pricePrecision for ${symbol}, using default precision: ${precision}`);
+    }
+    
+    // Apply price format with validated precision
+    candlestickSeries.applyOptions({
+      priceFormat: {
+        type: 'price',
+        precision: precision,
+        minMove: 1 / Math.pow(10, precision),
+      },
+    });
+  }
 
   const { currentCandles } = data;
 

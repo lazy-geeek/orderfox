@@ -49,6 +49,10 @@ orderfox/
     │   │   ├── websocketManager.js  # Centralized WebSocket connection logic
     │   │   └── websocketService.js  # Low-level WebSocket operations
     │   └── store/               # State management
+    ├── tests/                   # Vitest test suite
+    │   ├── components/          # Component unit tests
+    │   ├── integration/         # Integration tests
+    │   └── setup.js             # Test configuration
     └── main.js                  # App entry point
 ```
 
@@ -62,6 +66,12 @@ cd frontend_vanilla && npm install
 
 # Run tests
 cd backend && python -m pytest tests/ -v
+
+# Frontend tests
+cd frontend_vanilla && npm test
+
+# Run frontend tests once (CI mode)
+cd frontend_vanilla && npm run test:run
 
 # Full application test
 python test_paper_trading.py
@@ -146,6 +156,8 @@ Update parameters without reconnecting:
 - **Viewport-Based Data Loading**: Automatically calculates optimal candle count based on chart size
 - **Efficient Real-time Updates**: Uses `series.update()` for single candle updates to maintain performance
 - **Smart Auto-fitting**: Only calls `fitContent()` on initial load or symbol/timeframe changes
+- **Dynamic Price Precision**: Charts automatically adjust decimal places based on symbol precision (BTC: 1 decimal, XRP: 4 decimals, high-precision tokens: 6-7 decimals)
+- **Performance Optimization**: Price precision updates only on symbol changes, not during real-time data updates
 
 ### Working with WebSockets
 - **Backend**: Connection management in `connection_manager.py`
@@ -155,6 +167,7 @@ Update parameters without reconnecting:
 
 ## Testing
 
+### Backend Testing
 ```bash
 # Backend unit tests
 cd backend && python -m pytest tests/ -v
@@ -171,6 +184,27 @@ python -m pytest tests/integration/ -v
 # Performance tests
 python -m pytest tests/load/ -v
 ```
+
+### Frontend Testing
+```bash
+# Frontend unit tests (Vitest)
+cd frontend_vanilla && npm test
+
+# Run tests once (CI mode)
+cd frontend_vanilla && npm run test:run
+
+# Run tests with UI
+cd frontend_vanilla && npm run test:ui
+
+# Test specific component
+cd frontend_vanilla && npm test -- LightweightChart
+```
+
+**Frontend Test Coverage:**
+- **Price Precision Logic**: 14 unit tests covering default precision, dynamic updates, error handling, and edge cases
+- **Integration Tests**: 4 tests validating main.js flow and performance optimization patterns
+- **Framework**: Vitest with jsdom environment for DOM testing
+- **Test Structure**: Mirrors backend structure with `/tests/components/` and `/tests/integration/`
 
 ## Important Notes
 

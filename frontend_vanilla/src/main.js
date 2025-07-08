@@ -82,8 +82,20 @@ updateTradingModeToggle(tradingModeToggle, state);
 subscribe((key) => {
   switch (key) {
     case 'symbolsList':
-    case 'selectedSymbol':
       updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
+      break;
+    case 'selectedSymbol':
+      const selectedSymbolData = state.symbolsList.find(s => s.id === state.selectedSymbol);
+      updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
+      // Pass symbol data when symbol changes - reset zoom and treat as initial load
+      resetZoomState();
+      updateCandlestickChart(
+        { currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected },
+        state.selectedSymbol,
+        state.selectedTimeframe,
+        true, // isInitialLoad
+        selectedSymbolData // Pass symbol data for precision update
+      );
       break;
     case 'currentCandles':
       // Real-time updates - don't reset zoom
@@ -164,6 +176,14 @@ fetchSymbols().then(() => {
   if (state.symbolsList.length > 0) {
     const firstSymbol = state.symbolsList[0];
     WebSocketManager.initializeConnections(firstSymbol.id);
+    // Initial chart update with symbol data for price precision
+    updateCandlestickChart(
+      { currentCandles: [], candlesWsConnected: false },
+      firstSymbol.id,
+      state.selectedTimeframe,
+      true,
+      firstSymbol // Pass full symbol object for precision
+    );
   }
 });
 
