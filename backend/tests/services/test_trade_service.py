@@ -7,7 +7,7 @@ testing trade fetching, formatting, and error handling functionality.
 
 import pytest
 import time
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 from fastapi import HTTPException
 
 from app.services.trade_service import TradeService
@@ -42,7 +42,7 @@ class TestTradeService:
             
             # Setup mocks
             mock_symbol_service.get_symbol_info.return_value = self.mock_symbol_info
-            mock_exchange = AsyncMock()
+            mock_exchange = Mock()
             mock_exchange.fetch_trades.return_value = [self.mock_trade_raw]
             mock_exchange_service.get_exchange.return_value = mock_exchange
             
@@ -82,7 +82,7 @@ class TestTradeService:
             
             # Setup mocks
             mock_symbol_service.get_symbol_info.return_value = self.mock_symbol_info
-            mock_exchange = AsyncMock()
+            mock_exchange = Mock()
             mock_exchange.fetch_trades.side_effect = ccxt.NetworkError("Network timeout")
             mock_exchange_service.get_exchange.return_value = mock_exchange
             
@@ -103,7 +103,7 @@ class TestTradeService:
             
             # Setup mocks
             mock_symbol_service.get_symbol_info.return_value = self.mock_symbol_info
-            mock_exchange = AsyncMock()
+            mock_exchange = Mock()
             mock_exchange.fetch_trades.side_effect = ccxt.ExchangeError("Exchange API error")
             mock_exchange_service.get_exchange.return_value = mock_exchange
             

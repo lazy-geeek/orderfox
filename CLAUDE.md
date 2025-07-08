@@ -153,6 +153,13 @@ Optional settings:
 - **Mock Data Fallback**: Comprehensive mock data generation when live data unavailable
 - **Component Architecture**: Follows OrderBookDisplay patterns for consistency
 
+### Exchange Service Patterns
+- **CCXT Standard**: Regular CCXT exchange uses synchronous methods (`exchange.fetch_trades()`, `exchange.fetch_ohlcv()`)
+- **CCXT Pro**: Pro version uses async methods for WebSocket streaming (`await exchange_pro.watch_trades()`)
+- **Critical**: Never use `await` with standard CCXT methods - they return data directly, not Promises
+- **Testing**: Use `Mock()` for standard CCXT, `AsyncMock()` only for CCXT Pro methods
+- **Pattern**: Chart data service demonstrates correct synchronous usage in `get_initial_chart_data()`
+
 ### WebSocket Protocol
 
 Connect to order book:

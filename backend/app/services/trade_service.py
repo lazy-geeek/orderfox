@@ -56,7 +56,7 @@ class TradeService:
         try:
             # Fetch trades from exchange
             logger.debug(f"Requesting trades from exchange for {symbol}")
-            trades = await exchange.fetch_trades(symbol, limit=limit)
+            trades = exchange.fetch_trades(symbol, limit=limit)
             
             if not trades:
                 logger.warning(f"No trades returned for {symbol}")

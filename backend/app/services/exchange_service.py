@@ -175,7 +175,7 @@ class ExchangeService:
             exchange = self.get_exchange()
 
             # Test connection by fetching exchange status
-            status = await exchange.fetch_status()
+            status = exchange.fetch_status()
 
             logger.info("Connection to Binance API successful")
             return {
