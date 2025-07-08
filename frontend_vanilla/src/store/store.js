@@ -156,7 +156,7 @@ const validateTicker = (ticker) => {
 
   const lastPrice = parseFloat(ticker.last);
   if (isNaN(lastPrice)) {
-    console.warn(`❌ Invalid ticker data: 'last' price is required but not a valid number`, ticker.last, 'Full ticker:', ticker);
+    console.warn('❌ Invalid ticker data: \'last\' price is required but not a valid number', ticker.last, 'Full ticker:', ticker);
     return null;
   }
 

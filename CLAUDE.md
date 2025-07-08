@@ -64,6 +64,11 @@ orderfox/
 cd backend && pip install -r requirements.txt
 cd frontend_vanilla && npm install
 
+# Linting & Type Checking
+npm run lint              # Lint frontend JavaScript
+npm run lint:fix          # Auto-fix frontend linting issues
+npm run typecheck         # Reminder to use Pylance in VS Code for Python
+
 # Run tests
 cd backend && python -m pytest tests/ -v
 
