@@ -241,8 +241,28 @@ function updateOrderBookFromWebSocket(payload) {
 
 function updateCandlesFromWebSocket(payload) {
   const incomingData = payload;
+  
+  // CRITICAL: Strict symbol validation to prevent wrong symbol updates
   if (state.selectedSymbol && incomingData.symbol && incomingData.symbol !== state.selectedSymbol) {
     console.warn('Received candle for different symbol, skipping update:', incomingData.symbol, 'vs', state.selectedSymbol);
+    return;
+  }
+
+  // CRITICAL: Strict timeframe validation to prevent wrong timeframe updates
+  if (state.selectedTimeframe && incomingData.timeframe && incomingData.timeframe !== state.selectedTimeframe) {
+    console.warn('Received candle for different timeframe, skipping update:', incomingData.timeframe, 'vs', state.selectedTimeframe);
+    return;
+  }
+
+  // CRITICAL: Additional validation - ensure we actually have a selected symbol
+  if (!state.selectedSymbol) {
+    console.warn('No selected symbol, skipping candle update');
+    return;
+  }
+
+  // CRITICAL: Additional validation - ensure we actually have a selected timeframe
+  if (!state.selectedTimeframe) {
+    console.warn('No selected timeframe, skipping candle update');
     return;
   }
 
@@ -251,6 +271,25 @@ function updateCandlesFromWebSocket(payload) {
   if (!newCandle) {
     console.warn('Received invalid candle from WebSocket, skipping update:', incomingData);
     return;
+  }
+
+  // CRITICAL: Validate candle timestamp is reasonable (not too old)
+  const now = Date.now();
+  const candleAge = now - newCandle.timestamp;
+  const maxAge = 60 * 60 * 1000; // 1 hour max age for candles
+  
+  if (candleAge > maxAge) {
+    console.warn(`Rejecting stale candle update (age: ${Math.round(candleAge / 1000)}s):`, newCandle);
+    return;
+  }
+
+  // CRITICAL: Check if this candle is older than our newest candle (race condition protection)
+  if (state.currentCandles.length > 0) {
+    const newestCandle = state.currentCandles[state.currentCandles.length - 1];
+    if (newCandle.timestamp < newestCandle.timestamp - (5 * 60 * 1000)) { // 5 minutes tolerance
+      console.warn('Rejecting candle older than current data by more than 5 minutes:', newCandle.timestamp, 'vs newest:', newestCandle.timestamp);
+      return;
+    }
   }
 
   const existingIndex = state.currentCandles.findIndex(
@@ -270,7 +309,13 @@ function updateCandlesFromWebSocket(payload) {
   // Directly update the chart with the single candle instead of triggering full refresh
   // This preserves user zoom state and is more efficient
   if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
-    window.updateLatestCandleDirectly(newCandle);
+    // CRITICAL: Additional symbol validation before chart update
+    if (incomingData.symbol === state.selectedSymbol) {
+      window.updateLatestCandleDirectly(newCandle);
+    } else {
+      console.warn('Symbol mismatch before chart update, using full refresh instead');
+      notify('currentCandles');
+    }
   } else {
     // Fallback to full refresh if direct update isn't available
     notify('currentCandles');
@@ -573,6 +618,7 @@ async function setTradingModeApi(mode) {
 export { 
   state, 
   subscribe, 
+  notify,
   setState,
   setSelectedSymbol,
   setSelectedTimeframe,

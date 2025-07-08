@@ -10,6 +10,7 @@
     - 1 test for expected use
     - 1 edge case
     - 1 failure case
+- For the frontend, simulate the browser in the terminal as we can not run a real browser in the current environment.
 
 ### MCP Server
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.

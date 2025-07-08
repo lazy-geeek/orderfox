@@ -58,12 +58,37 @@ export class WebSocketManager {
    * @param {string} newSymbol - The new symbol to switch to
    */
   static async switchSymbol(newSymbol) {
+    // CRITICAL: Clear any pending chart updates immediately
+    if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
+      // Temporarily disable direct updates during symbol switch
+      const originalUpdate = window.updateLatestCandleDirectly;
+      window.updateLatestCandleDirectly = () => {
+        console.debug('Ignoring candle update during symbol switch');
+      };
+      
+      // Restore after a short delay to allow WebSocket cleanup
+      setTimeout(() => {
+        window.updateLatestCandleDirectly = originalUpdate;
+      }, 100);
+    }
+
     // Update state first
     setSelectedSymbol(newSymbol);
     
     // Reset UI state
     resetZoomState();
     clearOrderBook();
+    
+    // CRITICAL: Clear current candles to prevent stale data
+    if (typeof window !== 'undefined' && window.state && window.state.currentCandles) {
+      window.state.currentCandles = [];
+    }
+    
+    // CRITICAL: Reset chart data completely to prevent timestamp conflicts
+    if (typeof window !== 'undefined' && window.resetChartData) {
+      console.log('Resetting chart data for symbol switch');
+      window.resetChartData();
+    }
     
     // Disconnect all existing streams
     disconnectAllWebSockets();
@@ -80,17 +105,54 @@ export class WebSocketManager {
    * @param {string} newTimeframe - The new timeframe to switch to
    */
   static async switchTimeframe(newTimeframe) {
-    // Update state first
+    console.log(`WebSocketManager: Switching timeframe from ${state.selectedTimeframe} to ${newTimeframe}`);
+    
+    // CRITICAL: Store old timeframe before updating state
+    const oldTimeframe = state.selectedTimeframe;
+    
+    // CRITICAL: Clear any pending chart updates immediately
+    if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
+      // Temporarily disable direct updates during timeframe switch
+      const originalUpdate = window.updateLatestCandleDirectly;
+      window.updateLatestCandleDirectly = (candle) => {
+        console.debug('Ignoring candle update during timeframe switch:', candle);
+      };
+      
+      // Restore after a delay to allow WebSocket cleanup
+      setTimeout(() => {
+        window.updateLatestCandleDirectly = originalUpdate;
+        console.debug('Restored candle update handler after timeframe switch');
+      }, 200);
+    }
+    
+    // Update state after storing old value
     setSelectedTimeframe(newTimeframe);
     
     // Reset zoom state for timeframe changes
     resetZoomState();
     
-    // Disconnect only the candles stream for the current timeframe
-    disconnectWebSocketStream('candles', state.selectedSymbol, state.selectedTimeframe);
+    // CRITICAL: Clear current candles to prevent stale data
+    if (typeof window !== 'undefined' && window.state && window.state.currentCandles) {
+      console.log('Clearing current candles during timeframe switch');
+      window.state.currentCandles = [];
+    }
+    
+    // CRITICAL: Reset chart data completely to prevent timestamp conflicts
+    if (typeof window !== 'undefined' && window.resetChartData) {
+      console.log('Resetting chart data for timeframe switch');
+      window.resetChartData();
+    }
+    
+    // CRITICAL: Disconnect stream using the OLD timeframe, not the new one
+    console.log(`Disconnecting old candles stream for ${state.selectedSymbol}/${oldTimeframe}`);
+    disconnectWebSocketStream('candles', state.selectedSymbol, oldTimeframe);
+    
+    // Small delay to ensure cleanup completes
+    await new Promise(resolve => setTimeout(resolve, 50));
     
     // Connect new candles stream with optimal count
     const optimalCandleCount = getOptimalCandleCount();
+    console.log(`Connecting new candles stream for ${state.selectedSymbol}/${newTimeframe} with ${optimalCandleCount} candles`);
     connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, optimalCandleCount);
   }
 

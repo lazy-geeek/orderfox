@@ -118,6 +118,10 @@ export const connectWebSocketStream = async (
 
     ws.onopen = () => {
       console.log(`WebSocket connected for ${streamKey}: ${wsUrl}`);
+      // CRITICAL: Add debug logging for symbol switch tracking
+      if (streamType === 'candles') {
+        console.debug(`Candles WebSocket established for stream: ${streamKey}`);
+      }
       clearTimeout(connectionTimeout);
       
       connectionAttempts[streamKey] = 0;
@@ -199,6 +203,10 @@ export const connectWebSocketStream = async (
 
     ws.onclose = (event) => {
       console.log(`WebSocket closed for ${streamKey}:`, event.code, event.reason);
+      // CRITICAL: Add debug logging for symbol switch tracking
+      if (streamType === 'candles') {
+        console.debug(`Candles WebSocket closed for stream: ${streamKey}`);
+      }
       clearTimeout(connectionTimeout);
       connectionInProgress[streamKey] = false;
       

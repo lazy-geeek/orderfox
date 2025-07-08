@@ -3,7 +3,7 @@ import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
 import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
-import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState } from './components/LightweightChart.js';
+import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
@@ -15,6 +15,7 @@ import {
   setTradingModeApi,
   setSelectedRounding,
   setDisplayDepth,
+  notify,
 } from './store/store.js';
 
 import {
@@ -60,6 +61,15 @@ themeSwitcherPlaceholder.replaceWith(themeSwitcher);
 
 // Set up global function for direct chart updates from WebSocket
 window.updateLatestCandleDirectly = updateLatestCandle;
+
+// CRITICAL: Expose state globally for chart symbol validation
+window.state = state;
+
+// CRITICAL: Expose notify globally for chart error recovery
+window.notify = notify;
+
+// CRITICAL: Expose resetChartData globally for timeframe switches
+window.resetChartData = resetChartData;
 
 // Note: getOptimalCandleCount() function moved to WebSocketManager for centralization
 

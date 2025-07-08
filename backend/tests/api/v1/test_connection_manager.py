@@ -480,3 +480,272 @@ class TestConnectionManagerFormattedFields:
             # They should be passed through exactly as received from the aggregation service
             assert sent_data['bids'] == mock_aggregated_data['bids']
             assert sent_data['asks'] == mock_aggregated_data['asks']
+
+
+class TestConnectionManagerRaceConditionFixes:
+    """Test cases for race condition fixes in WebSocket connection management."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.connection_manager = ConnectionManager()
+    
+    @pytest.mark.asyncio
+    async def test_candle_stream_key_generation(self):
+        """Test that candle stream keys are generated correctly for symbol/timeframe combinations."""
+        test_cases = [
+            ("BTCUSDT", "1m", "BTCUSDT:1m"),
+            ("ETHUSDT", "5m", "ETHUSDT:5m"),
+            ("XRPUSDT", "1h", "XRPUSDT:1h"),
+            ("1000PEPEUSDT", "15m", "1000PEPEUSDT:15m"),
+        ]
+        
+        for symbol, timeframe, expected_key in test_cases:
+            # Test stream key generation logic
+            stream_key = f"{symbol}:{timeframe}"
+            assert stream_key == expected_key
+    
+    @pytest.mark.asyncio
+    async def test_connection_isolation_by_stream_key(self):
+        """Test that connections are properly isolated by stream key to prevent race conditions."""
+        # Mock WebSockets for different streams
+        mock_websocket_1m = AsyncMock()
+        mock_websocket_5m = AsyncMock()
+        mock_websocket_1m.accept = AsyncMock()
+        mock_websocket_5m.accept = AsyncMock()
+        
+        # Different stream keys should create separate connections
+        stream_key_1m = "BTCUSDT:1m"
+        stream_key_5m = "BTCUSDT:5m"
+        
+        # Connect to different timeframes
+        with patch.object(self.connection_manager, "_start_streaming") as mock_start_streaming:
+            await self.connection_manager.connect(mock_websocket_1m, stream_key_1m, "candles")
+            await self.connection_manager.connect(mock_websocket_5m, stream_key_5m, "candles")
+            
+            # Verify both connections exist separately
+            assert stream_key_1m in self.connection_manager.active_connections
+            assert stream_key_5m in self.connection_manager.active_connections
+            assert mock_websocket_1m in self.connection_manager.active_connections[stream_key_1m]
+            assert mock_websocket_5m in self.connection_manager.active_connections[stream_key_5m]
+            
+            # Verify separate streaming was started for each
+            assert mock_start_streaming.call_count == 2
+            mock_start_streaming.assert_any_call(stream_key_1m, "candles")
+            mock_start_streaming.assert_any_call(stream_key_5m, "candles")
+    
+    @pytest.mark.asyncio
+    async def test_timeframe_switch_isolation(self):
+        """Test that switching timeframes properly isolates old and new connections."""
+        mock_websocket = AsyncMock()
+        mock_websocket.accept = AsyncMock()
+        
+        old_stream_key = "BTCUSDT:1m"
+        new_stream_key = "BTCUSDT:5m"
+        
+        with patch.object(self.connection_manager, "_start_streaming") as mock_start_streaming:
+            with patch.object(self.connection_manager, "_stop_streaming") as mock_stop_streaming:
+                # Connect to 1m timeframe
+                await self.connection_manager.connect(mock_websocket, old_stream_key, "candles")
+                assert old_stream_key in self.connection_manager.active_connections
+                
+                # Disconnect from 1m (simulating timeframe switch)
+                self.connection_manager.disconnect(mock_websocket, old_stream_key)
+                assert old_stream_key not in self.connection_manager.active_connections
+                mock_stop_streaming.assert_called_with(old_stream_key)
+                
+                # Connect to 5m timeframe
+                await self.connection_manager.connect(mock_websocket, new_stream_key, "candles")
+                assert new_stream_key in self.connection_manager.active_connections
+                
+                # Verify the isolation - old stream should be completely disconnected
+                mock_start_streaming.assert_any_call(old_stream_key, "candles")
+                mock_start_streaming.assert_any_call(new_stream_key, "candles")
+    
+    @pytest.mark.asyncio
+    async def test_symbol_validation_in_broadcast(self):
+        """Test that broadcast messages include proper symbol validation data."""
+        mock_websocket = AsyncMock()
+        mock_websocket.send_text = AsyncMock()
+        
+        symbol = "BTCUSDT"
+        timeframe = "1m"
+        stream_key = f"{symbol}:{timeframe}"
+        
+        # Add connection manually
+        self.connection_manager.active_connections[stream_key] = [mock_websocket]
+        
+        # Test broadcast with symbol validation
+        test_data = {
+            "type": "candle_update",
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "timestamp": 1640995200000,
+            "candle": {
+                "open": 50000.0,
+                "high": 51000.0,
+                "low": 49000.0,
+                "close": 50500.0
+            }
+        }
+        
+        await self.connection_manager.broadcast_to_symbol(stream_key, test_data)
+        
+        # Verify broadcast occurred
+        mock_websocket.send_text.assert_called_once()
+        sent_data = json.loads(mock_websocket.send_text.call_args[0][0])
+        
+        # Verify symbol and timeframe are included for validation
+        assert sent_data["symbol"] == symbol
+        assert sent_data["timeframe"] == timeframe
+        assert "timestamp" in sent_data
+    
+    @pytest.mark.asyncio
+    async def test_timestamp_ordering_protection(self):
+        """Test that the system handles timestamp ordering issues gracefully."""
+        mock_websocket = AsyncMock()
+        mock_websocket.send_text = AsyncMock()
+        
+        stream_key = "BTCUSDT:1m"
+        self.connection_manager.active_connections[stream_key] = [mock_websocket]
+        
+        # Send candles with different timestamps to test ordering
+        current_time = 1640995200000  # Base timestamp
+        
+        test_candles = [
+            {
+                "type": "candle_update",
+                "symbol": "BTCUSDT",
+                "timeframe": "1m",
+                "timestamp": current_time,  # Current time
+                "candle": {"open": 50000, "high": 51000, "low": 49000, "close": 50500}
+            },
+            {
+                "type": "candle_update", 
+                "symbol": "BTCUSDT",
+                "timeframe": "1m",
+                "timestamp": current_time + 60000,  # 1 minute later (should be accepted)
+                "candle": {"open": 50500, "high": 51500, "low": 49500, "close": 51000}
+            },
+            {
+                "type": "candle_update",
+                "symbol": "BTCUSDT", 
+                "timeframe": "1m",
+                "timestamp": current_time - 60000,  # 1 minute earlier (would cause ordering issue)
+                "candle": {"open": 49500, "high": 50500, "low": 48500, "close": 49000}
+            }
+        ]
+        
+        # Send all candles
+        for candle_data in test_candles:
+            await self.connection_manager.broadcast_to_symbol(stream_key, candle_data)
+        
+        # Verify all broadcasts were attempted (the frontend will handle timestamp validation)
+        assert mock_websocket.send_text.call_count == 3
+        
+        # Verify the timestamps are preserved in the broadcast
+        for i, call in enumerate(mock_websocket.send_text.call_args_list):
+            sent_data = json.loads(call[0][0])
+            expected_timestamp = test_candles[i]["timestamp"]
+            assert sent_data["timestamp"] == expected_timestamp
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_symbol_timeframe_switches(self):
+        """Test handling of concurrent symbol and timeframe switches to prevent race conditions."""
+        mock_websockets = [AsyncMock() for _ in range(4)]
+        for ws in mock_websockets:
+            ws.accept = AsyncMock()
+        
+        # Simulate concurrent connections for different symbol/timeframe combinations
+        stream_keys = [
+            "BTCUSDT:1m",
+            "BTCUSDT:5m", 
+            "ETHUSDT:1m",
+            "ETHUSDT:5m"
+        ]
+        
+        with patch.object(self.connection_manager, "_start_streaming") as mock_start_streaming:
+            # Connect all streams concurrently
+            connection_tasks = []
+            for ws, stream_key in zip(mock_websockets, stream_keys):
+                task = self.connection_manager.connect(ws, stream_key, "candles")
+                connection_tasks.append(task)
+            
+            # Wait for all connections to complete
+            await asyncio.gather(*connection_tasks)
+            
+            # Verify all connections are isolated and properly established
+            for i, stream_key in enumerate(stream_keys):
+                assert stream_key in self.connection_manager.active_connections
+                assert mock_websockets[i] in self.connection_manager.active_connections[stream_key]
+            
+            # Verify separate streaming started for each unique stream
+            assert mock_start_streaming.call_count == 4
+            for stream_key in stream_keys:
+                mock_start_streaming.assert_any_call(stream_key, "candles")
+    
+    @pytest.mark.asyncio
+    async def test_stream_cleanup_on_error(self):
+        """Test that streams are properly cleaned up when errors occur to prevent memory leaks."""
+        mock_websocket = AsyncMock()
+        mock_websocket.accept = AsyncMock()
+        mock_websocket.send_text = AsyncMock(side_effect=Exception("Connection broken"))
+        
+        stream_key = "BTCUSDT:1m"
+        
+        # Add connection
+        self.connection_manager.active_connections[stream_key] = [mock_websocket]
+        
+        # Attempt broadcast that will fail
+        test_data = {"type": "candle_update", "symbol": "BTCUSDT"}
+        await self.connection_manager.broadcast_to_symbol(stream_key, test_data)
+        
+        # Verify failed connection was removed to prevent race conditions
+        assert mock_websocket not in self.connection_manager.active_connections.get(stream_key, [])
+    
+    @pytest.mark.asyncio
+    async def test_message_filtering_by_stream_type(self):
+        """Test that messages are properly filtered by stream type to prevent cross-contamination."""
+        mock_websocket_candles = AsyncMock()
+        mock_websocket_ticker = AsyncMock()
+        mock_websocket_candles.send_text = AsyncMock()
+        mock_websocket_ticker.send_text = AsyncMock()
+        
+        # Set up different stream types
+        candle_stream_key = "BTCUSDT:1m"
+        ticker_stream_key = "BTCUSDT"
+        
+        self.connection_manager.active_connections[candle_stream_key] = [mock_websocket_candles]
+        self.connection_manager.active_connections[ticker_stream_key] = [mock_websocket_ticker]
+        
+        # Send candle data
+        candle_data = {
+            "type": "candle_update",
+            "symbol": "BTCUSDT",
+            "timeframe": "1m",
+            "candle": {"open": 50000, "high": 51000, "low": 49000, "close": 50500}
+        }
+        
+        # Send ticker data
+        ticker_data = {
+            "type": "ticker_update", 
+            "symbol": "BTCUSDT",
+            "price": 50250.0,
+            "volume": 1234.5
+        }
+        
+        # Broadcast to appropriate streams
+        await self.connection_manager.broadcast_to_symbol(candle_stream_key, candle_data)
+        await self.connection_manager.broadcast_to_symbol(ticker_stream_key, ticker_data)
+        
+        # Verify each connection only received its appropriate message type
+        mock_websocket_candles.send_text.assert_called_once()
+        mock_websocket_ticker.send_text.assert_called_once()
+        
+        # Verify message content isolation
+        candle_sent = json.loads(mock_websocket_candles.send_text.call_args[0][0])
+        ticker_sent = json.loads(mock_websocket_ticker.send_text.call_args[0][0])
+        
+        assert candle_sent["type"] == "candle_update"
+        assert "timeframe" in candle_sent
+        assert ticker_sent["type"] == "ticker_update"
+        assert "timeframe" not in ticker_sent

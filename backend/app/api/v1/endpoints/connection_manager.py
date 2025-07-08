@@ -288,10 +288,21 @@ class ConnectionManager:
             logger.debug(
                 f"Cancelling and removing streaming task for {stream_key}")
             try:
-                self.streaming_tasks[stream_key].cancel()
+                # CRITICAL: Cancel task immediately to prevent race conditions
+                task = self.streaming_tasks[stream_key]
+                if not task.cancelled():
+                    task.cancel()
+                    logger.debug(f"Task for {stream_key} cancelled successfully")
             except Exception as e:  # Catch potential errors during cancellation
                 logger.error(f"Error cancelling task for {stream_key}: {e}")
             del self.streaming_tasks[stream_key]
+            
+            # CRITICAL: Immediately remove from active_connections to prevent new broadcasts
+            if stream_key in self.active_connections:
+                logger.debug(f"Clearing active connections for {stream_key} during stream stop")
+                # Don't delete the key yet, just clear the connections list
+                # The disconnect method will handle full cleanup
+                self.active_connections[stream_key] = []
         else:
             # This might be normal if a task was already stopped by another
             # path (e.g. base_symbol cleanup)
@@ -861,8 +872,18 @@ class ConnectionManager:
                 and self.active_connections[stream_key]
             ):
                 try:
+                    # CRITICAL: Validate stream is still active before processing
+                    if stream_key not in self.active_connections:
+                        logger.debug(f"Stream {stream_key} no longer active, stopping candles broadcast")
+                        break
+
                     # Watch OHLCV updates
                     ohlcv_data = await exchange_pro.watch_ohlcv(symbol, timeframe)
+
+                    # CRITICAL: Double-check stream is still active after async operation
+                    if stream_key not in self.active_connections:
+                        logger.debug(f"Stream {stream_key} disconnected during watch_ohlcv, stopping candles broadcast")
+                        break
 
                     # Convert to our schema format - get the latest candle
                     if ohlcv_data and len(ohlcv_data) > 0:
@@ -885,8 +906,16 @@ class ConnectionManager:
                                 f"Invalid candle data for {symbol} {timeframe}: {latest_candle}")
                             continue
 
-                        # Broadcast to all connected clients for this stream
-                        await self.broadcast_to_stream(stream_key, formatted_data)
+                        # CRITICAL: Final validation before broadcast - ensure stream still exists
+                        if stream_key in self.active_connections and self.active_connections[stream_key]:
+                            # Add stream creation timestamp to help frontend filter stale messages
+                            import time
+                            formatted_data['stream_timestamp'] = int(time.time() * 1000)
+                            
+                            # Broadcast to all connected clients for this stream
+                            await self.broadcast_to_stream(stream_key, formatted_data)
+                        else:
+                            logger.debug(f"Stream {stream_key} disconnected before broadcast, skipping candle update")
 
                 except Exception as e:
                     error_data = {
@@ -940,6 +969,11 @@ class ConnectionManager:
                 close_price = current_price * random.uniform(0.999, 1.001)
                 volume = random.uniform(10.0, 100.0)
 
+                # CRITICAL: Validate stream is still active before broadcast
+                if stream_key not in self.active_connections or not self.active_connections[stream_key]:
+                    logger.debug(f"Mock candles stream {stream_key} no longer active, stopping")
+                    break
+
                 # Use display symbol if available, otherwise use the stream
                 # symbol
                 display_symbol = getattr(self, "_display_symbols", {}).get(
@@ -956,6 +990,7 @@ class ConnectionManager:
                     "close": round(close_price, 2),
                     "volume": round(volume, 4),
                     "mock": True,  # Indicate this is mock data
+                    "stream_timestamp": current_time,  # Add stream timestamp for filtering
                 }
 
                 # Broadcast to all connected clients for this stream

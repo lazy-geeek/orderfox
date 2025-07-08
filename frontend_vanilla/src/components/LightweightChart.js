@@ -164,10 +164,26 @@ function createTimeframeSelector(handleTimeframeChange) {
 function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, symbolData = null) {
   if (!chartInstance || !candlestickSeries) return;
 
+  // CRITICAL: Check if this is a symbol or timeframe change
+  const isSymbolChange = lastSymbol !== symbol;
+  const isTimeframeChange = lastTimeframe !== timeframe;
+  const isContextChange = isSymbolChange || isTimeframeChange;
+
+  // Reduced logging for normal operation
+  if (isContextChange) {
+    console.log(`Chart: Context change - Symbol: ${symbol}, Timeframe: ${timeframe}`);
+  }
+
   // Store the last data for theme changes
   lastChartData = data;
   lastSymbol = symbol;
   lastTimeframe = timeframe;
+
+  // CRITICAL: Reset zoom state on context changes to allow proper fitting
+  if (isContextChange) {
+    console.log(`Chart: Context change detected - Symbol: ${isSymbolChange}, Timeframe: ${isTimeframeChange}`);
+    resetZoomState();
+  }
 
   // Only update price format when symbol data is provided (symbol change or initial load)
   if (symbolData && candlestickSeries) {
@@ -212,15 +228,20 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
   // Sort data by time to ensure proper ordering
   formattedData.sort((a, b) => a.time - b.time);
 
-  // Set the data for the candlestick series
+  // Only log chart data details for context changes or initial loads
+  if (isInitialLoad || isContextChange) {
+    console.log(`Chart: Loading ${formattedData.length} candles for ${symbol} ${timeframe}`);
+  }
+
+  // CRITICAL: Use setData to completely replace chart data
+  // This clears any previous data and prevents timestamp ordering conflicts
   candlestickSeries.setData(formattedData);
 
   // Update chart title - we'll add this as a visual indicator
   updateChartTitle(symbol, timeframe);
 
-  // Only fit content on initial load or when user hasn't zoomed
-  // This preserves user zoom/pan state during real-time updates
-  if (isInitialLoad || !userHasZoomed) {
+  // CRITICAL: Always fit content on context changes, respect user zoom for updates
+  if (isInitialLoad || isContextChange || !userHasZoomed) {
     chartInstance.timeScale().fitContent();
   }
 }
@@ -238,24 +259,102 @@ function updateChartTitle(symbol, timeframe) {
 }
 
 function updateLatestCandle(candleData) {
-  if (!candlestickSeries) return;
+  if (!candlestickSeries) {
+    console.warn('Chart: No candlestick series available for update');
+    return;
+  }
+
+  // CRITICAL: Import state to validate current symbol
+  if (typeof window !== 'undefined' && window.state) {
+    // Validate that this candle is for the current symbol
+    if (window.state.selectedSymbol && candleData.symbol && candleData.symbol !== window.state.selectedSymbol) {
+      console.warn('Chart: Rejecting candle update for wrong symbol:', candleData.symbol, 'vs', window.state.selectedSymbol);
+      return;
+    }
+  }
+
+  // CRITICAL: Enhanced timestamp validation and debugging
+  const rawTimestamp = candleData.timestamp;
+  const convertedTime = Math.floor(rawTimestamp / 1000); // Convert milliseconds to seconds
+  
+  // Get current chart data to check ordering
+  let lastChartTime = null;
+  try {
+    // Try to get the current data from the series to check timestamp ordering
+    const currentData = candlestickSeries.data();
+    if (currentData && currentData.length > 0) {
+      lastChartTime = currentData[currentData.length - 1].time;
+      
+      // Check for timestamp ordering issues
+      if (convertedTime <= lastChartTime) {
+        const timeDiff = lastChartTime - convertedTime;
+        
+        // If it's a very old update (more than 5 minutes), reject it
+        if (timeDiff > 300) { // 5 minutes
+          console.warn('Chart: Rejecting very old candle update to prevent chart errors');
+          console.warn(`Chart: Time difference: ${timeDiff} seconds`);
+          return;
+        }
+        
+        // Only log if it's a significant time difference (more than same timestamp)
+        if (timeDiff > 0) {
+          console.debug(`Chart: Timestamp ordering issue - rejecting update ${timeDiff}s older than current`);
+        }
+        // For same timestamp (timeDiff = 0), don't log - this is normal for real-time updates
+      }
+    }
+  } catch (e) {
+    console.debug('Chart: Could not get current chart data for comparison:', e.message);
+  }
 
   // CRITICAL: Use update() for real-time updates, not setData()
   // This preserves zoom state and is more efficient for single candle updates
   const formattedCandle = {
-    time: Math.floor(candleData.timestamp / 1000), // Convert milliseconds to seconds
+    time: convertedTime,
     open: candleData.open,
     high: candleData.high,
     low: candleData.low,
     close: candleData.close,
   };
 
-  candlestickSeries.update(formattedCandle);
+  try {
+    candlestickSeries.update(formattedCandle);
+    // Only log success in debug mode for troubleshooting
+    // console.debug('Chart: Successfully updated candle');
+  } catch (error) {
+    // CRITICAL: Catch and log TradingView chart errors without crashing
+    console.error('Chart update error (likely "Cannot update oldest data"):', error.message);
+    console.error('Raw candle data causing error:', candleData);
+    console.error('Formatted candle data causing error:', formattedCandle);
+    
+    if (lastChartTime !== null) {
+      console.error(`Chart: Timestamp comparison - Last: ${lastChartTime}, Attempted: ${convertedTime}, Diff: ${convertedTime - lastChartTime}`);
+    }
+    
+    // If it's the "Cannot update oldest data" error, we should trigger a full refresh
+    if (error.message.includes('Cannot update oldest data')) {
+      console.log('Triggering full chart refresh due to timestamp ordering issue');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify('currentCandles');
+      }
+    }
+  }
 }
 
 function resetZoomState() {
   // Reset zoom tracking when symbol or timeframe changes
   userHasZoomed = false;
+}
+
+function resetChartData() {
+  // CRITICAL: Completely reset chart data to prevent timestamp conflicts
+  if (candlestickSeries) {
+    console.log('Chart: Resetting chart data completely');
+    candlestickSeries.setData([]); // Clear all chart data
+    lastChartData = null;
+    lastSymbol = null;
+    lastTimeframe = null;
+  }
 }
 
 function disposeLightweightChart() {
@@ -281,5 +380,6 @@ export {
   updateLightweightChart as updateCandlestickChart,
   updateLatestCandle,
   resetZoomState,
+  resetChartData,
   disposeLightweightChart
 };
