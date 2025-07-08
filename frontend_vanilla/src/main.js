@@ -203,6 +203,8 @@ fetchSymbols().then(() => {
       true,
       firstSymbol // Pass full symbol object for precision
     );
+    // Update trades headers with initial symbol data
+    updateTradesHeaders(firstSymbol);
   }
 });
 

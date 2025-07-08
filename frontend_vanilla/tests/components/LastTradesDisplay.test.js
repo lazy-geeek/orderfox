@@ -188,8 +188,8 @@ describe('LastTradesDisplay', () => {
       document.body.appendChild(container);
       
       const symbolData = {
-        base_asset: 'BTC',
-        quote_asset: 'USDT'
+        baseAsset: 'BTC',
+        quoteAsset: 'USDT'
       };
       
       updateTradesHeaders(symbolData);
@@ -216,7 +216,7 @@ describe('LastTradesDisplay', () => {
       expect(amountHeader.textContent).toBe('Amount');
       
       // Test with incomplete symbol data
-      updateTradesHeaders({ base_asset: 'BTC' }); // Missing quote_asset
+      updateTradesHeaders({ baseAsset: 'BTC' }); // Missing quoteAsset
       
       expect(amountHeader.textContent).toBe('Amount (BTC)');
       expect(priceHeader.textContent).toBe('Price'); // Should remain unchanged

@@ -133,12 +133,12 @@ function updateTradesHeaders(symbolData) {
   const priceHeader = document.getElementById('trades-price-header');
   const amountHeader = document.getElementById('trades-amount-header');
   
-  if (priceHeader && symbolData?.quote_asset) {
-    priceHeader.textContent = `Price (${symbolData.quote_asset})`;
+  if (priceHeader && symbolData?.quoteAsset) {
+    priceHeader.textContent = `Price (${symbolData.quoteAsset})`;
   }
   
-  if (amountHeader && symbolData?.base_asset) {
-    amountHeader.textContent = `Amount (${symbolData.base_asset})`;
+  if (amountHeader && symbolData?.baseAsset) {
+    amountHeader.textContent = `Amount (${symbolData.baseAsset})`;
   }
 }
 
