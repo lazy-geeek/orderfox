@@ -11,19 +11,10 @@ import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher
 import {
   state,
   subscribe,
-  setState,
   fetchSymbols,
-  fetchOpenPositions,
-  executePaperTrade,
-  executeLiveTrade,
   setTradingModeApi,
   setSelectedRounding,
-  setAvailableRoundingOptions,
-  setShouldRestartWebSocketAfterFetch,
   setDisplayDepth,
-  setCandlesWsConnected,
-  setOrderBookWsConnected,
-  setTickerWsConnected,
 } from './store/store.js';
 
 import {
@@ -56,7 +47,7 @@ symbolSelectorPlaceholder.replaceWith(symbolSelector);
 
 const candlestickChartContainer = document.createElement('div');
 candlestickChartPlaceholder.replaceWith(candlestickChartContainer);
-const candlestickChart = createCandlestickChart(candlestickChartContainer);
+createCandlestickChart(candlestickChartContainer);
 
 const orderBookDisplay = createOrderBookDisplay();
 orderBookPlaceholder.replaceWith(orderBookDisplay);
@@ -84,7 +75,7 @@ subscribe((key) => {
     case 'symbolsList':
       updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
       break;
-    case 'selectedSymbol':
+    case 'selectedSymbol': {
       const selectedSymbolData = state.symbolsList.find(s => s.id === state.selectedSymbol);
       updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
       // Pass symbol data when symbol changes - reset zoom and treat as initial load
@@ -97,6 +88,7 @@ subscribe((key) => {
         selectedSymbolData // Pass symbol data for precision update
       );
       break;
+    }
     case 'currentCandles':
       // Real-time updates - don't reset zoom
       updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, false); // isInitialLoad = false

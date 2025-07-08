@@ -5,14 +5,11 @@ This module provides FastAPI WebSocket endpoints for real-time market data
 streaming including order books, tickers, and candlestick data.
 """
 
-import asyncio
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from app.services.exchange_service import exchange_service
 from app.services.symbol_service import symbol_service
 from app.services.chart_data_service import chart_data_service
 from app.api.v1.endpoints.connection_manager import connection_manager
-from app.api.v1.endpoints.trading import trading_engine_service_instance
 from app.core.logging_config import get_logger
 
 logger = get_logger("market_data_ws")
@@ -22,8 +19,8 @@ router = APIRouter()
 
 @router.websocket("/ws/orderbook/{symbol}")
 async def websocket_orderbook(
-    websocket: WebSocket, 
-    symbol: str, 
+    websocket: WebSocket,
+    symbol: str,
     limit: int = Query(default=20, ge=5, le=5000),
     rounding: float = Query(default=0.01, gt=0)
 ):
@@ -42,8 +39,8 @@ async def websocket_orderbook(
         "symbol": "BTCUSDT",
         "bids": [
             {
-                "price": 50000.0, 
-                "amount": 1.5, 
+                "price": 50000.0,
+                "amount": 1.5,
                 "cumulative": 1.5,
                 "price_formatted": "50000.00",
                 "amount_formatted": "1.50000000",
@@ -52,11 +49,11 @@ async def websocket_orderbook(
         ],
         "asks": [
             {
-                "price": 50100.0, 
-                "amount": 2.0, 
+                "price": 50100.0,
+                "amount": 2.0,
                 "cumulative": 2.0,
                 "price_formatted": "50100.00",
-                "amount_formatted": "2.00000000", 
+                "amount_formatted": "2.00000000",
                 "cumulative_formatted": "2.00000000"
             }, ...
         ],
@@ -66,9 +63,9 @@ async def websocket_orderbook(
         "market_depth_info": {"actual_levels": 20, "requested_levels": 20},
         "aggregated": true
     }
-    
-    Note: Formatted fields (price_formatted, amount_formatted, cumulative_formatted) 
-    are included when symbol precision data is available. These fields provide 
+
+    Note: Formatted fields (price_formatted, amount_formatted, cumulative_formatted)
+    are included when symbol precision data is available. These fields provide
     backend-formatted strings optimized for display, eliminating frontend formatting.
 
     Parameter update messages can be sent:
@@ -85,8 +82,8 @@ async def websocket_orderbook(
     }
     """
     logger.info(
-        f"WebSocket orderbook connection attempt for {symbol} from {websocket.client}"
-    )
+        f"WebSocket orderbook connection attempt for {symbol} from {
+            websocket.client}")
 
     try:
         # Accept connection first
@@ -94,7 +91,8 @@ async def websocket_orderbook(
         logger.info(f"WebSocket orderbook connection accepted for {symbol}")
 
         # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
+            symbol)
         if not exchange_symbol:
             # Get suggestions for invalid symbol
             suggestions = symbol_service.get_symbol_suggestions(symbol)
@@ -110,24 +108,30 @@ async def websocket_orderbook(
             return
 
         logger.info(
-            f"Using exchange symbol: {exchange_symbol} for WebSocket symbol: {symbol}"
-        )
+            f"Using exchange symbol: {exchange_symbol} for WebSocket symbol: {symbol}")
 
         # Validate and clamp limit parameter (handle Query object in tests)
-        limit_value = limit if isinstance(limit, int) else (limit.default if hasattr(limit, 'default') else 20)
-        limit = max(5, min(limit_value, 1000))  # Ensure limit is between 5 and 1000
-        
+        limit_value = limit if isinstance(
+            limit, int) else (
+            limit.default if hasattr(
+                limit, 'default') else 20)
+        # Ensure limit is between 5 and 1000
+        limit = max(5, min(limit_value, 1000))
+
         # Validate rounding parameter (handle Query object in tests)
-        rounding_value = rounding if isinstance(rounding, (int, float)) else (rounding.default if hasattr(rounding, 'default') else 0.01)
+        rounding_value = rounding if isinstance(
+            rounding, (int, float)) else (
+            rounding.default if hasattr(
+                rounding, 'default') else 0.01)
         rounding = max(0.0001, rounding_value)  # Ensure minimum rounding value
-        
+
         # Populate symbol data for optimal aggregation
         try:
             symbol_info = symbol_service.get_symbol_info(exchange_symbol)
             if symbol_info and symbol_info.get('pricePrecision') is not None:
                 # Import here to avoid circular imports
                 from app.services.orderbook_manager import orderbook_manager
-                
+
                 symbol_data = {
                     'pricePrecision': symbol_info['pricePrecision'],
                     'amountPrecision': symbol_info.get('amountPrecision', 2),
@@ -136,12 +140,18 @@ async def websocket_orderbook(
                     'quote_asset': symbol_info.get('quote_asset')
                 }
                 await orderbook_manager.update_symbol_data(exchange_symbol, symbol_data)
-                logger.info(f"Updated symbol data for {exchange_symbol} with pricePrecision={symbol_info['pricePrecision']}, amountPrecision={symbol_info.get('amountPrecision', 2)}")
+                logger.info(
+                    f"Updated symbol data for {exchange_symbol} with pricePrecision={
+                        symbol_info['pricePrecision']}, amountPrecision={
+                        symbol_info.get(
+                            'amountPrecision', 2)}")
         except Exception as e:
-            logger.warning(f"Could not populate symbol data for {exchange_symbol}: {e}")
+            logger.warning(
+                f"Could not populate symbol data for {exchange_symbol}: {e}")
             # Continue without symbol data - fallbacks will handle this
 
-        # Connect to the connection manager using the exchange symbol, limit, and rounding
+        # Connect to the connection manager using the exchange symbol, limit,
+        # and rounding
         await connection_manager.connect_orderbook(websocket, exchange_symbol, symbol, limit, rounding)
         logger.info(
             f"WebSocket orderbook streaming started for {symbol} (exchange: {exchange_symbol})"
@@ -151,14 +161,14 @@ async def websocket_orderbook(
             # Keep the connection alive
             while True:
                 try:
-                    # Use receive() instead of receive_text() to handle all message types
+                    # Use receive() instead of receive_text() to handle all
+                    # message types
                     message = await websocket.receive()
 
                     # Check if it's a disconnect message
                     if message["type"] == "websocket.disconnect":
                         logger.info(
-                            f"WebSocket orderbook client disconnected for {symbol}"
-                        )
+                            f"WebSocket orderbook client disconnected for {symbol}")
                         break
 
                     # Handle text messages
@@ -167,7 +177,7 @@ async def websocket_orderbook(
                             try:
                                 data = json.loads(message["text"])
                                 message_type = data.get("type")
-                                
+
                                 if message_type == "ping":
                                     await websocket.send_text(
                                         json.dumps({"type": "pong"})
@@ -179,30 +189,33 @@ async def websocket_orderbook(
                                     )
                                 else:
                                     logger.warning(
-                                        f"Unknown message type '{message_type}' received from client for {symbol}"
-                                    )
+                                        f"Unknown message type '{message_type}' received from client for {symbol}")
                             except json.JSONDecodeError:
                                 logger.warning(
-                                    f"Invalid JSON received from client for {symbol}"
-                                )
+                                    f"Invalid JSON received from client for {symbol}")
 
                 except WebSocketDisconnect:
-                    logger.debug(f"WebSocket orderbook client disconnected for {symbol}")
+                    logger.debug(
+                        f"WebSocket orderbook client disconnected for {symbol}")
                     break
                 except Exception as e:
                     logger.error(
-                        f"Error in WebSocket receive loop for {symbol}: {str(e)}"
-                    )
+                        f"Error in WebSocket receive loop for {symbol}: {
+                            str(e)}")
                     break
 
         except WebSocketDisconnect:
-            logger.debug(f"WebSocket orderbook client disconnected for {symbol}")
+            logger.debug(
+                f"WebSocket orderbook client disconnected for {symbol}")
         finally:
             await connection_manager.disconnect_orderbook(websocket, exchange_symbol)
-            logger.debug(f"WebSocket orderbook connection cleaned up for {symbol}")
+            logger.debug(
+                f"WebSocket orderbook connection cleaned up for {symbol}")
 
     except Exception as e:
-        logger.error(f"WebSocket orderbook error for {symbol}: {str(e)}", exc_info=True)
+        logger.error(
+            f"WebSocket orderbook error for {symbol}: {
+                str(e)}", exc_info=True)
         try:
             if websocket.client_state.name != "DISCONNECTED":
                 await websocket.send_text(
@@ -212,7 +225,9 @@ async def websocket_orderbook(
                 )
                 await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
         except Exception as close_error:
-            logger.error(f"Error closing WebSocket for {symbol}: {str(close_error)}")
+            logger.error(
+                f"Error closing WebSocket for {symbol}: {
+                    str(close_error)}")
 
 
 @router.websocket("/ws/ticker/{symbol}")
@@ -249,8 +264,8 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
     }
     """
     logger.info(
-        f"WebSocket ticker connection attempt for {symbol} from {websocket.client}"
-    )
+        f"WebSocket ticker connection attempt for {symbol} from {
+            websocket.client}")
 
     try:
         # Accept connection first
@@ -258,7 +273,8 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
         logger.info(f"WebSocket ticker connection accepted for {symbol}")
 
         # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
+            symbol)
         if not exchange_symbol:
             # Get suggestions for invalid symbol
             suggestions = symbol_service.get_symbol_suggestions(symbol)
@@ -284,14 +300,14 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
             # Keep the connection alive
             while True:
                 try:
-                    # Use receive() instead of receive_text() to handle all message types
+                    # Use receive() instead of receive_text() to handle all
+                    # message types
                     message = await websocket.receive()
 
                     # Check if it's a disconnect message
                     if message["type"] == "websocket.disconnect":
                         logger.info(
-                            f"WebSocket ticker client disconnected for {symbol}"
-                        )
+                            f"WebSocket ticker client disconnected for {symbol}")
                         break
 
                     # Handle text messages
@@ -305,16 +321,16 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
                                     )
                             except json.JSONDecodeError:
                                 logger.warning(
-                                    f"Invalid JSON received from client for {symbol}"
-                                )
+                                    f"Invalid JSON received from client for {symbol}")
 
                 except WebSocketDisconnect:
-                    logger.info(f"WebSocket ticker client disconnected for {symbol}")
+                    logger.info(
+                        f"WebSocket ticker client disconnected for {symbol}")
                     break
                 except Exception as e:
                     logger.error(
-                        f"Error in WebSocket receive loop for {symbol}: {str(e)}"
-                    )
+                        f"Error in WebSocket receive loop for {symbol}: {
+                            str(e)}")
                     break
 
         except WebSocketDisconnect:
@@ -324,7 +340,9 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
             logger.info(f"WebSocket ticker connection cleaned up for {symbol}")
 
     except Exception as e:
-        logger.error(f"WebSocket ticker error for {symbol}: {str(e)}", exc_info=True)
+        logger.error(
+            f"WebSocket ticker error for {symbol}: {
+                str(e)}", exc_info=True)
         try:
             if websocket.client_state.name != "DISCONNECTED":
                 await websocket.send_text(
@@ -334,16 +352,21 @@ async def websocket_ticker(websocket: WebSocket, symbol: str):
                 )
                 await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
         except Exception as close_error:
-            logger.error(f"Error closing WebSocket for {symbol}: {str(close_error)}")
+            logger.error(
+                f"Error closing WebSocket for {symbol}: {
+                    str(close_error)}")
 
 
 @router.websocket("/ws/candles/{symbol}/{timeframe}")
 async def websocket_candles(
-    websocket: WebSocket, 
-    symbol: str, 
+    websocket: WebSocket,
+    symbol: str,
     timeframe: str,
-    limit: int = Query(default=100, ge=50, le=1000, description="Number of historical candles to fetch")
-):
+    limit: int = Query(
+        default=100,
+        ge=50,
+        le=1000,
+        description="Number of historical candles to fetch")):
     """
     WebSocket endpoint for real-time candle/OHLCV updates.
 
@@ -393,7 +416,8 @@ async def websocket_candles(
     if timeframe not in valid_timeframes:
         logger.warning(f"WebSocket candles invalid timeframe: {timeframe}")
         await websocket.accept()
-        error_msg = f"Invalid timeframe. Valid options: {', '.join(valid_timeframes)}"
+        error_msg = f"Invalid timeframe. Valid options: {
+            ', '.join(valid_timeframes)}"
         await websocket.send_text(json.dumps({"type": "error", "message": error_msg}))
         await websocket.close(code=4000, reason=error_msg)
         return
@@ -405,10 +429,12 @@ async def websocket_candles(
     try:
         # Accept connection first
         await websocket.accept()
-        logger.info(f"WebSocket candles connection accepted for {symbol}/{timeframe}")
+        logger.info(
+            f"WebSocket candles connection accepted for {symbol}/{timeframe}")
 
         # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
+            symbol)
         if not exchange_symbol:
             # Get suggestions for invalid symbol
             suggestions = symbol_service.get_symbol_suggestions(symbol)
@@ -423,7 +449,8 @@ async def websocket_candles(
             await websocket.close(code=4000, reason=error_msg)
             return
 
-        # Create stream key for this symbol:timeframe combination using exchange symbol
+        # Create stream key for this symbol:timeframe combination using
+        # exchange symbol
         stream_key = f"{exchange_symbol}:{timeframe}"
 
         # Send initial historical data before starting real-time stream
@@ -432,11 +459,17 @@ async def websocket_candles(
                 exchange_symbol, timeframe, limit=limit
             )
             # Override the symbol in the response to use the frontend format
-            historical_data['symbol'] = symbol  # Use original frontend symbol, not exchange symbol
+            # Use original frontend symbol, not exchange symbol
+            historical_data['symbol'] = symbol
             await websocket.send_text(json.dumps(historical_data))
-            logger.info(f"Sent initial historical data for {symbol}/{timeframe}: {historical_data.get('count', 0)} candles (requested: {limit})")
+            logger.info(
+                f"Sent initial historical data for {symbol}/{timeframe}: {
+                    historical_data.get(
+                        'count',
+                        0)} candles (requested: {limit})")
         except Exception as e:
-            logger.error(f"Failed to send initial historical data for {symbol}/{timeframe}: {e}")
+            logger.error(
+                f"Failed to send initial historical data for {symbol}/{timeframe}: {e}")
             # Continue with real-time stream even if historical data fails
 
         # Connect to the connection manager for real-time updates
@@ -449,14 +482,14 @@ async def websocket_candles(
             # Keep the connection alive
             while True:
                 try:
-                    # Use receive() instead of receive_text() to handle all message types
+                    # Use receive() instead of receive_text() to handle all
+                    # message types
                     message = await websocket.receive()
 
                     # Check if it's a disconnect message
                     if message["type"] == "websocket.disconnect":
                         logger.info(
-                            f"WebSocket candles client disconnected for {symbol}/{timeframe}"
-                        )
+                            f"WebSocket candles client disconnected for {symbol}/{timeframe}")
                         break
 
                     # Handle text messages
@@ -470,13 +503,11 @@ async def websocket_candles(
                                     )
                             except json.JSONDecodeError:
                                 logger.warning(
-                                    f"Invalid JSON received from client for {symbol}/{timeframe}"
-                                )
+                                    f"Invalid JSON received from client for {symbol}/{timeframe}")
 
                 except WebSocketDisconnect:
                     logger.info(
-                        f"WebSocket candles client disconnected for {symbol}/{timeframe}"
-                    )
+                        f"WebSocket candles client disconnected for {symbol}/{timeframe}")
                     break
                 except Exception as e:
                     logger.error(
@@ -486,13 +517,11 @@ async def websocket_candles(
 
         except WebSocketDisconnect:
             logger.info(
-                f"WebSocket candles client disconnected for {symbol}/{timeframe}"
-            )
+                f"WebSocket candles client disconnected for {symbol}/{timeframe}")
         finally:
             connection_manager.disconnect(websocket, stream_key)
             logger.info(
-                f"WebSocket candles connection cleaned up for {symbol}/{timeframe}"
-            )
+                f"WebSocket candles connection cleaned up for {symbol}/{timeframe}")
 
     except Exception as e:
         logger.error(

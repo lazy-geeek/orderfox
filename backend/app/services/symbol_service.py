@@ -22,7 +22,8 @@ class SymbolService:
         self._markets_cache: Optional[Dict[str, Any]] = None
         self._cache_initialized = False
 
-        # Fallback symbols for development/demo mode when exchange is not available
+        # Fallback symbols for development/demo mode when exchange is not
+        # available
         self._fallback_symbols = {
             # Common USDT pairs
             "BTCUSDT": "BTC/USDT",
@@ -81,7 +82,9 @@ class SymbolService:
             )
 
         except Exception as e:
-            logger.warning(f"Failed to initialize symbol cache from exchange: {str(e)}")
+            logger.warning(
+                f"Failed to initialize symbol cache from exchange: {
+                    str(e)}")
             logger.info("Falling back to demo symbols for development mode")
 
             # Use fallback symbols for development/demo mode
@@ -94,7 +97,8 @@ class SymbolService:
                 f"Symbol cache initialized with {len(self._symbol_cache)} fallback symbols for demo mode"
             )
 
-    def resolve_symbol_to_exchange_format(self, symbol_id: str) -> Optional[str]:
+    def resolve_symbol_to_exchange_format(
+            self, symbol_id: str) -> Optional[str]:
         """
         Convert symbol ID to exchange format.
 
@@ -113,12 +117,13 @@ class SymbolService:
         # Then check if we can convert from ID to exchange format
         exchange_symbol = self._symbol_cache.get(symbol_id)
         if exchange_symbol:
-                return exchange_symbol
+            return exchange_symbol
 
         logger.warning(f"Symbol {symbol_id} not found in cache")
         return None
 
-    def resolve_exchange_to_id_format(self, exchange_symbol: str) -> Optional[str]:
+    def resolve_exchange_to_id_format(
+            self, exchange_symbol: str) -> Optional[str]:
         """
         Convert exchange symbol to ID format.
 
@@ -137,7 +142,7 @@ class SymbolService:
         # Then check if we can convert from exchange to ID format
         symbol_id = self._exchange_to_id_cache.get(exchange_symbol)
         if symbol_id:
-                return symbol_id
+            return symbol_id
 
         logger.warning(f"Exchange symbol {exchange_symbol} not found in cache")
         return None
@@ -155,35 +160,38 @@ class SymbolService:
         exchange_symbol = self.resolve_symbol_to_exchange_format(symbol_id)
         return exchange_symbol is not None
 
-    def calculate_rounding_options(self, price_precision: Optional[int] = None, 
-                                  current_price: Optional[float] = None) -> Tuple[List[float], float]:
+    def calculate_rounding_options(self,
+                                   price_precision: Optional[int] = None,
+                                   current_price: Optional[float] = None) -> Tuple[List[float],
+                                                                                   float]:
         """
         Calculate available rounding options for a symbol.
         Based on price precision and optional current price.
-        
+
         Args:
             price_precision: Number of decimal places for price accuracy
             current_price: Current market price (optional)
-            
+
         Returns:
             Tuple of (rounding_options, default_rounding)
         """
         if price_precision is None:
             return [], 0.01
-        
+
         # Import decimal utilities for precise calculations
         from app.utils.decimal_utils import DecimalUtils
-        
+
         # If current_price is available, limit options to 1/10th of price
         max_rounding = current_price / 10 if current_price else 1000
-        
-        # Generate options using decimal arithmetic to avoid floating-point precision issues
+
+        # Generate options using decimal arithmetic to avoid floating-point
+        # precision issues
         options = DecimalUtils.generate_power_of_10_options(
             base_precision=price_precision,
             max_options=7,
             max_value=max_rounding
         )
-        
+
         # Set default rounding (third item if available, or second, or first)
         if len(options) >= 3:
             default_rounding = options[2]  # Third option as default
@@ -191,10 +199,13 @@ class SymbolService:
             default_rounding = options[1]
         else:
             default_rounding = options[0] if options else 0.01
-        
+
         return options, default_rounding
 
-    def get_symbol_info(self, symbol_id: str, current_price: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    def get_symbol_info(self,
+                        symbol_id: str,
+                        current_price: Optional[float] = None) -> Optional[Dict[str,
+                                                                                Any]]:
         """
         Get detailed symbol information.
 
@@ -282,7 +293,8 @@ class SymbolService:
             )
 
         # Calculate rounding options based on price precision and current price
-        rounding_options, default_rounding = self.calculate_rounding_options(price_precision, current_price)
+        rounding_options, default_rounding = self.calculate_rounding_options(
+            price_precision, current_price)
 
         return {
             "id": market_info.get("id"),

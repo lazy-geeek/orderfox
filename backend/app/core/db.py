@@ -1,10 +1,10 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import json
-import os
 from typing import Optional, Dict, Any, List
 
-from app.core.config import settings  # Assuming your config.py has a 'settings' object
+# Assuming your config.py has a 'settings' object
+from app.core.config import settings
 
 # Global variable to hold the Firestore client
 db: Optional[firestore.Client] = None
@@ -21,14 +21,16 @@ def initialize_firebase():
         if firebase_config_json_str:
             firebase_config_dict = json.loads(firebase_config_json_str)
 
-            # Check if the app is already initialized to prevent re-initialization error
+            # Check if the app is already initialized to prevent
+            # re-initialization error
             if not firebase_admin._apps:
                 cred = credentials.Certificate(firebase_config_dict)
                 firebase_admin.initialize_app(cred)
                 db = firestore.client()
                 print("Firebase Admin SDK initialized successfully.")
             else:
-                # App is already initialized, just get the default app's firestore client
+                # App is already initialized, just get the default app's
+                # firestore client
                 db = firestore.client(firebase_admin.get_app())
                 print(
                     "Firebase Admin SDK was already initialized. Using existing instance."
@@ -48,12 +50,14 @@ def initialize_firebase():
         )
         db = None
     except Exception as e:
-        print(f"An unexpected error occurred during Firebase initialization: {e}")
+        print(
+            f"An unexpected error occurred during Firebase initialization: {e}")
         db = None
 
 
 # Call initialization at module load time.
-# Alternatively, you could have an explicit init function called from main.py startup.
+# Alternatively, you could have an explicit init function called from
+# main.py startup.
 initialize_firebase()
 
 
@@ -128,7 +132,8 @@ async def load_settings(user_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def save_paper_trade(user_id: str, trade_data: Dict[str, Any]) -> Optional[str]:
+async def save_paper_trade(
+        user_id: str, trade_data: Dict[str, Any]) -> Optional[str]:
     """
     Placeholder: Saves a paper trade to Firestore.
     Returns the ID of the saved trade document or None on failure.

@@ -14,8 +14,9 @@ from enum import Enum
 def to_camel(string: str) -> str:
     """Converts snake_case to camelCase."""
     return "".join(
-        word.capitalize() if i > 0 else word for i, word in enumerate(string.split("_"))
-    )
+        word.capitalize() if i > 0 else word for i,
+        word in enumerate(
+            string.split("_")))
 
 
 class SymbolInfo(BaseModel):
@@ -71,7 +72,9 @@ class OrderBookLevel(BaseModel):
     """
 
     price: float = Field(..., description="Price level", gt=0)
-    amount: float = Field(..., description="Quantity/amount at this price level", gt=0)
+    amount: float = Field(...,
+                          description="Quantity/amount at this price level",
+                          gt=0)
 
     model_config = ConfigDict(
         json_schema_extra={"example": {"price": 43250.50, "amount": 1.25}}
@@ -128,10 +131,14 @@ class Candle(BaseModel):
         ..., description="Unix timestamp in milliseconds for the candle period"
     )
     open: float = Field(..., description="Opening price", gt=0)
-    high: float = Field(..., description="Highest price during the period", gt=0)
+    high: float = Field(...,
+                        description="Highest price during the period",
+                        gt=0)
     low: float = Field(..., description="Lowest price during the period", gt=0)
     close: float = Field(..., description="Closing price", gt=0)
-    volume: float = Field(..., description="Trading volume during the period", ge=0)
+    volume: float = Field(...,
+                          description="Trading volume during the period",
+                          ge=0)
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -164,10 +171,14 @@ class Ticker(BaseModel):
     open: Optional[float] = Field(None, description="24h opening price", gt=0)
     close: Optional[float] = Field(None, description="24h closing price", gt=0)
     change: Optional[float] = Field(None, description="24h price change")
-    percentage: Optional[float] = Field(None, description="24h percentage change")
-    volume: Optional[float] = Field(None, description="24h trading volume", ge=0)
-    quote_volume: Optional[float] = Field(None, description="24h quote volume", ge=0)
-    timestamp: datetime = Field(..., description="Timestamp of the ticker data")
+    percentage: Optional[float] = Field(
+        None, description="24h percentage change")
+    volume: Optional[float] = Field(
+        None, description="24h trading volume", ge=0)
+    quote_volume: Optional[float] = Field(
+        None, description="24h quote volume", ge=0)
+    timestamp: datetime = Field(...,
+                                description="Timestamp of the ticker data")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -220,7 +231,9 @@ class Position(BaseModel):
     symbol: str = Field(..., description="Trading symbol")
     side: str = Field(..., description="Position side (long/short)")
     size: float = Field(..., description="Position size")
-    entryPrice: float = Field(..., description="Entry price of the position", gt=0)
+    entryPrice: float = Field(...,
+                              description="Entry price of the position",
+                              gt=0)
     markPrice: float = Field(..., description="Current mark price", gt=0)
     unrealizedPnl: float = Field(..., description="Unrealized profit and loss")
 

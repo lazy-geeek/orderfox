@@ -29,8 +29,10 @@ class ExchangeService:
             logger.info("Initializing CCXT Binance exchange...")
 
             if not settings.BINANCE_API_KEY or not settings.BINANCE_SECRET_KEY:
-                logger.warning("Binance API keys not found - initializing in demo mode")
-                # Initialize exchange without API keys for demo/public endpoints
+                logger.warning(
+                    "Binance API keys not found - initializing in demo mode")
+                # Initialize exchange without API keys for demo/public
+                # endpoints
                 self.exchange = ccxt.binance(
                     {
                         "sandbox": False,  # Explicitly use live net, even for demo/public endpoints
@@ -62,14 +64,18 @@ class ExchangeService:
             raise
         except ccxt.NetworkError as e:
             logger.error(f"Network error initializing CCXT exchange: {str(e)}")
-            raise HTTPException(status_code=503, detail="Exchange network error")
+            raise HTTPException(
+                status_code=503,
+                detail="Exchange network error")
         except ccxt.ExchangeError as e:
-            logger.error(f"Exchange error initializing CCXT exchange: {str(e)}")
+            logger.error(
+                f"Exchange error initializing CCXT exchange: {
+                    str(e)}")
             raise HTTPException(status_code=502, detail="Exchange API error")
         except Exception as e:
             logger.error(
-                f"Unexpected error initializing CCXT exchange: {str(e)}", exc_info=True
-            )
+                f"Unexpected error initializing CCXT exchange: {
+                    str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, detail="Exchange initialization failed"
             )
@@ -94,7 +100,8 @@ class ExchangeService:
                 logger.info("WebSocket streaming will use mock data instead")
                 return None  # Signal to use mock streaming
             else:
-                logger.info("API keys found - initializing CCXT Pro with credentials")
+                logger.info(
+                    "API keys found - initializing CCXT Pro with credentials")
                 self.exchange_pro = ccxt.pro.binance(
                     {
                         "apiKey": settings.BINANCE_API_KEY,
@@ -115,11 +122,15 @@ class ExchangeService:
         except HTTPException:
             raise
         except ccxt.NetworkError as e:
-            logger.error(f"Network error initializing CCXT Pro exchange: {str(e)}")
+            logger.error(
+                f"Network error initializing CCXT Pro exchange: {
+                    str(e)}")
             logger.info("Falling back to mock streaming mode")
             return None  # Signal to use mock streaming
         except ccxt.ExchangeError as e:
-            logger.error(f"Exchange error initializing CCXT Pro exchange: {str(e)}")
+            logger.error(
+                f"Exchange error initializing CCXT Pro exchange: {
+                    str(e)}")
             logger.info("Falling back to mock streaming mode")
             return None  # Signal to use mock streaming
         except Exception as e:
@@ -173,19 +184,24 @@ class ExchangeService:
                 "message": "Connection to Binance API successful",
             }
         except ccxt.NetworkError as e:
-            logger.error(f"Network error testing Binance API connection: {str(e)}")
+            logger.error(
+                f"Network error testing Binance API connection: {
+                    str(e)}")
             return {
                 "status": "error",
                 "message": "Network error connecting to Binance API",
             }
         except ccxt.ExchangeError as e:
-            logger.error(f"Exchange error testing Binance API connection: {str(e)}")
+            logger.error(
+                f"Exchange error testing Binance API connection: {
+                    str(e)}")
             return {
                 "status": "error",
                 "message": "Exchange API error",
             }
         except HTTPException as e:
-            logger.error(f"HTTP error testing Binance API connection: {str(e.detail)}")
+            logger.error(
+                f"HTTP error testing Binance API connection: {str(e.detail)}")
             return {
                 "status": "error",
                 "message": e.detail,

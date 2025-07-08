@@ -5,7 +5,7 @@ This module provides FastAPI HTTP endpoints for fetching market data including
 symbols, order books, and candlestick data from the exchange.
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from app.api.v1.schemas import SymbolInfo, OrderBook, OrderBookLevel, Candle
 from app.services.exchange_service import exchange_service
@@ -50,7 +50,7 @@ async def get_symbols():
             is_swap = market.get("type") == "swap"
 
             # Exclude spot markets explicitly
-            is_spot = market.get("type") == "spot" or market.get("spot") == True
+            is_spot = market.get("type") == "spot" or market.get("spot")
 
             if not (is_usdt_quoted and is_active and is_swap and not is_spot):
                 continue
@@ -82,7 +82,8 @@ async def get_symbols():
                         if isinstance(precision_value, int):
                             price_precision = precision_value
                         else:
-                            # If it's a float like 1e-8, calculate decimal places
+                            # If it's a float like 1e-8, calculate decimal
+                            # places
                             if precision_value > 0 and precision_value < 1:
                                 # Convert scientific notation to decimal places
                                 price_precision = abs(
@@ -99,14 +100,14 @@ async def get_symbols():
                                 price_precision = int(precision_value)
             except (KeyError, TypeError, ValueError) as e:
                 logger.warning(
-                    f"Could not extract pricePrecision for {market['symbol']}: {e}"
-                )
+                    f"Could not extract pricePrecision for {
+                        market['symbol']}: {e}")
 
             # Log warning if pricePrecision couldn't be determined
             if price_precision is None:
                 logger.warning(
-                    f"pricePrecision could not be determined for {market['symbol']}"
-                )
+                    f"pricePrecision could not be determined for {
+                        market['symbol']}")
 
             # Get current price from ticker for rounding calculation
             current_price = None
@@ -117,9 +118,12 @@ async def get_symbols():
                     current_price = None
 
             # Get rounding options from symbol service with current price
-            symbol_info = symbol_service.get_symbol_info(market["id"], current_price)
-            rounding_options = symbol_info.get("roundingOptions", []) if symbol_info else []
-            default_rounding = symbol_info.get("defaultRounding", 0.01) if symbol_info else 0.01
+            symbol_info = symbol_service.get_symbol_info(
+                market["id"], current_price)
+            rounding_options = symbol_info.get(
+                "roundingOptions", []) if symbol_info else []
+            default_rounding = symbol_info.get(
+                "defaultRounding", 0.01) if symbol_info else 0.01
 
             symbols.append(
                 SymbolInfo(
@@ -177,7 +181,8 @@ async def get_orderbook(
     """
     try:
         # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
+            symbol)
         if not exchange_symbol:
             # Get suggestions for invalid symbol
             suggestions = symbol_service.get_symbol_suggestions(symbol)
@@ -189,7 +194,8 @@ async def get_orderbook(
         exchange = exchange_service.get_exchange()
 
         # Fetch order book data using exchange symbol with limit
-        order_book_data = exchange.fetch_order_book(exchange_symbol, limit=limit)
+        order_book_data = exchange.fetch_order_book(
+            exchange_symbol, limit=limit)
 
         # Convert to our schema format
         bids = [
@@ -213,8 +219,9 @@ async def get_orderbook(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch order book for {symbol}: {str(e)}"
-        )
+            status_code=500,
+            detail=f"Failed to fetch order book for {symbol}: {
+                str(e)}")
 
 
 @router.get("/candles/{symbol}", response_model=List[Candle])
@@ -262,12 +269,14 @@ async def get_candles(
     if timeframe not in valid_timeframes:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid timeframe. Valid options: {', '.join(valid_timeframes)}",
+            detail=f"Invalid timeframe. Valid options: {
+                ', '.join(valid_timeframes)}",
         )
 
     try:
         # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(symbol)
+        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
+            symbol)
         if not exchange_symbol:
             # Get suggestions for invalid symbol
             suggestions = symbol_service.get_symbol_suggestions(symbol)
@@ -279,14 +288,16 @@ async def get_candles(
         exchange = exchange_service.get_exchange()
 
         # Fetch OHLCV data using exchange symbol
-        ohlcv_data = exchange.fetch_ohlcv(exchange_symbol, timeframe, limit=limit)
+        ohlcv_data = exchange.fetch_ohlcv(
+            exchange_symbol, timeframe, limit=limit)
 
         # Convert to our schema format
         candles = []
         for ohlcv in ohlcv_data:
             candles.append(
                 Candle(
-                    timestamp=int(ohlcv[0]),  # Keep as Unix timestamp in milliseconds
+                    timestamp=int(ohlcv[0]),
+                    # Keep as Unix timestamp in milliseconds
                     open=float(ohlcv[1]),
                     high=float(ohlcv[2]),
                     low=float(ohlcv[3]),
@@ -301,8 +312,9 @@ async def get_candles(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch candles for {symbol}: {str(e)}"
-        )
+            status_code=500,
+            detail=f"Failed to fetch candles for {symbol}: {
+                str(e)}")
 
 
 @router.post("/refresh-symbols")
@@ -324,7 +336,9 @@ async def refresh_symbols():
             "cache_stats": stats,
         }
     except Exception as e:
-        logger.error(f"Failed to refresh symbol cache: {str(e)}", exc_info=True)
+        logger.error(
+            f"Failed to refresh symbol cache: {
+                str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Failed to refresh symbol cache: {str(e)}"
         )
@@ -342,7 +356,10 @@ async def get_symbol_cache_stats():
         stats = symbol_service.get_cache_stats()
         return {"status": "success", "cache_stats": stats}
     except Exception as e:
-        logger.error(f"Failed to get symbol cache stats: {str(e)}", exc_info=True)
+        logger.error(
+            f"Failed to get symbol cache stats: {
+                str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get symbol cache stats: {str(e)}"
-        )
+            status_code=500,
+            detail=f"Failed to get symbol cache stats: {
+                str(e)}")

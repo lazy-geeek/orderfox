@@ -1,6 +1,5 @@
 import logging
 import sys
-from typing import Dict, Any
 
 
 def setup_logging(log_level: str = "INFO") -> logging.Logger:

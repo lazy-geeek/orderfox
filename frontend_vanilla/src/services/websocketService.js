@@ -7,7 +7,6 @@ import {
   setCandlesWsConnected,
   setOrderBookWsConnected,
   setTickerWsConnected,
-  clearOrderBook,
 } from '../store/store.js';
 import { WS_BASE_URL } from '../config/env.js';
 
@@ -298,7 +297,7 @@ export const disconnectWebSocketStream = (
 export const disconnectAllWebSockets = () => {
   console.log('Disconnecting all active WebSockets...');
   for (const key in activeWebSockets) {
-    if (activeWebSockets.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(activeWebSockets, key)) {
       activeWebSockets[key].close(1000, 'Client initiated close (all)');
       delete activeWebSockets[key];
     }

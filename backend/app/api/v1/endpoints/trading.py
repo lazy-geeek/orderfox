@@ -6,14 +6,12 @@ and controlling trading modes (paper vs live trading).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Body
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from app.api.v1.schemas import (
     TradeRequest,
     TradeResponse,
     Position as PositionSchema,
-    OrderType,
-    TradeSide,
 )
 from app.services.trading_engine_service import TradingEngineService
 
@@ -63,7 +61,8 @@ async def execute_trade_endpoint(
     """
     try:
         # The service's execute_trade expects enum values if you defined them as such.
-        # The Pydantic model TradeRequest should already validate and provide correct types.
+        # The Pydantic model TradeRequest should already validate and provide
+        # correct types.
         result = await service.execute_trade(
             symbol=trade_request.symbol,
             side=trade_request.side.value,  # Use .value if side is an Enum in Pydantic model
@@ -74,7 +73,8 @@ async def execute_trade_endpoint(
         # The service's execute_trade placeholder returns a dict.
         # We need to map this to TradeResponse.
         # Assuming the service returns a dict compatible with TradeResponse fields.
-        # If positionInfo is returned by the service, it should be a dict that can be parsed into PositionSchema.
+        # If positionInfo is returned by the service, it should be a dict that
+        # can be parsed into PositionSchema.
 
         position_info_data = result.get("positionInfo")
         position_info_schema = None
@@ -85,15 +85,12 @@ async def execute_trade_endpoint(
             try:
                 # A simple example, assuming direct mapping for placeholder
                 position_info_schema = PositionSchema(
-                    symbol=position_info_data.get("symbol"),
-                    side=position_info_data.get("side"),
-                    size=position_info_data.get(
-                        "amount"
-                    ),  # or "size" if service returns that
-                    entryPrice=position_info_data.get("entry_price"),  # or "entryPrice"
-                    markPrice=position_info_data.get("entry_price", 0)
-                    * 1.0,  # Placeholder mark price
-                    unrealizedPnl=0.0,  # Placeholder PnL
+                    symbol=str(position_info_data.get("symbol", "")),
+                    side=str(position_info_data.get("side", "")),
+                    size=float(position_info_data.get("amount", 0)),
+                    entryPrice=float(position_info_data.get("entry_price", 0)),
+                    markPrice=float(position_info_data.get("entry_price", 0)) * 1.0,
+                    unrealizedPnl=0.0,
                 )
             except Exception as e:
                 print(f"Error mapping positionInfo: {e}")
@@ -141,20 +138,19 @@ async def get_open_positions_endpoint(
         formatted_positions: List[PositionSchema] = []
         for pos_data in raw_positions:
             try:
-                # Example mapping, adjust keys based on what `get_open_positions` actually returns
+                # Example mapping, adjust keys based on what
+                # `get_open_positions` actually returns
                 formatted_positions.append(
                     PositionSchema(
-                        symbol=pos_data.get("symbol"),
-                        side=pos_data.get("side"),
-                        size=pos_data.get("amount"),  # Assuming 'amount' is 'size'
-                        entryPrice=pos_data.get("entry_price"),
-                        markPrice=pos_data.get("entry_price", 0)
-                        * 1.01,  # Placeholder mark price
+                        symbol=str(pos_data.get("symbol", "")),
+                        side=str(pos_data.get("side", "")),
+                        size=float(pos_data.get("amount", 0)),
+                        entryPrice=float(pos_data.get("entry_price", 0)),
+                        markPrice=float(pos_data.get("entry_price", 0)) * 1.01,
                         unrealizedPnl=(
-                            pos_data.get("entry_price", 0) * 1.01
-                            - pos_data.get("entry_price", 0)
-                        )
-                        * pos_data.get("amount", 0),  # Placeholder PnL
+                            float(pos_data.get("entry_price", 0)) * 1.01
+                            - float(pos_data.get("entry_price", 0))
+                        ) * float(pos_data.get("amount", 0)),
                     )
                 )
             except Exception as e:
@@ -200,7 +196,9 @@ async def set_trading_mode_endpoint(
         result = await service.set_trading_mode(mode)
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("message"))
-        return {"status": result.get("status"), "message": result.get("message")}
+        return {
+            "status": result.get("status"),
+            "message": result.get("message")}
     except HTTPException:
         raise  # Re-raise HTTPException
     except Exception as e:

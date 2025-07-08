@@ -57,9 +57,7 @@ function updateOrderBookDisplay(container, data) {
   const { 
     selectedSymbol,
     currentOrderBook: orderBook, 
-    currentTicker: ticker, 
     orderBookWsConnected, 
-    tickerWsConnected, 
     selectedRounding,
     availableRoundingOptions,
     displayDepth

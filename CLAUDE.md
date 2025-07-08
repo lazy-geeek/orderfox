@@ -67,7 +67,9 @@ cd frontend_vanilla && npm install
 # Linting & Type Checking
 npm run lint              # Lint frontend JavaScript
 npm run lint:fix          # Auto-fix frontend linting issues
-npm run typecheck         # Reminder to use Pylance in VS Code for Python
+npm run typecheck         # Use Pylance in VS Code for comprehensive Python checking
+# Pylance handles all Python code quality: types, imports, unused vars, style
+# All backend files should pass Pylance with zero diagnostics
 
 # Run tests
 cd backend && python -m pytest tests/ -v
@@ -81,6 +83,25 @@ cd frontend_vanilla && npm run test:run
 # Full application test
 python test_paper_trading.py
 ```
+
+### Code Quality & Linting
+```bash
+# Frontend linting (ESLint)
+cd frontend_vanilla && npm run lint         # Check for linting errors
+cd frontend_vanilla && npm run lint:fix     # Auto-fix linting issues
+
+# Backend type checking (Pylance only)
+# Use Pylance in VS Code for comprehensive type checking and linting
+# All Python files should pass Pylance validation with zero diagnostics
+# Pylance handles: type checking, import validation, unused variables, code style
+```
+
+**Code Quality Standards:**
+- **Frontend**: ESLint with no errors or warnings
+- **Backend**: Pylance type checking only (no flake8 or autopep8)
+- **Type Safety**: All Python files must pass Pylance validation with zero diagnostics
+- **Pylance Coverage**: Type hints, import management, unused variables, argument types
+- **IDE Integration**: Use VS Code with Pylance extension or mcp__ide__getDiagnostics tool
 
 ### Docker Development
 ```bash

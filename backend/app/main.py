@@ -1,6 +1,4 @@
-import logging
 import json
-import os
 import time
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
@@ -33,13 +31,14 @@ if DEVCONTAINER_MODE:
             debugpy.listen(("0.0.0.0", 5678))
             logger.info("Debugpy listening on 0.0.0.0:5678")
     except ImportError:
-        logger.warning("debugpy not available - install with: pip install debugpy")
+        logger.warning(
+            "debugpy not available - install with: pip install debugpy")
     except Exception as e:
         logger.warning(f"Failed to configure debugpy: {e}")
 
 # Create FastAPI app instance
 app = FastAPI(
-    title="Trading Bot API", 
+    title="Trading Bot API",
     version="1.0.0",
     debug=settings.DEBUG,
     docs_url="/docs" if DEVELOPMENT else None,  # Disable docs in production
@@ -77,7 +76,8 @@ async def starlette_http_exception_handler(
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
     """Handle Pydantic ValidationError."""
-    logger.error(f"Validation Error: {exc.errors()} - Path: {request.url.path}")
+    logger.error(
+        f"Validation Error: {exc.errors()} - Path: {request.url.path}")
     return JSONResponse(
         status_code=422,
         content={
@@ -92,34 +92,45 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle all other unhandled exceptions."""
     logger.error(
-        f"Unhandled Exception: {type(exc).__name__}: {str(exc)} - Path: {request.url.path}",
+        f"Unhandled Exception: {
+            type(exc).__name__}: {
+            str(exc)} - Path: {
+                request.url.path}",
         exc_info=True,
     )
     return JSONResponse(
-        status_code=500, content={"detail": "Internal server error", "status_code": 500}
-    )
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "status_code": 500})
 
 
 # Development middleware for timing and debugging
 class DevelopmentMiddleware(BaseHTTPMiddleware):
     """Development middleware for request timing and debugging."""
-    
+
     async def dispatch(self, request: Request, call_next):
         if DEVELOPMENT:
             start_time = time.time()
             response = await call_next(request)
             process_time = time.time() - start_time
             response.headers["X-Process-Time"] = str(process_time)
-            
+
             # Log slow requests
             if process_time > 1.0:  # Log requests taking more than 1 second
-                logger.warning(f"Slow request: {request.method} {request.url.path} took {process_time:.2f}s")
-            
+                logger.warning(
+                    f"Slow request: {
+                        request.method} {
+                        request.url.path} took {
+                        process_time:.2f}s")
+
             return response
         else:
             return await call_next(request)
 
 # Application Events
+
+
 @app.on_event("startup")
 async def startup_event():
     """Application startup event."""
@@ -128,16 +139,20 @@ async def startup_event():
     logger.info(f"Development mode: {DEVELOPMENT}")
     logger.info(f"Container mode: {DEVCONTAINER_MODE}")
     logger.info(f"Server binding to: {settings.HOST}:{settings.PORT}")
-    
+
     # Mount static files in development
     if settings.SERVE_STATIC_FILES:
         static_path = Path(settings.STATIC_FILES_PATH)
         if static_path.exists():
-            app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+            app.mount(
+                "/static",
+                StaticFiles(
+                    directory=str(static_path)),
+                name="static")
             logger.info(f"Serving static files from: {static_path}")
         else:
             logger.warning(f"Static files directory not found: {static_path}")
-    
+
     logger.info("Application startup completed")
 
 
@@ -164,8 +179,10 @@ if settings.REQUEST_LOGGING:
         logger.info(f"Incoming request: {request.method} {request.url.path}")
         response = await call_next(request)
         logger.info(
-            f"Request completed: {request.method} {request.url.path} - Status: {response.status_code}"
-        )
+            f"Request completed: {
+                request.method} {
+                request.url.path} - Status: {
+                response.status_code}")
         return response
 
 
@@ -188,8 +205,14 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(market_data_http_router, prefix="/api/v1", tags=["market-data-http"])
-app.include_router(market_data_ws_router, prefix="/api/v1", tags=["market-data-ws"])
+app.include_router(
+    market_data_http_router,
+    prefix="/api/v1",
+    tags=["market-data-http"])
+app.include_router(
+    market_data_ws_router,
+    prefix="/api/v1",
+    tags=["market-data-ws"])
 app.include_router(trading_router.router, prefix="/api/v1", tags=["trading"])
 
 
@@ -200,7 +223,9 @@ async def websocket_test(websocket: WebSocket):
     logger.info(f"WebSocket test connection attempt from {websocket.client}")
     try:
         await websocket.accept()
-        logger.info(f"WebSocket test connection established with {websocket.client}")
+        logger.info(
+            f"WebSocket test connection established with {
+                websocket.client}")
 
         # Send welcome message
         await websocket.send_text(
@@ -241,6 +266,8 @@ async def websocket_test(websocket: WebSocket):
             pass
 
 # Health check endpoint
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for container orchestration."""
@@ -261,7 +288,7 @@ async def root():
         index_path = Path(settings.STATIC_FILES_PATH) / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path), media_type="text/html")
-    
+
     return {
         "message": "Trading Bot API",
         "version": "1.0.0",
@@ -277,17 +304,18 @@ if settings.SERVE_STATIC_FILES:
     async def serve_spa(path: str):
         """Serve SPA frontend for client-side routing."""
         # Check if it's an API request
-        if path.startswith("api/") or path.startswith("docs") or path.startswith("redoc"):
+        if path.startswith(
+                "api/") or path.startswith("docs") or path.startswith("redoc"):
             raise HTTPException(status_code=404, detail="Not found")
-        
+
         # Try to serve the requested file
         file_path = Path(settings.STATIC_FILES_PATH) / path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
-        
+
         # Fall back to index.html for SPA routing
         index_path = Path(settings.STATIC_FILES_PATH) / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path), media_type="text/html")
-        
+
         raise HTTPException(status_code=404, detail="File not found")

@@ -39,7 +39,7 @@ function notify(key) {
 
 function setState(newState) {
   for (const key in newState) {
-    if (state.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(state, key)) {
       state[key] = newState[key];
       notify(key);
     }
