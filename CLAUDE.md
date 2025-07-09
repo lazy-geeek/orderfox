@@ -258,6 +258,19 @@ Optional settings:
 - **Testing**: Use `Mock()` for standard CCXT, `AsyncMock()` only for CCXT Pro methods
 - **Pattern**: Chart data service demonstrates correct synchronous usage in `get_initial_chart_data()`
 
+### Symbol Service & Performance Optimization
+- **Architecture Pattern**: Frontend → Backend API → Symbol Service → Exchange (proper layering)
+- **Single Source of Truth**: Symbol Service is the centralized authority for all symbol operations
+- **Performance Optimization**: Ticker caching with 5-minute TTL reduces API calls by 10x
+- **Deduplication**: Only ONE `exchange.load_markets()` call during application startup
+- **Exchange Call Monitoring**: Built-in monitoring tracks and prevents duplicate API calls
+- **Centralized Business Logic**: All symbol filtering, processing, and formatting happens in Symbol Service
+- **Error Resilience**: Graceful fallback to demo symbols when exchange is unavailable
+- **HTTP Endpoint Pattern**: `/symbols` endpoint is thin wrapper around `symbol_service.get_all_symbols()`
+- **Testing Strategy**: Mock Symbol Service methods instead of direct exchange calls for better isolation
+- **Cache Management**: Symbol and ticker caches with proper TTL and invalidation mechanisms
+- **Critical Rule**: Never bypass Symbol Service - always use it for symbol-related operations
+
 ### WebSocket Protocol
 
 Connect to order book:
@@ -316,6 +329,16 @@ Update parameters without reconnecting:
 2. Backend: Adjust WebSocket data streaming in `market_data_ws.py`
 3. Frontend: Update chart component in `LightweightChart.js`
 4. Note: Uses TradingView Lightweight Charts API, not ECharts
+
+### Working with Symbol Service (CRITICAL)
+1. **Always use Symbol Service**: Never call exchange directly for symbol operations
+2. **Get all symbols**: Use `symbol_service.get_all_symbols()` for symbol lists
+3. **Symbol validation**: Use `symbol_service.validate_symbol_exists(symbol_id)`
+4. **Symbol conversion**: Use `symbol_service.resolve_symbol_to_exchange_format(symbol_id)`
+5. **Testing**: Mock `symbol_service.get_all_symbols()` instead of exchange methods
+6. **Performance**: Symbol Service automatically handles caching and deduplication
+7. **Error handling**: Symbol Service provides graceful fallbacks to demo symbols
+8. **HTTP endpoints**: Use Symbol Service methods, not direct exchange calls
 
 ### Chart Performance & UX Features
 - **Zoom Preservation**: User zoom/pan state is preserved during real-time updates

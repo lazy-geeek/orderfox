@@ -6,6 +6,7 @@ validating symbols, and providing suggestions for invalid symbols.
 """
 
 import re
+import time
 from typing import Optional, List, Dict, Any, Tuple
 from app.services.exchange_service import exchange_service
 from app.core.logging_config import get_logger
@@ -21,6 +22,11 @@ class SymbolService:
         self._exchange_to_id_cache: Dict[str, str] = {}
         self._markets_cache: Optional[Dict[str, Any]] = None
         self._cache_initialized = False
+        
+        # Ticker cache for volume24h calculation
+        self._ticker_cache: Optional[Dict[str, Any]] = None
+        self._ticker_cache_time: Optional[float] = None
+        self._ticker_cache_ttl: float = 300  # 5 minutes TTL
 
         # Fallback symbols for development/demo mode when exchange is not
         # available
@@ -96,6 +102,177 @@ class SymbolService:
             logger.info(
                 f"Symbol cache initialized with {len(self._symbol_cache)} fallback symbols for demo mode"
             )
+
+    def _fetch_tickers(self) -> Dict[str, Any]:
+        """
+        Fetch ticker data with caching.
+        
+        Returns:
+            Dict[str, Any]: Ticker data from exchange
+        """
+        current_time = time.time()
+        
+        # Check if we have valid cached data
+        if (self._ticker_cache is not None and 
+            self._ticker_cache_time is not None and
+            current_time - self._ticker_cache_time < self._ticker_cache_ttl):
+            return self._ticker_cache
+        
+        try:
+            exchange = exchange_service.get_exchange()
+            tickers = exchange.fetch_tickers()
+            
+            # Cache the result
+            self._ticker_cache = tickers
+            self._ticker_cache_time = current_time
+            
+            logger.info(f"Fetched and cached {len(tickers)} tickers")
+            return tickers
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch tickers: {str(e)}")
+            # Return empty dict on error
+            return {}
+
+    def get_all_symbols(self) -> List[Dict[str, Any]]:
+        """
+        Get all available USDT perpetual swap symbols from the exchange.
+        
+        This method centralizes all symbol filtering and processing logic,
+        moving it from the HTTP endpoint to the Symbol Service for proper
+        architecture where Symbol Service is the single source of truth.
+        
+        Returns:
+            List[Dict[str, Any]]: List of symbol information dictionaries
+            
+        Raises:
+            Exception: If unable to fetch symbols from exchange
+        """
+        logger.info("Getting all symbols from Symbol Service")
+        
+        self._initialize_cache()
+        
+        if not self._markets_cache:
+            logger.error("Markets cache is not available")
+            return []
+            
+        try:
+            exchange = exchange_service.get_exchange()
+            
+            # Try to explicitly set the market type to futures
+            exchange.options["defaultType"] = "future"
+            
+            # Fetch ticker data (uses caching)
+            tickers = self._fetch_tickers()
+            
+            symbols = []
+            
+            for market_id, market in self._markets_cache.items():
+                # Filter for USDT-quoted active markets
+                is_usdt_quoted = market.get("quote") == "USDT"
+                is_active = market.get("active", True)
+                
+                # Must be a futures market (not spot)
+                is_swap = market.get("type") == "swap"
+                
+                # Exclude spot markets explicitly
+                is_spot = market.get("type") == "spot" or market.get("spot")
+                
+                if not (is_usdt_quoted and is_active and is_swap and not is_spot):
+                    continue
+                
+                # Get 24h volume from ticker data
+                ticker = tickers.get(market["symbol"])
+                
+                volume24h = None
+                if ticker and "info" in ticker and "quoteVolume" in ticker["info"]:
+                    try:
+                        volume24h = float(ticker["info"]["quoteVolume"])
+                    except ValueError:
+                        volume24h = None  # Handle cases where it might not be a valid number
+                
+                # Extract price precision
+                price_precision = None
+                try:
+                    if (
+                        market.get("precision")
+                        and market["precision"].get("price") is not None
+                    ):
+                        precision_value = market["precision"]["price"]
+                        if isinstance(precision_value, (int, float)):
+                            # If it's already an integer, use it directly
+                            if isinstance(precision_value, int):
+                                price_precision = precision_value
+                            else:
+                                # If it's a float like 1e-8, calculate decimal places
+                                if precision_value > 0 and precision_value < 1:
+                                    # Convert scientific notation to decimal places
+                                    price_precision = abs(
+                                        int(
+                                            round(
+                                                float(
+                                                    f"{precision_value:.10e}".split("e")[1]
+                                                )
+                                            )
+                                        )
+                                    )
+                                else:
+                                    # If it's a regular float, convert to int
+                                    price_precision = int(precision_value)
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.warning(
+                        f"Could not extract pricePrecision for {market['symbol']}: {e}"
+                    )
+                
+                # Log warning if pricePrecision couldn't be determined
+                if price_precision is None:
+                    logger.warning(
+                        f"pricePrecision could not be determined for {market['symbol']}"
+                    )
+                
+                # Get current price from ticker for rounding calculation
+                current_price = None
+                if ticker and "last" in ticker and ticker["last"]:
+                    try:
+                        current_price = float(ticker["last"])
+                    except (ValueError, TypeError):
+                        current_price = None
+                
+                # Calculate rounding options using existing method
+                rounding_options, default_rounding = self.calculate_rounding_options(
+                    price_precision, current_price
+                )
+                
+                # Create symbol info dictionary
+                symbol_info = {
+                    "id": market["id"],
+                    "symbol": market["symbol"],
+                    "base_asset": market["base"],
+                    "quote_asset": market["quote"],
+                    "ui_name": f"{market['base']}/{market['quote']}",
+                    "volume24h": volume24h,
+                    "pricePrecision": price_precision,
+                    "roundingOptions": rounding_options,
+                    "defaultRounding": default_rounding,
+                }
+                
+                symbols.append(symbol_info)
+            
+            # Sort symbols by 24h volume in descending order,
+            # with symbols without volume (None or 0) at the end
+            symbols.sort(
+                key=lambda x: (
+                    x["volume24h"] is None or x["volume24h"] == 0,
+                    -float(x["volume24h"] or 0),
+                )
+            )
+            
+            logger.info(f"Retrieved {len(symbols)} symbols from Symbol Service")
+            return symbols
+            
+        except Exception as e:
+            logger.error(f"Failed to get all symbols: {str(e)}", exc_info=True)
+            raise
 
     def resolve_symbol_to_exchange_format(
             self, symbol_id: str) -> Optional[str]:
@@ -376,16 +553,28 @@ class SymbolService:
         self._symbol_cache.clear()
         self._exchange_to_id_cache.clear()
         self._markets_cache = None
+        # Also clear ticker cache
+        self._ticker_cache = None
+        self._ticker_cache_time = None
         self._initialize_cache()
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics for debugging."""
         self._initialize_cache()
+        
+        # Calculate ticker cache age
+        ticker_cache_age = None
+        if self._ticker_cache_time is not None:
+            ticker_cache_age = time.time() - self._ticker_cache_time
+        
         return {
             "initialized": self._cache_initialized,
             "symbol_count": len(self._symbol_cache),
             "exchange_symbol_count": len(self._exchange_to_id_cache),
             "markets_loaded": self._markets_cache is not None,
+            "ticker_cache_loaded": self._ticker_cache is not None,
+            "ticker_cache_age_seconds": ticker_cache_age,
+            "ticker_cache_ttl_seconds": self._ticker_cache_ttl,
         }
 
 
