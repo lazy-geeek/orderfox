@@ -134,6 +134,17 @@ Optional settings:
 
 ## Architecture Highlights
 
+### CSS Architecture & Component Styling
+- **Shared Base Classes**: Use `.orderfox-display-base` for all display components (order book, trades, charts)
+- **Semantic Class Names**: Use semantic names like `.display-header`, `.display-content`, `.display-footer` instead of component-specific names
+- **Component-Specific Overrides**: Keep only unique styles in component-specific classes (e.g., `.orderfox-order-book-display`, `.orderfox-last-trades-display`)
+- **DRY Principle**: Avoid duplicating common styles like headers, footers, loading states, and connection status
+- **Naming Convention**: 
+  - Base classes: `.orderfox-display-base`
+  - Shared components: `.display-header`, `.display-content`, `.display-footer`
+  - Component-specific: `.orderfox-[component]-display`
+- **Theme Support**: All components inherit CSS custom properties for consistent theming
+
 ### WebSocket Connection Management
 - **Centralized Manager**: `WebSocketManager` class eliminates duplicate connection logic across UI components
 - **DRY Principle**: Single source of truth for connection patterns (symbol switching, timeframe changes, initialization)
@@ -194,6 +205,14 @@ Update parameters without reconnecting:
 2. Add to router in `backend/app/api/v1/api.py`
 3. Create service logic in `backend/app/services/`
 4. Add tests in `backend/tests/`
+
+### Adding a New Display Component
+1. Create component in `frontend_vanilla/src/components/`
+2. Use `.orderfox-display-base` as base class in HTML
+3. Use semantic class names: `.display-header`, `.display-content`, `.display-footer`
+4. Add only component-specific styles to `style.css`
+5. Follow existing patterns for connection status, loading states, etc.
+6. Test with both light and dark themes
 
 ### Modifying Order Book Display
 1. Backend: Update aggregation in `orderbook_aggregation_service.py`
