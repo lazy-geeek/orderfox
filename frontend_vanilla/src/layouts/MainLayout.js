@@ -77,7 +77,12 @@ export function createMainLayout() {
   orderBookPlaceholder.id = 'order-book-placeholder';
   orderBookPlaceholder.textContent = 'OrderBookDisplay';
 
+  const lastTradesPlaceholder = document.createElement('div');
+  lastTradesPlaceholder.id = 'last-trades-container';
+  lastTradesPlaceholder.textContent = 'LastTradesDisplay';
+
   rightSidebar.appendChild(orderBookPlaceholder);
+  rightSidebar.appendChild(lastTradesPlaceholder);
 
   mainContent.appendChild(chartSection);
   mainContent.appendChild(rightSidebar);

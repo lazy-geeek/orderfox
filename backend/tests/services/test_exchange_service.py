@@ -6,7 +6,7 @@ including initialization, connection testing, and error handling.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 import ccxt
 import ccxt.pro
@@ -299,7 +299,7 @@ class TestExchangeServiceConnectionTest:
     @pytest.mark.asyncio
     async def test_test_connection_success(self):
         """Test successful connection test."""
-        mock_exchange = AsyncMock()
+        mock_exchange = MagicMock()
         mock_exchange.fetch_status.return_value = {
             "status": "ok",
             "updated": 1640995200000,
@@ -318,7 +318,7 @@ class TestExchangeServiceConnectionTest:
     @pytest.mark.asyncio
     async def test_test_connection_network_error(self):
         """Test connection test with network error."""
-        mock_exchange = AsyncMock()
+        mock_exchange = MagicMock()
         mock_exchange.fetch_status.side_effect = ccxt.NetworkError("Connection timeout")
 
         with patch.object(
@@ -332,7 +332,7 @@ class TestExchangeServiceConnectionTest:
     @pytest.mark.asyncio
     async def test_test_connection_exchange_error(self):
         """Test connection test with exchange error."""
-        mock_exchange = AsyncMock()
+        mock_exchange = MagicMock()
         mock_exchange.fetch_status.side_effect = ccxt.ExchangeError(
             "API rate limit exceeded"
         )
@@ -361,7 +361,7 @@ class TestExchangeServiceConnectionTest:
     @pytest.mark.asyncio
     async def test_test_connection_unexpected_error(self):
         """Test connection test with unexpected error."""
-        mock_exchange = AsyncMock()
+        mock_exchange = MagicMock()
         mock_exchange.fetch_status.side_effect = ValueError("Unexpected error")
 
         with patch.object(

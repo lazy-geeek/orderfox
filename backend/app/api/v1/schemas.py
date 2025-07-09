@@ -5,9 +5,8 @@ This module defines the data models used for API endpoints,
 particularly for market data operations.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
 from enum import Enum
 
 
@@ -37,8 +36,14 @@ class SymbolInfo(BaseModel):
     volume24h: Optional[float] = Field(
         None, description="24-hour trading volume in quote currency"
     )
+    volume24h_formatted: Optional[str] = Field(
+        None, description="Formatted 24-hour trading volume (e.g., '1.23B', '456.78M')"
+    )
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
+    )
+    priceFormat: Optional[Dict[str, Any]] = Field(
+        None, description="TradingView Lightweight Charts price format configuration"
     )
     roundingOptions: Optional[List[float]] = Field(
         None, description="Available rounding options for this symbol"
@@ -154,48 +159,85 @@ class Candle(BaseModel):
     )
 
 
-class Ticker(BaseModel):
-    """
-    Schema for ticker data.
 
-    Represents real-time ticker information including current price,
-    24h change, volume, and other market statistics.
+class Trade(BaseModel):
+    """
+    Schema for trade data.
+
+    Represents a single trade execution with price, amount, side,
+    and formatted display values.
     """
 
-    symbol: str = Field(..., description="Trading symbol")
-    last: float = Field(..., description="Last traded price", gt=0)
-    bid: Optional[float] = Field(None, description="Best bid price", gt=0)
-    ask: Optional[float] = Field(None, description="Best ask price", gt=0)
-    high: Optional[float] = Field(None, description="24h high price", gt=0)
-    low: Optional[float] = Field(None, description="24h low price", gt=0)
-    open: Optional[float] = Field(None, description="24h opening price", gt=0)
-    close: Optional[float] = Field(None, description="24h closing price", gt=0)
-    change: Optional[float] = Field(None, description="24h price change")
-    percentage: Optional[float] = Field(
-        None, description="24h percentage change")
-    volume: Optional[float] = Field(
-        None, description="24h trading volume", ge=0)
-    quote_volume: Optional[float] = Field(
-        None, description="24h quote volume", ge=0)
-    timestamp: datetime = Field(...,
-                                description="Timestamp of the ticker data")
+    id: str = Field(..., description="Unique trade identifier")
+    price: float = Field(..., description="Trade execution price", gt=0)
+    amount: float = Field(..., description="Trade amount/quantity", gt=0)
+    side: Literal["buy", "sell"] = Field(..., description="Trade side (buy or sell)")
+    timestamp: int = Field(
+        ..., description="Unix timestamp in milliseconds when trade occurred"
+    )
+    price_formatted: str = Field(..., description="Formatted price string for display")
+    amount_formatted: str = Field(..., description="Formatted amount string for display")
+    time_formatted: str = Field(..., description="Formatted time string (HH:MM:SS)")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
+                "id": "12345",
+                "price": 50000.0,
+                "amount": 1.5,
+                "side": "buy",
+                "timestamp": 1640995200000,
+                "price_formatted": "50,000.00",
+                "amount_formatted": "1.50000000",
+                "time_formatted": "12:30:45"
+            }
+        }
+    )
+
+
+class TradesUpdate(BaseModel):
+    """
+    Schema for WebSocket trades update message.
+
+    Represents a real-time update containing trade data for a symbol,
+    including both historical and live trades.
+    """
+
+    type: Literal["trades_update"] = Field(
+        default="trades_update", 
+        description="Message type identifier"
+    )
+    symbol: str = Field(..., description="Trading symbol")
+    trades: List[Trade] = Field(
+        ..., description="List of trades (newest first)"
+    )
+    initial: bool = Field(
+        default=False, 
+        description="True for first batch of historical trades"
+    )
+    timestamp: int = Field(
+        ..., description="Unix timestamp when update was sent"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "type": "trades_update",
                 "symbol": "BTCUSDT",
-                "last": 43250.00,
-                "bid": 43249.50,
-                "ask": 43250.50,
-                "high": 43500.00,
-                "low": 43000.00,
-                "open": 43100.00,
-                "close": 43250.00,
-                "change": 150.00,
-                "percentage": 0.35,
-                "volume": 1250.75,
-                "quote_volume": 54125000.00,
-                "timestamp": "2024-01-01T12:00:00Z",
+                "trades": [
+                    {
+                        "id": "12345",
+                        "price": 50000.0,
+                        "amount": 1.5,
+                        "side": "buy",
+                        "timestamp": 1640995200000,
+                        "price_formatted": "50,000.00",
+                        "amount_formatted": "1.50000000",
+                        "time_formatted": "12:30:45"
+                    }
+                ],
+                "initial": True,
+                "timestamp": 1640995200000
             }
         }
     )

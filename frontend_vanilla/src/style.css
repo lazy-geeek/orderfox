@@ -98,65 +98,9 @@ code {
   min-height: 100vh;
 }
 
-/* ManualTradeForm.css */
-.orderfox-manual-trade-form {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  box-shadow: var(--shadow-light);
-}
 
-.orderfox-manual-trade-form .form-title {
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--color-info);
-  padding-bottom: 0.5rem;
-}
-
-.orderfox-manual-trade-form .trade-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.orderfox-manual-trade-form .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.orderfox-manual-trade-form .form-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.orderfox-manual-trade-form .form-input,
-.orderfox-manual-trade-form .form-select {
-  padding: 0.75rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-}
-
-.orderfox-manual-trade-form .form-input:focus,
-.orderfox-manual-trade-form .form-select:focus {
-  outline: none;
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
-}
-
-/* OrderBookDisplay.css */
-.orderfox-order-book-display {
+/* Shared Display Components Base Classes */
+.orderfox-display-base {
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   background: var(--bg-secondary);
@@ -167,7 +111,7 @@ code {
   overflow: hidden;
 }
 
-.orderfox-order-book-display .order-book-header {
+.display-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -176,46 +120,105 @@ code {
   background: var(--bg-tertiary);
 }
 
-.orderfox-order-book-display .order-book-header h3 {
+.display-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.orderfox-order-book-display .header-controls {
+.header-controls {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.orderfox-order-book-display .symbol-label {
+.symbol-label {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 14px;
 }
 
-.orderfox-order-book-display .connection-status {
+.connection-status {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.orderfox-order-book-display .status-indicator.connected {
+.status-indicator.connected {
   color: var(--color-buy);
   font-size: 12px;
 }
 
-.orderfox-order-book-display .status-indicator.disconnected {
+.status-indicator.disconnected {
   color: var(--color-sell);
   font-size: 12px;
 }
 
-.orderfox-order-book-display .status-text {
+.status-text {
   font-size: 11px;
   color: var(--text-tertiary);
   font-weight: 500;
 }
+
+.display-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 10px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-header {
+  text-align: left;
+}
+
+.amount-header,
+.time-header {
+  text-align: right;
+}
+
+.display-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  text-align: center;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.loading-state {
+  color: var(--color-info);
+}
+
+/* OrderBookDisplay.css */
+.orderfox-order-book-display {
+  /* Inherits from .orderfox-display-base */
+}
+
+/* OrderBook-specific header styles are handled by shared base classes */
 
 .orderfox-order-book-display .depth-selector {
   padding: 8px 16px;
@@ -265,29 +268,6 @@ code {
   font-family: 'Inter', sans-serif;
 }
 
-.orderfox-order-book-display .order-book-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.orderfox-order-book-display .section-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  padding: 10px 16px;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-primary);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.orderfox-order-book-display .price-header {
-  text-align: left;
-}
-
-.orderfox-order-book-display .amount-header,
 .orderfox-order-book-display .total-header {
   text-align: right;
 }
@@ -420,20 +400,6 @@ code {
   color: var(--color-sell);
 }
 
-.orderfox-order-book-display .order-book-footer {
-  padding: 8px 16px;
-  border-top: 1px solid var(--border-primary);
-  background: var(--bg-tertiary);
-  text-align: center;
-}
-
-.orderfox-order-book-display .timestamp {
-  font-size: 10px;
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
-.orderfox-order-book-display .loading-state, 
 .orderfox-order-book-display .error-state, 
 .orderfox-order-book-display .no-symbol-state {
   padding: 40px 16px;
@@ -500,17 +466,7 @@ code {
   overflow: visible;
 }
 
-.orderfox-order-book-display .loading-state,
-.orderfox-order-book-display .empty-state {
-  text-align: center;
-  padding: 20px;
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
-.orderfox-order-book-display .loading-state {
-  color: var(--color-info);
-}
+/* Loading and empty states handled by shared base classes */
 
 .orderfox-order-book-display .market-depth-indicator {
   background: var(--bg-tertiary);
@@ -534,22 +490,6 @@ code {
   font-style: italic;
 }
 
-/* PositionsTable.css */
-.orderfox-positions-table-container {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: var(--shadow-light);
-  margin: 20px 0;
-  border: 1px solid var(--border-primary);
-}
-
-.orderfox-positions-table-container .positions-title {
-  margin: 0 0 16px 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 600;
-}
 
 /* TradingModeToggle.css */
 .orderfox-trading-mode-toggle {
@@ -746,4 +686,65 @@ body {
 
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Last Trades Display CSS - Component-specific styles */
+.orderfox-last-trades-display .trades-section {
+  flex: 1;
+}
+
+.orderfox-last-trades-display .trades-header {
+  background: rgba(14, 203, 129, 0.05);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.orderfox-last-trades-display .trades-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.orderfox-last-trades-display .trades-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.orderfox-last-trades-display .trade-level {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  transition: background-color 0.1s ease;
+}
+
+.orderfox-last-trades-display .trade-level:hover {
+  background: var(--hover-bg);
+}
+
+.orderfox-last-trades-display .trade-level .price {
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.orderfox-last-trades-display .trade-level .amount {
+  text-align: right;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .trade-level .time {
+  text-align: right;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.orderfox-last-trades-display .bid-price {
+  color: var(--color-buy) !important;
+}
+
+.orderfox-last-trades-display .ask-price {
+  color: var(--color-sell) !important;
 }

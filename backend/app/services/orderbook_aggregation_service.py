@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 import time
 import asyncio
 import logging
+from datetime import datetime
 
 from ..models.orderbook import OrderBook
 from .formatting_service import formatting_service
@@ -388,12 +389,21 @@ class OrderBookAggregationService:
                 ask['cumulative_formatted'] = formatting_service.format_total(
                     ask['cumulative'], symbol_data)
 
+        # Format timestamp for display
+        try:
+            dt = datetime.fromtimestamp(orderbook.timestamp / 1000)
+            time_formatted = dt.strftime('%H:%M:%S')
+        except (ValueError, OSError) as e:
+            logger.warning(f"Invalid orderbook timestamp {orderbook.timestamp}: {e}")
+            time_formatted = "Invalid"
+
         # Build result
         result = {
             'symbol': orderbook.symbol,
             'bids': bids_with_cumulative,
             'asks': asks_with_cumulative,
             'timestamp': orderbook.timestamp,
+            'time_formatted': time_formatted,
             'limit': limit,
             'rounding': rounding,
             'market_depth_info': market_depth_info

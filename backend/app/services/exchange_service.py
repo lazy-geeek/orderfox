@@ -14,6 +14,8 @@ class ExchangeService:
     def __init__(self):
         self.exchange: Optional[ccxt.Exchange] = None
         self.exchange_pro: Optional[Any] = None
+        self._load_markets_call_count = 0
+        self._exchange_wrapped = False
 
     def initialize_exchange(self) -> ccxt.Exchange:
         """
@@ -150,7 +152,29 @@ class ExchangeService:
         """
         if self.exchange is None:
             self.initialize_exchange()
+        if not self._exchange_wrapped:
+            self._wrap_exchange_for_monitoring(self.exchange)
+            self._exchange_wrapped = True
         return self.exchange
+
+    def _wrap_exchange_for_monitoring(self, exchange: ccxt.Exchange) -> None:
+        """
+        Wrap exchange to monitor load_markets calls.
+        
+        Args:
+            exchange: The exchange instance to wrap
+        """
+        # Store original method
+        original_load_markets = exchange.load_markets
+        
+        def monitored_load_markets(reload=False):
+            """Wrapped load_markets method with monitoring."""
+            self._load_markets_call_count += 1
+            logger.info(f"load_markets() called - total calls: {self._load_markets_call_count}")
+            return original_load_markets(reload)
+        
+        # Replace with monitored version
+        exchange.load_markets = monitored_load_markets
 
     def get_exchange_pro(self) -> Any:
         """
@@ -175,7 +199,7 @@ class ExchangeService:
             exchange = self.get_exchange()
 
             # Test connection by fetching exchange status
-            status = await exchange.fetch_status()
+            status = exchange.fetch_status()
 
             logger.info("Connection to Binance API successful")
             return {
@@ -215,6 +239,19 @@ class ExchangeService:
                 "status": "error",
                 "message": "Failed to connect to Binance API",
             }
+
+    def get_api_call_stats(self) -> Dict[str, Any]:
+        """
+        Get API call statistics for monitoring.
+        
+        Returns:
+            Dict[str, Any]: Statistics about API calls
+        """
+        return {
+            "load_markets_call_count": self._load_markets_call_count,
+            "exchange_initialized": self.exchange is not None,
+            "exchange_pro_initialized": self.exchange_pro is not None,
+        }
 
 
 # Create global exchange service instance

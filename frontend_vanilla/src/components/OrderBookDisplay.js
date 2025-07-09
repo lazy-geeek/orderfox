@@ -1,10 +1,10 @@
 
 function createOrderBookDisplay() {
   const container = document.createElement('div');
-  container.className = 'order-book-display orderfox-order-book-display';
+  container.className = 'orderfox-display-base orderfox-order-book-display';
 
   container.innerHTML = `
-    <div class="order-book-header">
+    <div class="display-header">
       <h3>Order Book</h3>
       <div class="header-controls">
         <span class="symbol-label"></span>
@@ -27,7 +27,7 @@ function createOrderBookDisplay() {
         <select id="rounding-select" class="rounding-select"></select>
       </div>
     </div>
-    <div class="order-book-content">
+    <div class="display-content">
       <div class="asks-section">
         <div class="section-header asks-header">
           <span class="price-header">Price</span>
@@ -45,7 +45,7 @@ function createOrderBookDisplay() {
         <div class="bids-list"></div>
       </div>
     </div>
-    <div class="order-book-footer">
+    <div class="display-footer">
       <span class="timestamp"></span>
     </div>
   `;
@@ -181,8 +181,8 @@ function updateOrderBookDisplay(container, data) {
 
   // Update timestamp
   const timestampEl = container.querySelector('.timestamp');
-  if (timestampEl && orderBook && orderBook.timestamp) {
-    timestampEl.textContent = `Last updated: ${new Date(orderBook.timestamp).toLocaleTimeString()}`;
+  if (timestampEl && orderBook && orderBook.time_formatted) {
+    timestampEl.textContent = `Last updated: ${orderBook.time_formatted}`;
   }
 }
 

@@ -30,124 +30,28 @@ async def get_symbols():
         HTTPException: If unable to fetch symbols from exchange
     """
     try:
-        exchange = exchange_service.get_exchange()
-
-        # Try to explicitly set the market type to futures
-        exchange.options["defaultType"] = "future"
-
-        # Load markets to get symbol information
-        markets = exchange.load_markets()
-        tickers = exchange.fetch_tickers()
-
+        # Use Symbol Service as single source of truth for all symbol data
+        symbol_data = symbol_service.get_all_symbols()
+        
+        # Convert to SymbolInfo schema objects
         symbols = []
-
-        for market_id, market in markets.items():
-            # Filter for USDT-quoted active markets
-            is_usdt_quoted = market.get("quote") == "USDT"
-            is_active = market.get("active", True)
-
-            # Must be a futures market (not spot)
-            is_swap = market.get("type") == "swap"
-
-            # Exclude spot markets explicitly
-            is_spot = market.get("type") == "spot" or market.get("spot")
-
-            if not (is_usdt_quoted and is_active and is_swap and not is_spot):
-                continue
-
-            # Get 24h volume from ticker data
-            ticker = tickers.get(market["symbol"])
-
-            volume24h = None
-            if ticker and "info" in ticker and "quoteVolume" in ticker["info"]:
-                try:
-                    volume24h = float(ticker["info"]["quoteVolume"])
-                except ValueError:
-                    volume24h = (
-                        None  # Handle cases where it might not be a valid number
-                    )
-
-            # Extract pricePrecision
-            price_precision = None
-
-            # Extract pricePrecision from market['precision']['price']
-            try:
-                if (
-                    market.get("precision")
-                    and market["precision"].get("price") is not None
-                ):
-                    precision_value = market["precision"]["price"]
-                    if isinstance(precision_value, (int, float)):
-                        # If it's already an integer, use it directly
-                        if isinstance(precision_value, int):
-                            price_precision = precision_value
-                        else:
-                            # If it's a float like 1e-8, calculate decimal
-                            # places
-                            if precision_value > 0 and precision_value < 1:
-                                # Convert scientific notation to decimal places
-                                price_precision = abs(
-                                    int(
-                                        round(
-                                            float(
-                                                f"{precision_value:.10e}".split("e")[1]
-                                            )
-                                        )
-                                    )
-                                )
-                            else:
-                                # If it's a regular float, convert to int
-                                price_precision = int(precision_value)
-            except (KeyError, TypeError, ValueError) as e:
-                logger.warning(
-                    f"Could not extract pricePrecision for {
-                        market['symbol']}: {e}")
-
-            # Log warning if pricePrecision couldn't be determined
-            if price_precision is None:
-                logger.warning(
-                    f"pricePrecision could not be determined for {
-                        market['symbol']}")
-
-            # Get current price from ticker for rounding calculation
-            current_price = None
-            if ticker and "last" in ticker and ticker["last"]:
-                try:
-                    current_price = float(ticker["last"])
-                except (ValueError, TypeError):
-                    current_price = None
-
-            # Get rounding options from symbol service with current price
-            symbol_info = symbol_service.get_symbol_info(
-                market["id"], current_price)
-            rounding_options = symbol_info.get(
-                "roundingOptions", []) if symbol_info else []
-            default_rounding = symbol_info.get(
-                "defaultRounding", 0.01) if symbol_info else 0.01
-
+        for symbol_dict in symbol_data:
             symbols.append(
                 SymbolInfo(
-                    id=market["id"],
-                    symbol=market["symbol"],
-                    base_asset=market["base"],
-                    quote_asset=market["quote"],
-                    ui_name=f"{market['base']}/{market['quote']}",
-                    volume24h=volume24h,
-                    pricePrecision=price_precision,
-                    roundingOptions=rounding_options,
-                    defaultRounding=default_rounding,
+                    id=symbol_dict["id"],
+                    symbol=symbol_dict["symbol"],
+                    base_asset=symbol_dict["base_asset"],
+                    quote_asset=symbol_dict["quote_asset"],
+                    ui_name=symbol_dict["ui_name"],
+                    volume24h=symbol_dict["volume24h"],
+                    volume24h_formatted=symbol_dict["volume24h_formatted"],
+                    pricePrecision=symbol_dict["pricePrecision"],
+                    priceFormat=symbol_dict["priceFormat"],
+                    roundingOptions=symbol_dict["roundingOptions"],
+                    defaultRounding=symbol_dict["defaultRounding"],
                 )
             )
-
-        # Sort symbols by 24h volume in descending order,
-        # with symbols without volume (None or 0) at the end
-        symbols.sort(
-            key=lambda x: (
-                x.volume24h is None or x.volume24h == 0,
-                -float(x.volume24h or 0),
-            )
-        )
-
+        
         return symbols
 
     except Exception as e:

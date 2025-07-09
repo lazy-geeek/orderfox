@@ -22,81 +22,40 @@ client = TestClient(app)
 class TestSymbolsEndpoint:
     """Test cases for the /api/v1/symbols endpoint."""
 
-    @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_symbols_success(self, mock_exchange_service):
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
+    def test_get_symbols_success(self, mock_symbol_service):
         """Test successful retrieval of symbols."""
-        # Mock exchange and markets data
-        from unittest.mock import MagicMock
-
-        mock_exchange = MagicMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-
-        mock_markets = {
-            "BTC/USDT": {
+        # Mock symbol service get_all_symbols method
+        mock_symbol_data = [
+            {
                 "id": "BTCUSDT",
                 "symbol": "BTC/USDT",
-                "base": "BTC",
-                "quote": "USDT",
-                "type": "swap",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": True,  # Perpetual swap
-                "active": True,
-                "precision": {"price": 8},  # For pricePrecision
-                "info": {"tickSize": "0.00000001"},  # For tickSize (string from API)
+                "base_asset": "BTC",
+                "quote_asset": "USDT",
+                "ui_name": "BTC/USDT",
+                "volume24h": 1000000.0,
+                "volume24h_formatted": "1.00M",
+                "pricePrecision": 2,
+                "priceFormat": {"type": "price", "precision": 2, "minMove": 0.01},
+                "roundingOptions": [0.01, 0.1, 1.0],
+                "defaultRounding": 0.1,
             },
-            "ETH/USDT": {
+            {
                 "id": "ETHUSDT",
                 "symbol": "ETH/USDT",
-                "base": "ETH",
-                "quote": "USDT",
-                "type": "swap",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": True,  # Perpetual swap
-                "active": True,
-                "precision": {"price": 5},  # For pricePrecision
-                "limits": {"price": {"min": 0.00001}},  # Alternative for tickSize
+                "base_asset": "ETH",
+                "quote_asset": "USDT",
+                "ui_name": "ETH/USDT",
+                "volume24h": 500000.0,
+                "volume24h_formatted": "500.00K",
+                "pricePrecision": 2,
+                "priceFormat": {"type": "price", "precision": 2, "minMove": 0.01},
+                "roundingOptions": [0.01, 0.1, 1.0],
+                "defaultRounding": 0.1,
             },
-            "ADA/USDT": {
-                "id": "ADAUSDT",
-                "symbol": "ADA/USDT",
-                "base": "ADA",
-                "quote": "USDT",
-                "type": "spot",  # Should be filtered out
-                "future": False,
-                "spot": True,
-                "contract": False,
-                "swap": False,
-                "active": True,
-                "precision": {},  # Case where price precision is missing
-                "info": {},  # Case where tickSize info is missing
-            },
-            "BTC/USDT:USDT-250627": {
-                "id": "BTCUSDT_250627",
-                "symbol": "BTC/USDT:USDT-250627",
-                "base": "BTC",
-                "quote": "USDT",
-                "type": "future",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": False,  # Dated future - should be filtered out
-                "active": True,
-            },
-        }
-        mock_exchange.load_markets.return_value = mock_markets
-
-        # Mock tickers data
-        mock_tickers = {
-            "BTC/USDT": {"info": {"quoteVolume": "1000000"}},
-            "ETH/USDT": {"info": {"quoteVolume": "500000"}},
-            "ADA/USDT": {"info": {"quoteVolume": "100000"}},
-            "BTC/USDT:USDT-250627": {"info": {"quoteVolume": "50000"}},
-        }
-        mock_exchange.fetch_tickers.return_value = mock_tickers
+        ]
+        
+        mock_symbol_service.get_all_symbols.return_value = mock_symbol_data
 
         # Make request
         response = client.get("/api/v1/symbols")
@@ -104,98 +63,80 @@ class TestSymbolsEndpoint:
         # Assertions
         assert response.status_code == 200
         data = response.json()
-        assert (
-            len(data) == 2
-        )  # Only perpetual swaps should be returned (not dated futures or spot)
-
-        # Sort data by symbol for consistent testing
-        data_sorted = sorted(data, key=lambda x: x["symbol"])
+        assert len(data) == 2
 
         # Test BTC/USDT symbol
-        btc_symbol = data_sorted[0]
+        btc_symbol = data[0]
+        assert btc_symbol["id"] == "BTCUSDT"
         assert btc_symbol["symbol"] == "BTC/USDT"
         assert btc_symbol["baseAsset"] == "BTC"
         assert btc_symbol["quoteAsset"] == "USDT"
-        assert btc_symbol["exchange"] == "binance"
-        assert btc_symbol["pricePrecision"] == 8
-        assert btc_symbol["tickSize"] == 0.00000001
+        assert btc_symbol["uiName"] == "BTC/USDT"
         assert btc_symbol["volume24h"] == 1000000.0
+        assert btc_symbol["pricePrecision"] == 2
+        assert btc_symbol["roundingOptions"] == [0.01, 0.1, 1.0]
+        assert btc_symbol["defaultRounding"] == 0.1
 
         # Test ETH/USDT symbol
-        eth_symbol = data_sorted[1]
+        eth_symbol = data[1]
+        assert eth_symbol["id"] == "ETHUSDT"
         assert eth_symbol["symbol"] == "ETH/USDT"
         assert eth_symbol["baseAsset"] == "ETH"
         assert eth_symbol["quoteAsset"] == "USDT"
-        assert eth_symbol["exchange"] == "binance"
-        assert eth_symbol["pricePrecision"] == 5
-        assert eth_symbol["tickSize"] == 0.00001  # From limits.price.min
+        assert eth_symbol["uiName"] == "ETH/USDT"
         assert eth_symbol["volume24h"] == 500000.0
+        assert eth_symbol["pricePrecision"] == 2
 
-        # Verify exchange service was called
-        mock_exchange_service.get_exchange.assert_called_once()
-        mock_exchange.load_markets.assert_called_once()
+        # Verify symbol service was called
+        mock_symbol_service.get_all_symbols.assert_called_once()
 
-    @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_symbols_missing_precision_data(self, mock_exchange_service):
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
+    def test_get_symbols_missing_precision_data(self, mock_symbol_service):
         """Test symbols endpoint with missing or incomplete precision data."""
-        # Mock exchange and markets data with various precision scenarios
-        from unittest.mock import MagicMock
-
-        mock_exchange = MagicMock()
-        mock_exchange_service.get_exchange.return_value = mock_exchange
-
-        mock_markets = {
-            "DOT/USDT": {
+        # Mock symbol service get_all_symbols method with various precision scenarios
+        mock_symbol_data = [
+            {
                 "id": "DOTUSDT",
                 "symbol": "DOT/USDT",
-                "base": "DOT",
-                "quote": "USDT",
-                "type": "swap",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": True,
-                "active": True,
-                # Missing precision and info fields entirely
+                "base_asset": "DOT",
+                "quote_asset": "USDT",
+                "ui_name": "DOT/USDT",
+                "volume24h": 300000.0,
+                "volume24h_formatted": "300.00K",
+                "pricePrecision": None,  # Missing precision data
+                "priceFormat": None,
+                "roundingOptions": [],
+                "defaultRounding": 0.01,
             },
-            "LINK/USDT": {
+            {
                 "id": "LINKUSDT",
                 "symbol": "LINK/USDT",
-                "base": "LINK",
-                "quote": "USDT",
-                "type": "swap",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": True,
-                "active": True,
-                "precision": {},  # Empty precision object
-                "info": {},  # Empty info object
+                "base_asset": "LINK",
+                "quote_asset": "USDT",
+                "ui_name": "LINK/USDT",
+                "volume24h": 200000.0,
+                "volume24h_formatted": "200.00K",
+                "pricePrecision": None,  # Empty precision
+                "priceFormat": None,
+                "roundingOptions": [],
+                "defaultRounding": 0.01,
             },
-            "MATIC/USDT": {
+            {
                 "id": "MATICUSDT",
                 "symbol": "MATIC/USDT",
-                "base": "MATIC",
-                "quote": "USDT",
-                "type": "swap",
-                "future": True,
-                "spot": False,
-                "contract": True,
-                "swap": True,
-                "active": True,
-                "precision": {"price": 6},  # Has pricePrecision
-                # Missing info field for tickSize
+                "base_asset": "MATIC",
+                "quote_asset": "USDT",
+                "ui_name": "MATIC/USDT",
+                "volume24h": 150000.0,
+                "volume24h_formatted": "150.00K",
+                "pricePrecision": 6,  # Has precision data
+                "priceFormat": {"type": "price", "precision": 6, "minMove": 0.000001},
+                "roundingOptions": [0.000001, 0.00001, 0.0001],
+                "defaultRounding": 0.00001,
             },
-        }
-        mock_exchange.load_markets.return_value = mock_markets
-
-        # Mock tickers data
-        mock_tickers = {
-            "DOT/USDT": {"info": {"quoteVolume": "300000"}},
-            "LINK/USDT": {"info": {"quoteVolume": "200000"}},
-            "MATIC/USDT": {"info": {"quoteVolume": "150000"}},
-        }
-        mock_exchange.fetch_tickers.return_value = mock_tickers
+        ]
+        
+        mock_symbol_service.get_all_symbols.return_value = mock_symbol_data
 
         # Make request
         response = client.get("/api/v1/symbols")
@@ -205,41 +146,35 @@ class TestSymbolsEndpoint:
         data = response.json()
         assert len(data) == 3
 
-        # Sort data by symbol for consistent testing
-        data_sorted = sorted(data, key=lambda x: x["symbol"])
-
         # Test DOT/USDT - completely missing precision data
-        dot_symbol = data_sorted[0]
+        dot_symbol = data[0]
+        assert dot_symbol["id"] == "DOTUSDT"
         assert dot_symbol["symbol"] == "DOT/USDT"
         assert dot_symbol["pricePrecision"] is None
-        assert dot_symbol["tickSize"] is None
         assert dot_symbol["volume24h"] == 300000.0
 
         # Test LINK/USDT - empty precision objects
-        link_symbol = data_sorted[1]
+        link_symbol = data[1]
+        assert link_symbol["id"] == "LINKUSDT"
         assert link_symbol["symbol"] == "LINK/USDT"
         assert link_symbol["pricePrecision"] is None
-        assert link_symbol["tickSize"] is None
         assert link_symbol["volume24h"] == 200000.0
 
-        # Test MATIC/USDT - has pricePrecision but missing tickSize info
-        matic_symbol = data_sorted[2]
+        # Test MATIC/USDT - has pricePrecision
+        matic_symbol = data[2]
+        assert matic_symbol["id"] == "MATICUSDT"
         assert matic_symbol["symbol"] == "MATIC/USDT"
         assert matic_symbol["pricePrecision"] == 6
-        assert (
-            matic_symbol["tickSize"] == 0.000001
-        )  # Calculated from pricePrecision (10^-6)
         assert matic_symbol["volume24h"] == 150000.0
 
-        # Verify exchange service was called
-        mock_exchange_service.get_exchange.assert_called_once()
-        mock_exchange.load_markets.assert_called_once()
+        # Verify symbol service was called
+        mock_symbol_service.get_all_symbols.assert_called_once()
 
-    @patch("app.api.v1.endpoints.market_data_http.exchange_service")
-    def test_get_symbols_exchange_error(self, mock_exchange_service):
-        """Test error handling when exchange fails."""
-        mock_exchange_service.get_exchange.side_effect = Exception(
-            "Exchange connection failed"
+    @patch("app.api.v1.endpoints.market_data_http.symbol_service")
+    def test_get_symbols_service_error(self, mock_symbol_service):
+        """Test error handling when symbol service fails."""
+        mock_symbol_service.get_all_symbols.side_effect = Exception(
+            "Symbol service failed"
         )
 
         response = client.get("/api/v1/symbols")
