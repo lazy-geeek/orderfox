@@ -643,6 +643,7 @@ class TestSymbolServiceIntegration:
         """Test that get_all_symbols includes volume24h_formatted field."""
         # Mock exchange and markets
         mock_exchange = Mock()
+        mock_exchange.options = {}  # Add options dict for the Mock
         mock_exchange_service.get_exchange.return_value = mock_exchange
         
         self.symbol_service._markets_cache = {
@@ -657,6 +658,7 @@ class TestSymbolServiceIntegration:
                 "precision": {"price": 1, "amount": 8}
             }
         }
+        self.symbol_service._cache_initialized = True  # Mark cache as initialized
         
         # Mock tickers with volume data
         mock_tickers = {
