@@ -51,17 +51,14 @@ export const connectWebSocketStream = async (
   }
 
   if (connectionInProgress[streamKey]) {
-    console.log(`WebSocket connection already in progress for ${streamKey}, skipping duplicate attempt`);
     return;
   }
 
   if (activeWebSockets[streamKey]) {
     const currentState = activeWebSockets[streamKey].readyState;
     if (currentState === WebSocket.OPEN) {
-      console.log(`WebSocket for ${streamKey} is already connected, skipping new connection attempt`);
       return;
     } else if (currentState === WebSocket.CONNECTING) {
-      console.log(`WebSocket for ${streamKey} is already connecting, skipping duplicate attempt`);
       return;
     }
   }
@@ -77,7 +74,6 @@ export const connectWebSocketStream = async (
     
     if (timeSinceLastAttempt < minWaitTime) {
       const waitTime = minWaitTime - timeSinceLastAttempt;
-      console.log(`Rate limiting WebSocket connection for ${streamKey}, waiting ${waitTime}ms (attempt ${connectionAttempts[streamKey]})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
     
@@ -91,12 +87,10 @@ export const connectWebSocketStream = async (
     
     if (connectionAttempts[streamKey] > 1) {
       const backoffDelay = Math.min(2000 * Math.pow(2, connectionAttempts[streamKey] - 1), 15000);
-      console.log(`WebSocket connection attempt #${connectionAttempts[streamKey]} for ${streamKey}, waiting ${backoffDelay}ms`);
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
 
     if (activeWebSockets[streamKey]) {
-      console.log(`Closing existing WebSocket for ${streamKey} before reconnecting.`);
       activeWebSockets[streamKey].close(1000, 'Client replacing connection');
       delete activeWebSockets[streamKey];
       
@@ -105,7 +99,6 @@ export const connectWebSocketStream = async (
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
-    console.log(`Starting WebSocket connection for ${streamKey} to ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
     activeWebSockets[streamKey] = ws;
 
@@ -119,11 +112,6 @@ export const connectWebSocketStream = async (
     }, 10000);
 
     ws.onopen = () => {
-      console.log(`WebSocket connected for ${streamKey}: ${wsUrl}`);
-      // CRITICAL: Add debug logging for symbol switch tracking
-      if (streamType === 'candles') {
-        console.debug(`Candles WebSocket established for stream: ${streamKey}`);
-      }
       clearTimeout(connectionTimeout);
       
       connectionAttempts[streamKey] = 0;
@@ -159,9 +147,9 @@ export const connectWebSocketStream = async (
         } else if (data.type === 'trades_update') {
           updateTradesFromWebSocket(data);
         } else if (data.type === 'param_update_ack') {
-          console.log('Parameter update acknowledged:', data);
+          // Parameter update acknowledged
         } else if (data.type === 'params_updated') {
-          console.log('Parameter update successful:', data);
+          // Parameter update successful
         } else if (data.type === 'error') {
           console.error('WebSocket error message:', data.message);
           // Handle chart data errors specifically
@@ -212,11 +200,6 @@ export const connectWebSocketStream = async (
     };
 
     ws.onclose = (event) => {
-      console.log(`WebSocket closed for ${streamKey}:`, event.code, event.reason);
-      // CRITICAL: Add debug logging for symbol switch tracking
-      if (streamType === 'candles') {
-        console.debug(`Candles WebSocket closed for stream: ${streamKey}`);
-      }
       clearTimeout(connectionTimeout);
       connectionInProgress[streamKey] = false;
       
@@ -235,7 +218,6 @@ export const connectWebSocketStream = async (
         if ((event.code !== 1000 && event.code !== 1006) ||
             (event.code === 1006 && connectionAttempts[streamKey] < 3)) {
           const reconnectDelay = Math.min(5000 * connectionAttempts[streamKey], 30000);
-          console.log(`Attempting to reconnect WebSocket for ${streamKey} in ${reconnectDelay}ms...`);
           setTimeout(() => {
             if (!activeWebSockets[streamKey]) {
               const params = connectionParams[streamKey];
@@ -249,8 +231,6 @@ export const connectWebSocketStream = async (
         } else if (event.code === 1006) {
           console.error(`WebSocket for ${streamKey} closed abnormally after ${connectionAttempts[streamKey]} attempts. Not reconnecting.`);
         }
-      } else {
-        console.log(`WebSocket close event for ${streamKey} ignored - not the active connection`);
       }
     };
 
@@ -274,7 +254,6 @@ export const sendWebSocketMessage = (streamType, symbol, timeframe, message) => 
   
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message));
-    console.log(`Sent WebSocket message for ${streamKey}:`, message);
     return true;
   } else {
     console.warn(`Cannot send message to ${streamKey}: WebSocket not open`);
@@ -298,7 +277,6 @@ export const disconnectWebSocketStream = (
 ) => {
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
   if (activeWebSockets[streamKey]) {
-    console.log(`Manually closing WebSocket for ${streamKey}`);
     const ws = activeWebSockets[streamKey];
     ws.onopen = null;
     ws.onmessage = null;
@@ -317,7 +295,6 @@ export const disconnectWebSocketStream = (
 };
 
 export const disconnectAllWebSockets = () => {
-  console.log('Disconnecting all active WebSockets...');
   for (const key in activeWebSockets) {
     if (Object.prototype.hasOwnProperty.call(activeWebSockets, key)) {
       activeWebSockets[key].close(1000, 'Client initiated close (all)');
@@ -338,11 +315,9 @@ document.addEventListener('visibilitychange', () => {
   isPageVisible = !document.hidden;
   
   if (wasVisible && !isPageVisible) {
-    // Page became hidden - log but keep connections (browsers throttle but don't kill WebSockets)
-    console.log('Page became hidden, WebSocket connections may be throttled by browser');
+    // Page became hidden - keep connections (browsers throttle but don't kill WebSockets)
   } else if (!wasVisible && isPageVisible) {
     // Page became visible again - check WebSocket health and reconnect if needed
-    console.log('Page became visible, checking WebSocket connection health');
     checkAndRefreshConnections();
   }
 });
@@ -364,20 +339,17 @@ function checkAndRefreshConnections() {
         ws.readyState === WebSocket.CLOSING || 
         timeSinceLastMessage > staleThreshold) {
       staleConnections.push(streamKey);
-      console.log(`Stale connection detected for ${streamKey}: readyState=${ws.readyState}, timeSinceLastMessage=${timeSinceLastMessage}ms`);
     }
   }
   
   // If no stale connections detected but page was hidden, force a data refresh
   // This ensures we get latest data even if WebSocket appears healthy
   if (staleConnections.length === 0) {
-    console.log('No stale connections found, but forcing data refresh after page visibility change');
     forceDataRefresh();
   }
   
   // Reconnect stale connections
   if (staleConnections.length > 0) {
-    console.log(`Found ${staleConnections.length} stale WebSocket connections, reconnecting...`);
     staleConnections.forEach(streamKey => {
       // Clean up old connection
       delete activeWebSockets[streamKey];
@@ -404,12 +376,10 @@ async function forceDataRefresh() {
   const { state, fetchOrderBook } = await import('../store/store.js');
   
   if (state.selectedSymbol) {
-    console.log('Forcing data refresh for symbol:', state.selectedSymbol);
-    
     // Refresh orderbook data
     if (state.selectedRounding && state.displayDepth) {
-      const { getValidOrderBookLimit } = await import('../store/store.js');
-      const limit = getValidOrderBookLimit(state.displayDepth);
+      // Send raw display depth - backend handles validation
+      const limit = state.displayDepth;
       await fetchOrderBook(state.selectedSymbol, limit);
     }
     

@@ -715,3 +715,53 @@ class TestOrderBookAggregationService:
                 assert 'price_formatted' not in ask
                 assert 'amount_formatted' not in ask
                 assert 'cumulative_formatted' not in ask
+
+    @pytest.mark.asyncio
+    async def test_aggregate_orderbook_includes_time_formatted(self):
+        """Test that aggregated orderbook includes time_formatted field."""
+        service = OrderBookAggregationService()
+        
+        # Create mock orderbook with specific timestamp
+        mock_orderbook = OrderBook(
+            symbol="BTCUSDT",
+            bids=[[50000.0, 1.0]],
+            asks=[[50100.0, 1.0]],
+            timestamp=1640995200000  # 2022-01-01 00:00:00 UTC
+        )
+        
+        result = await service.aggregate_orderbook(
+            mock_orderbook,
+            limit=10,
+            rounding=1.0
+        )
+        
+        # Check that time_formatted is included
+        assert 'time_formatted' in result
+        assert 'timestamp' in result
+        assert result['timestamp'] == 1640995200000
+        # time_formatted should be in HH:MM:SS format
+        assert isinstance(result['time_formatted'], str)
+        assert len(result['time_formatted']) >= 8  # HH:MM:SS format
+
+    @pytest.mark.asyncio
+    async def test_aggregate_orderbook_invalid_timestamp(self):
+        """Test handling of invalid timestamp in orderbook."""
+        service = OrderBookAggregationService()
+        
+        # Create mock orderbook with invalid timestamp
+        mock_orderbook = OrderBook(
+            symbol="BTCUSDT",
+            bids=[[50000.0, 1.0]],
+            asks=[[50100.0, 1.0]],
+            timestamp=-1  # Invalid timestamp
+        )
+        
+        result = await service.aggregate_orderbook(
+            mock_orderbook,
+            limit=10,
+            rounding=1.0
+        )
+        
+        # Should still include time_formatted field, even if invalid
+        assert 'time_formatted' in result
+        assert result['time_formatted'] == "Invalid"

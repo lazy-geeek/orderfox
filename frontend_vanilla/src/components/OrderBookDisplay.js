@@ -181,8 +181,8 @@ function updateOrderBookDisplay(container, data) {
 
   // Update timestamp
   const timestampEl = container.querySelector('.timestamp');
-  if (timestampEl && orderBook && orderBook.timestamp) {
-    timestampEl.textContent = `Last updated: ${new Date(orderBook.timestamp).toLocaleTimeString()}`;
+  if (timestampEl && orderBook && orderBook.time_formatted) {
+    timestampEl.textContent = `Last updated: ${orderBook.time_formatted}`;
   }
 }
 

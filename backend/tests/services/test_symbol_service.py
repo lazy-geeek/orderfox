@@ -543,3 +543,134 @@ class TestSymbolServiceIntegration:
         # Only assert if both lookups succeeded
         if result1 is not None:
             assert second_lookup_time < first_lookup_time
+
+    def test_format_volume_billions(self):
+        """Test volume formatting for billions."""
+        assert self.symbol_service.format_volume(1_234_567_890) == "1.23B"
+        assert self.symbol_service.format_volume(5_000_000_000) == "5.00B"
+
+    def test_format_volume_millions(self):
+        """Test volume formatting for millions."""
+        assert self.symbol_service.format_volume(1_234_567) == "1.23M"
+        assert self.symbol_service.format_volume(500_000_000) == "500.00M"
+
+    def test_format_volume_thousands(self):
+        """Test volume formatting for thousands."""
+        assert self.symbol_service.format_volume(1_234) == "1.23K"
+        assert self.symbol_service.format_volume(999_999) == "1000.00K"
+
+    def test_format_volume_small_numbers(self):
+        """Test volume formatting for numbers less than 1000."""
+        assert self.symbol_service.format_volume(123.45) == "123.45"
+        assert self.symbol_service.format_volume(1) == "1.00"
+
+    def test_format_volume_edge_cases(self):
+        """Test volume formatting edge cases."""
+        assert self.symbol_service.format_volume(None) == ""
+        assert self.symbol_service.format_volume(0) == ""
+        assert self.symbol_service.format_volume("invalid") == ""
+
+    def test_generate_price_format_normal_precision(self):
+        """Test priceFormat generation for normal precision values."""
+        # 2 decimal places
+        result = self.symbol_service.generate_price_format(2)
+        assert result["type"] == "price"
+        assert result["precision"] == 2
+        assert result["minMove"] == 0.01
+
+        # 4 decimal places
+        result = self.symbol_service.generate_price_format(4)
+        assert result["type"] == "price"
+        assert result["precision"] == 4
+        assert result["minMove"] == 0.0001
+
+        # 1 decimal place
+        result = self.symbol_service.generate_price_format(1)
+        assert result["type"] == "price"
+        assert result["precision"] == 1
+        assert result["minMove"] == 0.1
+
+    def test_generate_price_format_edge_cases(self):
+        """Test priceFormat generation for edge cases."""
+        # None precision
+        result = self.symbol_service.generate_price_format(None)
+        assert result["type"] == "price"
+        assert result["precision"] == 2
+        assert result["minMove"] == 0.01
+
+        # Very high precision (should be clamped to 8)
+        result = self.symbol_service.generate_price_format(12)
+        assert result["precision"] == 8
+        assert result["minMove"] == 0.00000001
+
+        # Negative precision (should be clamped to 0)
+        result = self.symbol_service.generate_price_format(-1)
+        assert result["precision"] == 0
+        assert result["minMove"] == 1.0
+
+    def test_get_symbol_info_includes_price_format(self):
+        """Test that get_symbol_info includes priceFormat object."""
+        # Mock markets cache
+        self.symbol_service._markets_cache = {
+            "BTC/USDT": {
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT",
+                "base": "BTC",
+                "quote": "USDT",
+                "active": True,
+                "type": "swap",
+                "precision": {
+                    "price": 1,
+                    "amount": 8
+                }
+            }
+        }
+        
+        # Mock symbol cache
+        self.symbol_service._symbol_cache = {"BTCUSDT": "BTC/USDT"}
+        self.symbol_service._cache_initialized = True
+
+        result = self.symbol_service.get_symbol_info("BTCUSDT")
+        
+        assert result is not None
+        assert "priceFormat" in result
+        assert result["priceFormat"]["type"] == "price"
+        assert result["priceFormat"]["precision"] == 1
+        assert result["priceFormat"]["minMove"] == 0.1
+
+    @patch('app.services.symbol_service.exchange_service')
+    def test_get_all_symbols_includes_formatted_volume(self, mock_exchange_service):
+        """Test that get_all_symbols includes volume24h_formatted field."""
+        # Mock exchange and markets
+        mock_exchange = Mock()
+        mock_exchange_service.get_exchange.return_value = mock_exchange
+        
+        self.symbol_service._markets_cache = {
+            "BTC/USDT": {
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT",
+                "base": "BTC",
+                "quote": "USDT",
+                "active": True,
+                "type": "swap",
+                "spot": False,
+                "precision": {"price": 1, "amount": 8}
+            }
+        }
+        
+        # Mock tickers with volume data
+        mock_tickers = {
+            "BTC/USDT": {
+                "info": {
+                    "quoteVolume": "1234567890"  # 1.23B
+                }
+            }
+        }
+        
+        with patch.object(self.symbol_service, '_fetch_tickers', return_value=mock_tickers):
+            result = self.symbol_service.get_all_symbols()
+            
+            assert len(result) > 0
+            symbol = result[0]
+            assert "volume24h_formatted" in symbol
+            assert symbol["volume24h_formatted"] == "1.23B"

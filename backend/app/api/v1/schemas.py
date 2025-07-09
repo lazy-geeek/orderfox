@@ -37,6 +37,9 @@ class SymbolInfo(BaseModel):
     volume24h: Optional[float] = Field(
         None, description="24-hour trading volume in quote currency"
     )
+    volume24h_formatted: Optional[str] = Field(
+        None, description="Formatted 24-hour trading volume (e.g., '1.23B', '456.78M')"
+    )
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
     )

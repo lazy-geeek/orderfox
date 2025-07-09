@@ -24,29 +24,17 @@ import {
 } from './websocketService.js';
 
 /**
- * Calculate optimal number of candles to fetch based on chart viewport size.
- * This ensures the chart viewport is always fully populated with data.
+ * Get chart container width for backend calculation.
+ * Backend will calculate optimal candle count based on this width.
  * 
- * @returns {number} Optimal candle count (200-1000 range)
+ * @returns {number} Container width in pixels
  */
-function getOptimalCandleCount() {
+function getContainerWidth() {
   // Get chart container width (fallback to reasonable default if not available)
   const chartContainer = document.querySelector('.chart-container');
   const containerWidth = chartContainer ? chartContainer.clientWidth : 800; // Default 800px
   
-  // Lightweight Charts default bar spacing is ~6 pixels per candle
-  const barSpacing = 6;
-  
-  // Calculate how many candles fit in viewport
-  const candlesInViewport = Math.floor(containerWidth / barSpacing);
-  
-  // Add buffer for smooth scrolling and zooming (3x viewport)
-  // Minimum 200, maximum 1000 for performance
-  const optimalCount = Math.min(Math.max(candlesInViewport * 3, 200), 1000);
-  
-  console.log(`Chart width: ${containerWidth}px, Candles in viewport: ${candlesInViewport}, Fetching: ${optimalCount} candles`);
-  
-  return optimalCount;
+  return containerWidth;
 }
 
 /**
@@ -64,7 +52,7 @@ export class WebSocketManager {
       // Temporarily disable direct updates during symbol switch
       const originalUpdate = window.updateLatestCandleDirectly;
       window.updateLatestCandleDirectly = () => {
-        console.debug('Ignoring candle update during symbol switch');
+        // Ignore candle updates during symbol switch
       };
       
       // Restore after a short delay to allow WebSocket cleanup
@@ -88,16 +76,15 @@ export class WebSocketManager {
     
     // CRITICAL: Reset chart data completely to prevent timestamp conflicts
     if (typeof window !== 'undefined' && window.resetChartData) {
-      console.log('Resetting chart data for symbol switch');
       window.resetChartData();
     }
     
     // Disconnect all existing streams
     disconnectAllWebSockets();
     
-    // Connect new WebSocket streams with optimal parameters
-    const optimalCandleCount = getOptimalCandleCount();
-    connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, optimalCandleCount);
+    // Connect new WebSocket streams with container width for backend calculation
+    const containerWidth = getContainerWidth();
+    connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(newSymbol, 'trades');
   }
@@ -108,8 +95,6 @@ export class WebSocketManager {
    * @param {string} newTimeframe - The new timeframe to switch to
    */
   static async switchTimeframe(newTimeframe) {
-    console.log(`WebSocketManager: Switching timeframe from ${state.selectedTimeframe} to ${newTimeframe}`);
-    
     // CRITICAL: Store old timeframe before updating state
     const oldTimeframe = state.selectedTimeframe;
     
@@ -117,14 +102,13 @@ export class WebSocketManager {
     if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
       // Temporarily disable direct updates during timeframe switch
       const originalUpdate = window.updateLatestCandleDirectly;
-      window.updateLatestCandleDirectly = (candle) => {
-        console.debug('Ignoring candle update during timeframe switch:', candle);
+      window.updateLatestCandleDirectly = () => {
+        // Ignore candle updates during timeframe switch
       };
       
       // Restore after a delay to allow WebSocket cleanup
       setTimeout(() => {
         window.updateLatestCandleDirectly = originalUpdate;
-        console.debug('Restored candle update handler after timeframe switch');
       }, 200);
     }
     
@@ -136,27 +120,23 @@ export class WebSocketManager {
     
     // CRITICAL: Clear current candles to prevent stale data
     if (typeof window !== 'undefined' && window.state && window.state.currentCandles) {
-      console.log('Clearing current candles during timeframe switch');
       window.state.currentCandles = [];
     }
     
     // CRITICAL: Reset chart data completely to prevent timestamp conflicts
     if (typeof window !== 'undefined' && window.resetChartData) {
-      console.log('Resetting chart data for timeframe switch');
       window.resetChartData();
     }
     
     // CRITICAL: Disconnect stream using the OLD timeframe, not the new one
-    console.log(`Disconnecting old candles stream for ${state.selectedSymbol}/${oldTimeframe}`);
     disconnectWebSocketStream('candles', state.selectedSymbol, oldTimeframe);
     
     // Small delay to ensure cleanup completes
     await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Connect new candles stream with optimal count
-    const optimalCandleCount = getOptimalCandleCount();
-    console.log(`Connecting new candles stream for ${state.selectedSymbol}/${newTimeframe} with ${optimalCandleCount} candles`);
-    connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, optimalCandleCount);
+    // Connect new candles stream with container width for backend calculation
+    const containerWidth = getContainerWidth();
+    connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, containerWidth);
   }
 
   /**
@@ -174,8 +154,8 @@ export class WebSocketManager {
     clearTrades();
     
     // Start WebSocket connections for the selected symbol
-    const optimalCandleCount = getOptimalCandleCount();
-    connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, optimalCandleCount);
+    const containerWidth = getContainerWidth();
+    connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(symbol, 'trades');
   }
@@ -193,12 +173,12 @@ export class WebSocketManager {
   }
 
   /**
-   * Get optimal candle count for external use.
+   * Get container width for external use.
    * 
-   * @returns {number} Optimal candle count
+   * @returns {number} Container width in pixels
    */
-  static getOptimalCandleCount() {
-    return getOptimalCandleCount();
+  static getContainerWidth() {
+    return getContainerWidth();
   }
 }
 
@@ -219,11 +199,11 @@ export const ConnectionUtils = {
   getConnectionParams(symbol, streamType, timeframe = null, limit = null, rounding = null) {
     const baseParams = { symbol, streamType, timeframe, limit, rounding };
     
-    // For candles streams, always use optimal candle count
+    // For candles streams, always use container width
     if (streamType === 'candles') {
       return {
         ...baseParams,
-        limit: getOptimalCandleCount()
+        limit: getContainerWidth()
       };
     }
     

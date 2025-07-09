@@ -98,62 +98,6 @@ code {
   min-height: 100vh;
 }
 
-/* ManualTradeForm.css */
-.orderfox-manual-trade-form {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  box-shadow: var(--shadow-light);
-}
-
-.orderfox-manual-trade-form .form-title {
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--color-info);
-  padding-bottom: 0.5rem;
-}
-
-.orderfox-manual-trade-form .trade-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.orderfox-manual-trade-form .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.orderfox-manual-trade-form .form-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.orderfox-manual-trade-form .form-input,
-.orderfox-manual-trade-form .form-select {
-  padding: 0.75rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-}
-
-.orderfox-manual-trade-form .form-input:focus,
-.orderfox-manual-trade-form .form-select:focus {
-  outline: none;
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
-}
 
 /* Shared Display Components Base Classes */
 .orderfox-display-base {
@@ -546,22 +490,6 @@ code {
   font-style: italic;
 }
 
-/* PositionsTable.css */
-.orderfox-positions-table-container {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: var(--shadow-light);
-  margin: 20px 0;
-  border: 1px solid var(--border-primary);
-}
-
-.orderfox-positions-table-container .positions-title {
-  margin: 0 0 16px 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 600;
-}
 
 /* TradingModeToggle.css */
 .orderfox-trading-mode-toggle {

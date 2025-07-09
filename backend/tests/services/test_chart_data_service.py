@@ -235,3 +235,109 @@ class TestChartDataService:
         
         with pytest.raises(Exception, match="Failed to fetch chart data"):
             await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', 100)
+
+    def test_calculate_optimal_candle_count_normal_widths(self):
+        """Test optimal candle count calculation for normal container widths."""
+        # Test formula: min(max((containerWidth/6)*3, 200), 1000)
+        
+        # Small container
+        assert self.chart_service.calculate_optimal_candle_count(400) == 200  # min threshold
+        
+        # Medium container
+        assert self.chart_service.calculate_optimal_candle_count(800) == 400  # (800/6)*3 = 400
+        
+        # Large container
+        assert self.chart_service.calculate_optimal_candle_count(1200) == 600  # (1200/6)*3 = 600
+        
+        # Very large container (hits max threshold)
+        assert self.chart_service.calculate_optimal_candle_count(2400) == 1000  # max threshold
+
+    def test_calculate_optimal_candle_count_edge_cases(self):
+        """Test optimal candle count calculation for edge cases."""
+        # Invalid inputs - should use default
+        assert self.chart_service.calculate_optimal_candle_count(0) == 600  # default fallback
+        assert self.chart_service.calculate_optimal_candle_count(-100) == 600  # default fallback
+        assert self.chart_service.calculate_optimal_candle_count(None) == 600  # default fallback
+        
+        # Very small valid width
+        assert self.chart_service.calculate_optimal_candle_count(300) == 200  # min threshold
+        
+        # Float input should work
+        assert self.chart_service.calculate_optimal_candle_count(800.5) == 400  # rounded down
+
+    @pytest.mark.asyncio
+    async def test_format_realtime_update_with_time_field(self):
+        """Test formatting real-time updates includes both timestamp and time fields."""
+        candle_data = {
+            'symbol': 'BTCUSDT',
+            'timeframe': '1m',
+            'timestamp': 1640995200000,  # milliseconds
+            'open': 50000.0,
+            'high': 50500.0,
+            'low': 49500.0,
+            'close': 50250.0,
+            'volume': 100.0
+        }
+        
+        result = await self.chart_service.format_realtime_update(candle_data)
+        
+        # Should include both timestamp (ms) and time (seconds)
+        assert result['timestamp'] == 1640995200000
+        assert result['time'] == 1640995200  # timestamp // 1000
+        assert result['type'] == 'candle_update'
+
+    @pytest.mark.asyncio 
+    async def test_get_initial_chart_data_with_container_width(self):
+        """Test initial chart data uses container width for optimal count calculation."""
+        # Mock the exchange service
+        mock_exchange = AsyncMock()
+        mock_exchange.fetch_ohlcv.return_value = [
+            [1640995200000, 50000.0, 50500.0, 49500.0, 50250.0, 100.0],
+            [1640995260000, 50250.0, 50750.0, 50000.0, 50500.0, 150.0],
+        ]
+        
+        self.chart_service.exchange_service = AsyncMock()
+        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        
+        # Test with specific container width
+        container_width = 1200  # Should result in limit of 600
+        result = await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', container_width)
+        
+        # Verify that exchange was called with calculated optimal count (600)
+        mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USDT', '1m', limit=600)
+        
+        # Check that data includes both timestamp and time fields
+        first_candle = result['data'][0]
+        assert first_candle['timestamp'] == 1640995200000
+        assert first_candle['time'] == 1640995200  # timestamp // 1000
+
+    @pytest.mark.asyncio
+    async def test_get_initial_chart_data_includes_symbol_data(self):
+        """Test initial chart data includes symbolData with priceFormat."""
+        # Mock the exchange service
+        mock_exchange = AsyncMock()
+        mock_exchange.fetch_ohlcv.return_value = [
+            [1640995200000, 50000.0, 50500.0, 49500.0, 50250.0, 100.0],
+        ]
+        
+        self.chart_service.exchange_service = AsyncMock()
+        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        
+        # Mock symbol service to return symbol info with priceFormat
+        from unittest.mock import patch
+        with patch('app.services.chart_data_service.symbol_service') as mock_symbol_service:
+            mock_symbol_service.get_symbol_info.return_value = {
+                'priceFormat': {
+                    'type': 'price',
+                    'precision': 1,
+                    'minMove': 0.1
+                }
+            }
+            
+            result = await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', 800)
+            
+            # Check that symbolData is included
+            assert 'symbolData' in result
+            assert 'priceFormat' in result['symbolData']
+            assert result['symbolData']['priceFormat']['precision'] == 1
+            assert result['symbolData']['priceFormat']['minMove'] == 0.1

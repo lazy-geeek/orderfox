@@ -169,10 +169,7 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
   const isTimeframeChange = lastTimeframe !== timeframe;
   const isContextChange = isSymbolChange || isTimeframeChange;
 
-  // Reduced logging for normal operation
-  if (isContextChange) {
-    console.log(`Chart: Context change - Symbol: ${symbol}, Timeframe: ${timeframe}`);
-  }
+  // Context change handling
 
   // Store the last data for theme changes
   lastChartData = data;
@@ -181,57 +178,32 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 
   // CRITICAL: Reset zoom state on context changes to allow proper fitting
   if (isContextChange) {
-    console.log(`Chart: Context change detected - Symbol: ${isSymbolChange}, Timeframe: ${isTimeframeChange}`);
     resetZoomState();
   }
 
-  // Only update price format when symbol data is provided (symbol change or initial load)
-  if (symbolData && candlestickSeries) {
-    let precision = 2; // Default precision
-    
-    // Extract and validate precision from symbolData
-    if (symbolData.pricePrecision !== undefined && symbolData.pricePrecision !== null) {
-      // Validate precision is a non-negative integer and clamp to reasonable range (0-8)
-      const rawPrecision = symbolData.pricePrecision;
-      if (typeof rawPrecision === 'number' && !isNaN(rawPrecision) && rawPrecision >= 0) {
-        precision = Math.max(0, Math.min(8, Math.floor(rawPrecision)));
-      } else {
-        console.warn(`Invalid pricePrecision value for ${symbol}: ${rawPrecision}, using default precision: ${precision}`);
-      }
-    } else {
-      console.warn(`Missing pricePrecision for ${symbol}, using default precision: ${precision}`);
-    }
-    
-    // Apply price format with validated precision
+  // Apply price format from backend when symbol data is provided
+  if (symbolData && candlestickSeries && symbolData.priceFormat) {
+    // Backend provides complete priceFormat object ready for TradingView
     candlestickSeries.applyOptions({
-      priceFormat: {
-        type: 'price',
-        precision: precision,
-        minMove: 1 / Math.pow(10, precision),
-      },
+      priceFormat: symbolData.priceFormat
     });
   }
 
   const { currentCandles } = data;
 
-  // CRITICAL: Convert data format from ECharts to Lightweight Charts
-  // ECharts: [timestamp, open, close, low, high, volume]
-  // Lightweight Charts: { time: timestamp_in_seconds, open, high, low, close }
+  // Backend provides data ready for Lightweight Charts
+  // Backend sends: { time: seconds, timestamp: milliseconds, open, high, low, close }
   const formattedData = currentCandles.map(candle => ({
-    time: Math.floor(candle.timestamp / 1000), // Convert milliseconds to seconds
+    time: candle.time, // Backend provides time in seconds for TradingView
     open: candle.open,
     high: candle.high,
     low: candle.low,
     close: candle.close,
   }));
 
-  // Sort data by time to ensure proper ordering
-  formattedData.sort((a, b) => a.time - b.time);
+  // Backend sends pre-sorted data - no sorting needed
 
-  // Only log chart data details for context changes or initial loads
-  if (isInitialLoad || isContextChange) {
-    console.log(`Chart: Loading ${formattedData.length} candles for ${symbol} ${timeframe}`);
-  }
+  // Chart data loading
 
   // CRITICAL: Use setData to completely replace chart data
   // This clears any previous data and prevents timestamp ordering conflicts
@@ -260,7 +232,6 @@ function updateChartTitle(symbol, timeframe) {
 
 function updateLatestCandle(candleData) {
   if (!candlestickSeries) {
-    console.warn('Chart: No candlestick series available for update');
     return;
   }
 
@@ -268,14 +239,12 @@ function updateLatestCandle(candleData) {
   if (typeof window !== 'undefined' && window.state) {
     // Validate that this candle is for the current symbol
     if (window.state.selectedSymbol && candleData.symbol && candleData.symbol !== window.state.selectedSymbol) {
-      console.warn('Chart: Rejecting candle update for wrong symbol:', candleData.symbol, 'vs', window.state.selectedSymbol);
       return;
     }
   }
 
-  // CRITICAL: Enhanced timestamp validation and debugging
-  const rawTimestamp = candleData.timestamp;
-  const convertedTime = Math.floor(rawTimestamp / 1000); // Convert milliseconds to seconds
+  // Backend provides time field in seconds for TradingView
+  const chartTime = candleData.time; // Backend sends time in seconds
   
   // Get current chart data to check ordering
   let lastChartTime = null;
@@ -286,31 +255,24 @@ function updateLatestCandle(candleData) {
       lastChartTime = currentData[currentData.length - 1].time;
       
       // Check for timestamp ordering issues
-      if (convertedTime <= lastChartTime) {
-        const timeDiff = lastChartTime - convertedTime;
+      if (chartTime <= lastChartTime) {
+        const timeDiff = lastChartTime - chartTime;
         
         // If it's a very old update (more than 5 minutes), reject it
         if (timeDiff > 300) { // 5 minutes
-          console.warn('Chart: Rejecting very old candle update to prevent chart errors');
-          console.warn(`Chart: Time difference: ${timeDiff} seconds`);
           return;
-        }
-        
-        // Only log if it's a significant time difference (more than same timestamp)
-        if (timeDiff > 0) {
-          console.debug(`Chart: Timestamp ordering issue - rejecting update ${timeDiff}s older than current`);
         }
         // For same timestamp (timeDiff = 0), don't log - this is normal for real-time updates
       }
     }
   } catch (e) {
-    console.debug('Chart: Could not get current chart data for comparison:', e.message);
+    // Chart data comparison failed - continue with update
   }
 
   // CRITICAL: Use update() for real-time updates, not setData()
   // This preserves zoom state and is more efficient for single candle updates
   const formattedCandle = {
-    time: convertedTime,
+    time: chartTime,
     open: candleData.open,
     high: candleData.high,
     low: candleData.low,
@@ -319,8 +281,6 @@ function updateLatestCandle(candleData) {
 
   try {
     candlestickSeries.update(formattedCandle);
-    // Only log success in debug mode for troubleshooting
-    // console.debug('Chart: Successfully updated candle');
   } catch (error) {
     // CRITICAL: Catch and log TradingView chart errors without crashing
     console.error('Chart update error (likely "Cannot update oldest data"):', error.message);
@@ -328,12 +288,11 @@ function updateLatestCandle(candleData) {
     console.error('Formatted candle data causing error:', formattedCandle);
     
     if (lastChartTime !== null) {
-      console.error(`Chart: Timestamp comparison - Last: ${lastChartTime}, Attempted: ${convertedTime}, Diff: ${convertedTime - lastChartTime}`);
+      console.error(`Chart: Timestamp comparison - Last: ${lastChartTime}, Attempted: ${chartTime}, Diff: ${chartTime - lastChartTime}`);
     }
     
     // If it's the "Cannot update oldest data" error, we should trigger a full refresh
     if (error.message.includes('Cannot update oldest data')) {
-      console.log('Triggering full chart refresh due to timestamp ordering issue');
       if (typeof window !== 'undefined' && window.notify) {
         window.notify('currentCandles');
       }
@@ -349,7 +308,6 @@ function resetZoomState() {
 function resetChartData() {
   // CRITICAL: Completely reset chart data to prevent timestamp conflicts
   if (candlestickSeries) {
-    console.log('Chart: Resetting chart data completely');
     candlestickSeries.setData([]); // Clear all chart data
     lastChartData = null;
     lastSymbol = null;

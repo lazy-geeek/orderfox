@@ -220,6 +220,18 @@ Optional settings:
 
 ## Architecture Highlights
 
+### Thin Client Architecture (NEW - 2025)
+- **Architecture Transformation**: OrderFox implements a thin client architecture where the frontend is a lightweight display layer that trusts backend data completely
+- **Backend Data Contract**: Backend provides display-ready data with all formatting, validation, and business logic processed server-side
+- **Zero Frontend Validation**: Frontend components directly assign backend data without validation or transformation
+- **Performance Optimization**: Moving logic to backend reduces bundle size and improves client-side performance
+- **camelCase API Convention**: Backend uses Pydantic `alias_generator=to_camel` for JavaScript-friendly field names (`uiName`, `volume24hFormatted`)
+- **Container-Width Optimization**: Chart data service calculates optimal candle count based on container width: `min(max((containerWidth/6)*3, 200), 1000)`
+- **Volume Display Formatting**: Backend provides formatted volume strings with K/M/B units (e.g., "12.59B", "456.78M")
+- **Pre-sorted Data**: All data arrays (candles, trades, orderbook) are pre-sorted by backend before transmission
+- **Dual Time Fields**: Chart data includes both `timestamp` (ms) and `time` (seconds) for TradingView compatibility
+- **Complete Price Format**: Backend generates full TradingView `priceFormat` objects with precision and minMove calculated
+
 ### CSS Architecture & Component Styling
 - **Shared Base Classes**: Use `.orderfox-display-base` for all display components (order book, trades, charts)
 - **Semantic Class Names**: Use semantic names like `.display-header`, `.display-content`, `.display-footer` instead of component-specific names
@@ -234,7 +246,8 @@ Optional settings:
 ### WebSocket Connection Management
 - **Centralized Manager**: `WebSocketManager` class eliminates duplicate connection logic across UI components
 - **DRY Principle**: Single source of truth for connection patterns (symbol switching, timeframe changes, initialization)
-- **Optimal Candle Count**: Dynamic calculation based on chart viewport width (200-1000 range)
+- **Container-Width Parameter**: WebSocket candles endpoint accepts `container_width` instead of `limit` for optimal data loading
+- **Backend Processing**: All WebSocket data is processed and formatted server-side before transmission
 - **State Integration**: Seamless integration with state management and UI reset patterns
 
 ### Order Book System
@@ -267,6 +280,9 @@ Optional settings:
 - **Centralized Business Logic**: All symbol filtering, processing, and formatting happens in Symbol Service
 - **Error Resilience**: Graceful fallback to demo symbols when exchange is unavailable
 - **HTTP Endpoint Pattern**: `/symbols` endpoint is thin wrapper around `symbol_service.get_all_symbols()`
+- **Volume Formatting**: Backend provides `volume24h_formatted` field with K/M/B units (e.g., "12.59B", "456.78M")
+- **TradingView Integration**: Backend generates complete `priceFormat` objects with precision and minMove for charts
+- **camelCase Fields**: API returns JavaScript-friendly field names (`uiName`, `volume24hFormatted`, `pricePrecision`)
 - **Testing Strategy**: Mock Symbol Service methods instead of direct exchange calls for better isolation
 - **Cache Management**: Symbol and ticker caches with proper TTL and invalidation mechanisms
 - **Critical Rule**: Never bypass Symbol Service - always use it for symbol-related operations
@@ -283,6 +299,11 @@ Connect to trades stream:
 ws://localhost:8000/api/v1/ws/trades/BTCUSDT
 ```
 
+Connect to candles stream (NEW - container-width optimization):
+```
+ws://localhost:8000/api/v1/ws/candles/BTCUSDT?timeframe=1m&container_width=800
+```
+
 Update parameters without reconnecting:
 ```json
 {
@@ -296,6 +317,9 @@ Update parameters without reconnecting:
 - Frontend uses custom subscribe/notify pattern
 - WebSocket service handles automatic reconnection
 - Backend manages all data aggregation and formatting
+- **Thin Client Pattern**: Frontend directly assigns backend data without validation or transformation
+- **Zero Processing**: State update functions simplified to direct assignment (`state.currentCandles = payload.data`)
+- **Backend Trust**: Frontend trusts backend data completely - no client-side validation required
 
 ## Common Tasks
 

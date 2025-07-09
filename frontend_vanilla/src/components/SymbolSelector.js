@@ -14,7 +14,7 @@ function updateSymbolSelector(selector, symbols, selectedSymbol) {
   symbols.forEach(symbol => {
     const option = document.createElement('option');
     option.value = symbol.id;
-    option.textContent = `${symbol.uiName}${typeof symbol.volume24h === 'number' && symbol.volume24h > 0 ? ` (${(symbol.volume24h / 1000000).toFixed(2)}M)` : ''}`;
+    option.textContent = `${symbol.uiName}${symbol.volume24hFormatted ? ` (${symbol.volume24hFormatted})` : ''}`;
     if (symbol.id === selectedSymbol) {
       option.selected = true;
     }

@@ -362,11 +362,11 @@ async def websocket_candles(
     websocket: WebSocket,
     symbol: str,
     timeframe: str,
-    limit: int = Query(
-        default=100,
-        ge=50,
-        le=1000,
-        description="Number of historical candles to fetch")):
+    container_width: int = Query(
+        default=800,
+        ge=300,
+        le=3000,
+        description="Container width in pixels for optimal candle count calculation")):
     """
     WebSocket endpoint for real-time candle/OHLCV updates.
 
@@ -374,7 +374,7 @@ async def websocket_candles(
         websocket: WebSocket connection
         symbol: Trading symbol (e.g., 'BTCUSDT')
         timeframe: Timeframe for candles (e.g., '1m', '5m', '1h', '1d')
-        limit: Number of historical candles to fetch (default: 100, min: 50, max: 1000)
+        container_width: Container width in pixels for optimal candle count calculation (default: 800, min: 300, max: 3000)
 
     The WebSocket will send JSON messages with the following format:
     {
@@ -382,6 +382,7 @@ async def websocket_candles(
         "symbol": "BTCUSDT",
         "timeframe": "1m",
         "timestamp": 1640995200000,
+        "time": 1640995200,
         "open": 49500.0,
         "high": 50100.0,
         "low": 49400.0,
@@ -456,7 +457,7 @@ async def websocket_candles(
         # Send initial historical data before starting real-time stream
         try:
             historical_data = await chart_data_service.get_initial_chart_data(
-                exchange_symbol, timeframe, limit=limit
+                exchange_symbol, timeframe, container_width=container_width
             )
             # Override the symbol in the response to use the frontend format
             # Use original frontend symbol, not exchange symbol
@@ -466,7 +467,7 @@ async def websocket_candles(
                 f"Sent initial historical data for {symbol}/{timeframe}: {
                     historical_data.get(
                         'count',
-                        0)} candles (requested: {limit})")
+                        0)} candles (container_width: {container_width}px)")
         except Exception as e:
             logger.error(
                 f"Failed to send initial historical data for {symbol}/{timeframe}: {e}")

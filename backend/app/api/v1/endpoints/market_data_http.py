@@ -44,6 +44,7 @@ async def get_symbols():
                     quote_asset=symbol_dict["quote_asset"],
                     ui_name=symbol_dict["ui_name"],
                     volume24h=symbol_dict["volume24h"],
+                    volume24h_formatted=symbol_dict["volume24h_formatted"],
                     pricePrecision=symbol_dict["pricePrecision"],
                     roundingOptions=symbol_dict["roundingOptions"],
                     defaultRounding=symbol_dict["defaultRounding"],

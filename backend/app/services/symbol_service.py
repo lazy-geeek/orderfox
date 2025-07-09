@@ -251,6 +251,7 @@ class SymbolService:
                     "quote_asset": market["quote"],
                     "ui_name": f"{market['base']}/{market['quote']}",
                     "volume24h": volume24h,
+                    "volume24h_formatted": self.format_volume(volume24h),
                     "pricePrecision": price_precision,
                     "roundingOptions": rounding_options,
                     "defaultRounding": default_rounding,
@@ -473,6 +474,9 @@ class SymbolService:
         rounding_options, default_rounding = self.calculate_rounding_options(
             price_precision, current_price)
 
+        # Generate TradingView-compatible priceFormat object
+        price_format = self.generate_price_format(price_precision)
+
         return {
             "id": market_info.get("id"),
             "symbol": exchange_symbol,
@@ -487,7 +491,67 @@ class SymbolService:
             "amountPrecision": amount_precision,
             "roundingOptions": rounding_options,
             "defaultRounding": default_rounding,
+            "priceFormat": price_format,
         }
+
+    def generate_price_format(self, price_precision: Optional[int]) -> Dict[str, Any]:
+        """
+        Generate TradingView Lightweight Charts compatible priceFormat object.
+        
+        Args:
+            price_precision: Number of decimal places for price precision
+            
+        Returns:
+            Dict containing priceFormat configuration for TradingView
+        """
+        if price_precision is None:
+            # Default format for when precision is unknown
+            return {
+                "type": "price",
+                "precision": 2,
+                "minMove": 0.01
+            }
+        
+        # Ensure precision is within reasonable bounds
+        precision = max(0, min(price_precision, 8))
+        
+        # Calculate minimum price movement based on precision
+        # minMove = 1 / (10 ^ precision)
+        min_move = 1 / (10 ** precision)
+        
+        return {
+            "type": "price",
+            "precision": precision,
+            "minMove": min_move
+        }
+
+    def format_volume(self, volume: Optional[float]) -> str:
+        """
+        Format volume for display with appropriate units (K, M, B).
+        
+        Args:
+            volume: Volume value to format
+            
+        Returns:
+            Formatted volume string (e.g., "1.23M", "456.78K")
+        """
+        if volume is None or volume == 0:
+            return ""
+        
+        try:
+            volume = float(volume)
+            
+            if volume >= 1_000_000_000:  # Billions
+                return f"{volume / 1_000_000_000:.2f}B"
+            elif volume >= 1_000_000:  # Millions
+                return f"{volume / 1_000_000:.2f}M"
+            elif volume >= 1_000:  # Thousands
+                return f"{volume / 1_000:.2f}K"
+            else:
+                return f"{volume:.2f}"
+                
+        except (ValueError, TypeError):
+            return ""
 
     def get_symbol_suggestions(
         self, invalid_symbol: str, max_suggestions: int = 5

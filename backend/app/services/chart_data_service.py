@@ -24,11 +24,46 @@ class ChartDataService:
         """Initialize the chart data service."""
         self.exchange_service = exchange_service
 
+    def calculate_optimal_candle_count(self, container_width: int) -> int:
+        """
+        Calculate optimal number of candles based on container width.
+        
+        This replaces the frontend getOptimalCandleCount function to ensure
+        consistent calculation and reduce frontend processing.
+        
+        Args:
+            container_width: Container width in pixels
+            
+        Returns:
+            Optimal number of candles (between 200 and 1000)
+        """
+        try:
+            # Validate container width
+            if not isinstance(container_width, (int, float)) or container_width <= 0:
+                logger.warning(f"Invalid container width: {container_width}, using default")
+                container_width = 800  # Default fallback
+            
+            # Original frontend logic: Math.min(Math.max((containerWidth/6)*3, 200), 1000)
+            # This ensures good chart density while maintaining performance
+            base_calculation = (container_width / 6) * 3
+            optimal_count = min(max(base_calculation, 200), 1000)
+            
+            # Ensure we return an integer
+            optimal_count = int(optimal_count)
+            
+            logger.debug(f"Container width: {container_width}px -> Optimal candle count: {optimal_count}")
+            
+            return optimal_count
+            
+        except Exception as e:
+            logger.error(f"Error calculating optimal candle count: {e}")
+            return 600  # Safe default
+
     async def get_initial_chart_data(
         self,
         symbol: str,
         timeframe: str,
-        limit: int = 100
+        container_width: int = 800
     ) -> Dict[str, Any]:
         """
         Get initial historical data optimized for Lightweight Charts.
@@ -36,7 +71,7 @@ class ChartDataService:
         Args:
             symbol: Trading symbol (e.g., 'BTC/USDT')
             timeframe: Timeframe for candles (e.g., '1m', '5m', '1h', '1d')
-            limit: Number of historical candles to fetch
+            container_width: Container width in pixels for optimal candle count calculation
 
         Returns:
             Dict containing historical candles data with metadata
@@ -45,8 +80,11 @@ class ChartDataService:
             Exception: If data fetching fails
         """
         try:
+            # Calculate optimal candle count from container width
+            limit = self.calculate_optimal_candle_count(container_width)
+            
             logger.info(
-                f"Fetching initial chart data for {symbol} {timeframe}, limit={limit}")
+                f"Fetching initial chart data for {symbol} {timeframe}, limit={limit} (container_width={container_width}px)")
 
             # Fetch from exchange service
             exchange = self.exchange_service.get_exchange()
@@ -61,12 +99,15 @@ class ChartDataService:
                     'data': []
                 }
 
-            # Convert to standardized format
+            # Convert to standardized format with BOTH timestamp fields
             formatted_data = []
             for candle in raw_data:
+                timestamp_ms = int(candle[0])
                 formatted_candle = {
-                    # Keep milliseconds for backend consistency
-                    'timestamp': int(candle[0]),
+                    # Backend processing and consistency
+                    'timestamp': timestamp_ms,
+                    # TradingView Lightweight Charts requirement (seconds)
+                    'time': timestamp_ms // 1000,
                     'open': float(candle[1]),
                     'high': float(candle[2]),
                     'low': float(candle[3]),
@@ -78,17 +119,30 @@ class ChartDataService:
             # Sort by timestamp to ensure proper ordering
             formatted_data.sort(key=lambda x: x['timestamp'])
 
-            logger.info(
-                f"Successfully formatted {
-                    len(formatted_data)} candles for {symbol} {timeframe}")
-
-            return {
+            # Get symbol info for priceFormat
+            from app.services.symbol_service import symbol_service
+            symbol_info = symbol_service.get_symbol_info(symbol)
+            
+            # Prepare the response with symbol data including priceFormat
+            response = {
                 'type': 'historical_candles',
                 'symbol': symbol,
                 'timeframe': timeframe,
                 'data': formatted_data,
                 'count': len(formatted_data)
             }
+            
+            # Add symbol data if available
+            if symbol_info and symbol_info.get('priceFormat'):
+                response['symbolData'] = {
+                    'priceFormat': symbol_info['priceFormat']
+                }
+
+            logger.info(
+                f"Successfully formatted {
+                    len(formatted_data)} candles for {symbol} {timeframe}")
+
+            return response
 
         except Exception as e:
             logger.error(
@@ -108,11 +162,15 @@ class ChartDataService:
             Formatted candle update message
         """
         try:
+            timestamp_ms = candle_data['timestamp']
             return {
                 'type': 'candle_update',
                 'symbol': candle_data['symbol'],
                 'timeframe': candle_data['timeframe'],
-                'timestamp': candle_data['timestamp'],
+                # Backend processing and consistency
+                'timestamp': timestamp_ms,
+                # TradingView Lightweight Charts requirement (seconds)
+                'time': timestamp_ms // 1000,
                 'open': candle_data['open'],
                 'high': candle_data['high'],
                 'low': candle_data['low'],

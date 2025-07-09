@@ -118,8 +118,8 @@ function updateLastTradesDisplay(container, data) {
   if (timestampEl && trades && trades.length > 0) {
     // Use the timestamp of the most recent trade
     const latestTrade = trades[0];
-    if (latestTrade && latestTrade.timestamp) {
-      timestampEl.textContent = `Last updated: ${new Date(latestTrade.timestamp).toLocaleTimeString()}`;
+    if (latestTrade && latestTrade.time_formatted) {
+      timestampEl.textContent = `Last updated: ${latestTrade.time_formatted}`;
     }
   }
 }
