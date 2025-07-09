@@ -26,10 +26,10 @@ describe('LastTradesDisplay', () => {
       
       // Check basic structure
       expect(container).toBeTruthy();
-      expect(container.className).toBe('order-book-display orderfox-last-trades-display');
+      expect(container.className).toBe('orderfox-display-base orderfox-last-trades-display');
       
       // Check header structure
-      const header = container.querySelector('.order-book-header');
+      const header = container.querySelector('.display-header');
       expect(header).toBeTruthy();
       expect(header.querySelector('h3').textContent).toBe('Trades');
       

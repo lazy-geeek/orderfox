@@ -11,10 +11,10 @@
  */
 function createLastTradesDisplay() {
   const container = document.createElement('div');
-  container.className = 'order-book-display orderfox-last-trades-display';
+  container.className = 'orderfox-display-base orderfox-last-trades-display';
 
   container.innerHTML = `
-    <div class="order-book-header">
+    <div class="display-header">
       <h3>Trades</h3>
       <div class="header-controls">
         <span class="symbol-label"></span>
@@ -24,7 +24,7 @@ function createLastTradesDisplay() {
         </div>
       </div>
     </div>
-    <div class="order-book-content">
+    <div class="display-content">
       <div class="trades-section">
         <div class="section-header trades-header">
           <span class="price-header" id="trades-price-header">Price</span>
@@ -38,7 +38,7 @@ function createLastTradesDisplay() {
         </div>
       </div>
     </div>
-    <div class="order-book-footer">
+    <div class="display-footer">
       <span class="timestamp"></span>
     </div>
   `;
