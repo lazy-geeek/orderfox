@@ -16,19 +16,95 @@ OrderFox is a cryptocurrency trading application with real-time market data and 
 ## Quick Start
 
 ```bash
-# Run both frontend and backend (from root)
+# RECOMMENDED: Run both frontend and backend (from root)
 npm run dev
 
-# Or run separately:
-# Backend
-cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Frontend
-cd frontend_vanilla && npm run dev
-
-# With Docker
+# With Docker (from root directory)
 docker-compose up --build
 ```
+
+### ⚠️ Manual Server Management (STRONGLY DISCOURAGED)
+```bash
+# ❌ AVOID: These commands cause the 2-minute restart delays and navigation errors
+# ❌ AVOID: Use only if npm run dev is broken - otherwise use npm run dev!
+# Backend
+cd /home/bail/github/orderfox/backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend  
+cd /home/bail/github/orderfox/frontend_vanilla && npm run dev
+```
+
+**Why avoid manual server management?**
+- Causes 2-minute restart delays when switching between tasks
+- Requires managing two separate terminal sessions
+- No automatic port cleanup - can cause port conflicts
+- Increases chance of "no such file or directory" errors
+
+## Development Workflow Optimization
+
+**CRITICAL**: Follow these patterns to prevent 2-minute server restart delays and folder navigation errors:
+
+### Working Directory Management
+- **Always work from root**: `/home/bail/github/orderfox`
+- **Use absolute paths**: Prevents "no such file or directory" errors
+- **Frontend path**: `frontend_vanilla/` (with trailing slash)
+- **Backend path**: `backend/`
+
+### Server Management Best Practices
+- **Primary rule**: Always use `npm run dev` from root - never manually restart servers
+- **Auto-restart**: File changes trigger automatic server restarts for both backend and frontend
+- **Port management**: Root command handles port cleanup (3000, 8000) automatically
+- **Concurrent execution**: Both servers run simultaneously via `concurrently`
+
+### Efficient Command Patterns
+```bash
+# ✅ CORRECT: Root-based development
+npm run dev                    # Start both servers
+npm run lint                   # Frontend linting
+npm run lint:fix              # Auto-fix frontend issues
+
+# ✅ CORRECT: Absolute path navigation
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
+cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
+
+# ❌ WRONG: Manual server management
+cd /home/bail/github/orderfox/backend && uvicorn app.main:app --reload  # Don't do this
+cd /home/bail/github/orderfox/frontend_vanilla && npm run dev           # Don't do this
+```
+
+### Time-Saving Rules
+- **Leverage auto-restart**: Don't manually restart servers - they restart automatically
+- **Use parallel tool calls**: Execute multiple bash commands simultaneously
+- **Verify paths with LS**: Check directory structure before navigation
+- **Root package.json scripts**: Use existing infrastructure instead of manual commands
+
+## Root-Based Command Reference
+
+Quick reference for optimized development workflow:
+
+```bash
+# 🚀 PRIMARY DEVELOPMENT COMMANDS (from root)
+npm run dev                    # Start both servers (MOST IMPORTANT)
+npm run lint                   # Frontend linting
+npm run lint:fix              # Auto-fix frontend linting issues
+
+# 📦 DEPENDENCY MANAGEMENT
+cd /home/bail/github/orderfox/backend && pip install -r requirements.txt           # Backend dependencies
+cd /home/bail/github/orderfox/frontend_vanilla && npm install                      # Frontend dependencies
+
+# 🧪 TESTING (use absolute paths)
+cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
+
+# 🔍 SPECIFIC TESTS
+cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_trade_service.py -v
+cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
+
+# 🐳 DOCKER ALTERNATIVE (from root)
+docker-compose up --build     # Alternative to npm run dev
+```
+
+**Remember**: Always work from `/home/bail/github/orderfox/` and use `npm run dev` for development!
 
 ## Project Structure
 
@@ -68,36 +144,46 @@ orderfox/
 ## Key Commands
 
 ### Development
-```bash
-# Install dependencies
-cd backend && pip install -r requirements.txt
-cd frontend_vanilla && npm install
 
-# Linting & Type Checking
+#### Start Development (PRIMARY COMMAND)
+```bash
+npm run dev               # Starts both backend and frontend with auto-restart
+```
+
+#### Install Dependencies
+```bash
+# Install backend dependencies
+cd /home/bail/github/orderfox/backend && pip install -r requirements.txt
+
+# Install frontend dependencies  
+cd /home/bail/github/orderfox/frontend_vanilla && npm install
+```
+
+#### Linting & Type Checking
+```bash
 npm run lint              # Lint frontend JavaScript
 npm run lint:fix          # Auto-fix frontend linting issues
 npm run typecheck         # Use Pylance in VS Code for comprehensive Python checking
 # Pylance handles all Python code quality: types, imports, unused vars, style
 # All backend files should pass Pylance with zero diagnostics
+```
 
-# Run tests
-cd backend && python -m pytest tests/ -v
+#### Testing (Use Absolute Paths)
+```bash
+# Backend tests
+cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
 
-# Frontend tests
-cd frontend_vanilla && npm test
+# Frontend tests  
+cd /home/bail/github/orderfox/frontend_vanilla && npm test
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
 
-# Run frontend tests once (CI mode)
-cd frontend_vanilla && npm run test:run
-
-# Full application test
-python test_paper_trading.py
 ```
 
 ### Code Quality & Linting
 ```bash
-# Frontend linting (ESLint)
-cd frontend_vanilla && npm run lint         # Check for linting errors
-cd frontend_vanilla && npm run lint:fix     # Auto-fix linting issues
+# Frontend linting (ESLint) - Use root commands
+npm run lint         # Check for linting errors
+npm run lint:fix     # Auto-fix linting issues
 
 # Backend type checking (Pylance only)
 # Use Pylance in VS Code for comprehensive type checking and linting
@@ -249,39 +335,39 @@ Update parameters without reconnecting:
 
 ### Backend Testing
 ```bash
-# Backend unit tests
-cd backend && python -m pytest tests/ -v
+# Backend unit tests (use absolute path)
+cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
 
-# Specific test file
-python -m pytest tests/services/test_orderbook_aggregation_service.py -v
+# Specific test file (from backend directory)
+cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_orderbook_aggregation_service.py -v
 
 # Chart data service tests
-python -m pytest tests/services/test_chart_data_service.py -v
+cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_chart_data_service.py -v
 
 # Trade service tests
-python -m pytest tests/services/test_trade_service.py -v
+cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_trade_service.py -v
 
 # Integration tests
-python -m pytest tests/integration/ -v
+cd /home/bail/github/orderfox/backend && python -m pytest tests/integration/ -v
 
 # Performance tests
-python -m pytest tests/load/ -v
+cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 ```
 
 ### Frontend Testing
 ```bash
-# Frontend unit tests (Vitest)
-cd frontend_vanilla && npm test
+# Frontend unit tests (Vitest) - use absolute path
+cd /home/bail/github/orderfox/frontend_vanilla && npm test
 
 # Run tests once (CI mode)
-cd frontend_vanilla && npm run test:run
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
 
 # Run tests with UI
-cd frontend_vanilla && npm run test:ui
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:ui
 
 # Test specific component
-cd frontend_vanilla && npm test -- LightweightChart
-cd frontend_vanilla && npm test -- LastTradesDisplay
+cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LightweightChart
+cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 ```
 
 **Frontend Test Coverage:**
@@ -304,10 +390,12 @@ cd frontend_vanilla && npm test -- LastTradesDisplay
 - This is a market limitation, not a bug
 
 ### Development Tips
-- Backend and frontend auto-restart on file changes
-- Check logs for WebSocket connection issues
-- Use browser DevTools for WebSocket debugging
-- Symbol info cached for 5 minutes
+- **Primary Command**: Always use `npm run dev` from root - handles both servers with auto-restart
+- **No Manual Restarts**: Backend and frontend auto-restart on file changes via `npm run dev`
+- **Use Absolute Paths**: Always use `/home/bail/github/orderfox/` prefix for directory navigation
+- **Port Management**: Root command automatically cleans up ports 3000 and 8000
+- **Debugging**: Check logs for WebSocket connection issues, use browser DevTools for WebSocket debugging
+- **Caching**: Symbol info cached for 5 minutes
 
 ## Error Handling
 
@@ -326,6 +414,8 @@ cd frontend_vanilla && npm test -- LastTradesDisplay
 ```
 
 Container uses `/workspaces/orderfox` as working directory.
+
+**Note**: In Dev Container, replace `/home/bail/github/orderfox` with `/workspaces/orderfox` in all absolute path commands.
 
 ## Project specific rules
 
