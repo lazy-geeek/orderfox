@@ -16,33 +16,15 @@ OrderFox is a cryptocurrency trading application with real-time market data and 
 ## Quick Start
 
 ```bash
-# RECOMMENDED: Run both frontend and backend (from root)
-npm run dev
+# RECOMMENDED: Smart server management (from root)
+npm run dev                    # Checks if servers are running, only starts if needed
 
 # With Docker (from root directory)
 docker-compose up --build
 ```
 
-### ⚠️ Manual Server Management (STRONGLY DISCOURAGED)
-```bash
-# ❌ AVOID: These commands cause the 2-minute restart delays and navigation errors
-# ❌ AVOID: Use only if npm run dev is broken - otherwise use npm run dev!
-# Backend
-cd /home/bail/github/orderfox/backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend  
-cd /home/bail/github/orderfox/frontend_vanilla && npm run dev
-```
-
-**Why avoid manual server management?**
-- Causes 2-minute restart delays when switching between tasks
-- Requires managing two separate terminal sessions
-- No automatic port cleanup - can cause port conflicts
-- Increases chance of "no such file or directory" errors
-
-## Development Workflow Optimization
-
-**CRITICAL**: Follow these patterns to prevent 2-minute server restart delays and folder navigation errors:
+## Development Workflow
 
 ### Working Directory Management
 - **Always work from root**: `/home/bail/github/orderfox`
@@ -50,33 +32,75 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm run dev
 - **Frontend path**: `frontend_vanilla/` (with trailing slash)
 - **Backend path**: `backend/`
 
-### Server Management Best Practices
-- **Primary rule**: Always use `npm run dev` from root - never manually restart servers
-- **Auto-restart**: File changes trigger automatic server restarts for both backend and frontend
-- **Port management**: Root command handles port cleanup (3000, 8000) automatically
-- **Concurrent execution**: Both servers run simultaneously via `concurrently`
+## Server Management
 
-### Efficient Command Patterns
+### How It Works
+- **Smart detection**: Checks if servers are already running before starting
+- **Auto-restart**: File changes trigger automatic server restarts
+- **Persistent servers**: Once started, servers keep running between sessions
+- **Port management**: Automatic cleanup and detection of existing processes
+
+### For Manual Development
+
+Use `npm run dev` for interactive development:
+
 ```bash
-# ✅ CORRECT: Root-based development
-npm run dev                    # Start both servers
-npm run lint                   # Frontend linting
-npm run lint:fix              # Auto-fix frontend issues
-
-# ✅ CORRECT: Absolute path navigation
-cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
-cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
-
-# ❌ WRONG: Manual server management
-cd /home/bail/github/orderfox/backend && uvicorn app.main:app --reload  # Don't do this
-cd /home/bail/github/orderfox/frontend_vanilla && npm run dev           # Don't do this
+npm run dev               # Smart server management - checks if running, starts if needed
 ```
 
-### Time-Saving Rules
-- **Leverage auto-restart**: Don't manually restart servers - they restart automatically
-- **Use parallel tool calls**: Execute multiple bash commands simultaneously
-- **Verify paths with LS**: Check directory structure before navigation
-- **Root package.json scripts**: Use existing infrastructure instead of manual commands
+**Behavior:**
+- **If servers not running**: Starts both with live output
+- **If servers already running**: Shows status and monitoring mode
+- **Use Ctrl+C**: Exit script (servers continue running)
+
+### For Claude Code (Non-blocking)
+
+Claude Code should use these commands to avoid blocking:
+
+```bash
+# 🤖 CLAUDE CODE SERVER MANAGEMENT (non-blocking)
+npm run dev:bg          # Start servers in background (if not already running)
+npm run dev:wait        # Wait for servers to be ready (returns quickly)
+npm run dev:status      # Check if servers are running
+npm run dev:stop        # Stop background servers
+```
+
+### Claude Code Workflow Pattern
+```bash
+# 1. Start servers (only if not already running - they auto-reload on changes)
+npm run dev:bg
+
+# 2. Wait for servers to be ready (returns immediately when ready)
+npm run dev:wait
+
+# 3. Do development work - servers auto-reload on file changes
+# ... make changes to files ...
+
+# 4. Check status if needed
+npm run dev:status
+
+# 5. Servers continue running for future tasks (no need to restart)
+```
+
+### Key Benefits for Claude Code
+- **No blocking**: Commands return immediately, preventing 2-minute timeouts
+- **Smart startup**: Only starts servers if they're not already running
+- **Auto-reload preserved**: Servers still auto-reload on file changes
+- **Persistent servers**: Servers remain running between tasks
+- **Health checks**: `dev:wait` ensures servers are ready before proceeding
+
+### When to Use Each Command
+- **`npm run dev`**: For manual/human use only (blocks terminal)
+- **`npm run dev:bg`**: Claude Code should use this to start servers
+- **`npm run dev:wait`**: Use after `dev:bg` to ensure servers are ready
+- **`npm run dev:status`**: Check server health anytime
+- **`npm run dev:stop`**: Clean shutdown when needed
+
+### Important Notes
+- Servers only need to be started once per session
+- They auto-reload on file changes (no restart needed)
+- Check `logs/backend.log` and `logs/frontend.log` for debugging
+- If ports are blocked, use `npm run dev:stop` first
 
 ## Root-Based Command Reference
 
@@ -84,7 +108,9 @@ Quick reference for optimized development workflow:
 
 ```bash
 # 🚀 PRIMARY DEVELOPMENT COMMANDS (from root)
-npm run dev                    # Start both servers (MOST IMPORTANT)
+npm run dev                    # Smart server management (see Server Management section)
+npm run dev:bg                 # Claude Code: Start servers in background
+npm run dev:status             # Check server status
 npm run lint                   # Frontend linting
 npm run lint:fix              # Auto-fix frontend linting issues
 
@@ -104,7 +130,6 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 docker-compose up --build     # Alternative to npm run dev
 ```
 
-**Remember**: Always work from `/home/bail/github/orderfox/` and use `npm run dev` for development!
 
 ## Project Structure
 
@@ -145,10 +170,8 @@ orderfox/
 
 ### Development
 
-#### Start Development (PRIMARY COMMAND)
-```bash
-npm run dev               # Starts both backend and frontend with auto-restart
-```
+#### Start Development
+See "Server Management" section above for `npm run dev` behavior and Claude Code alternatives.
 
 #### Install Dependencies
 ```bash
@@ -452,11 +475,10 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - This is a market limitation, not a bug
 
 ### Development Tips
-- **Primary Command**: Always use `npm run dev` from root - handles both servers with auto-restart
-- **No Manual Restarts**: Backend and frontend auto-restart on file changes via `npm run dev`
+- **Smart Server Management**: `npm run dev` checks if servers are already running
+- **Auto-restart**: Servers automatically reload when files change
 - **Use Absolute Paths**: Always use `/home/bail/github/orderfox/` prefix for directory navigation
-- **Port Management**: Root command automatically cleans up ports 3000 and 8000
-- **Debugging**: Check logs for WebSocket connection issues, use browser DevTools for WebSocket debugging
+- **Debugging**: Check logs in `logs/` directory, use browser DevTools for WebSocket debugging
 - **Caching**: Symbol info cached for 5 minutes
 
 ## Error Handling
