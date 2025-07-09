@@ -253,6 +253,7 @@ class SymbolService:
                     "volume24h": volume24h,
                     "volume24h_formatted": self.format_volume(volume24h),
                     "pricePrecision": price_precision,
+                    "priceFormat": self.generate_price_format(price_precision),
                     "roundingOptions": rounding_options,
                     "defaultRounding": default_rounding,
                 }

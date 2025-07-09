@@ -5,7 +5,7 @@ This module defines the data models used for API endpoints,
 particularly for market data operations.
 """
 
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from enum import Enum
@@ -42,6 +42,9 @@ class SymbolInfo(BaseModel):
     )
     pricePrecision: Optional[int] = Field(
         None, description="Number of decimal places for price accuracy"
+    )
+    priceFormat: Optional[Dict[str, Any]] = Field(
+        None, description="TradingView Lightweight Charts price format configuration"
     )
     roundingOptions: Optional[List[float]] = Field(
         None, description="Available rounding options for this symbol"

@@ -73,6 +73,7 @@ function getChartOptions(theme) {
         top: 0.1,
         bottom: 0.1,
       },
+      autoScale: true, // Ensure price scale auto-adjusts to data
     },
     timeScale: {
       borderColor: isDark ? '#2B3139' : '#EAECEF',
@@ -191,6 +192,14 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 
   const { currentCandles } = data;
 
+  // Check if we have valid candle data
+  if (!currentCandles || currentCandles.length === 0) {
+    console.warn(`No candle data available for ${symbol} ${timeframe}`);
+    // Clear the chart but don't break
+    candlestickSeries.setData([]);
+    return;
+  }
+
   // Backend provides data ready for Lightweight Charts
   // Backend sends: { time: seconds, timestamp: milliseconds, open, high, low, close }
   const formattedData = currentCandles.map(candle => ({
@@ -214,7 +223,16 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 
   // CRITICAL: Always fit content on context changes, respect user zoom for updates
   if (isInitialLoad || isContextChange || !userHasZoomed) {
+    // Ensure the chart properly fits the new data
     chartInstance.timeScale().fitContent();
+    
+    // For symbol changes, also ensure price scale adjusts to new price range
+    if (isSymbolChange && candlestickSeries) {
+      // Force price scale to recalculate its range for the new symbol
+      candlestickSeries.priceScale().applyOptions({
+        autoScale: true,
+      });
+    }
   }
 }
 
