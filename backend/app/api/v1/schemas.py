@@ -7,7 +7,6 @@ particularly for market data operations.
 
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
 from enum import Enum
 
 
@@ -159,52 +158,6 @@ class Candle(BaseModel):
         }
     )
 
-
-class Ticker(BaseModel):
-    """
-    Schema for ticker data.
-
-    Represents real-time ticker information including current price,
-    24h change, volume, and other market statistics.
-    """
-
-    symbol: str = Field(..., description="Trading symbol")
-    last: float = Field(..., description="Last traded price", gt=0)
-    bid: Optional[float] = Field(None, description="Best bid price", gt=0)
-    ask: Optional[float] = Field(None, description="Best ask price", gt=0)
-    high: Optional[float] = Field(None, description="24h high price", gt=0)
-    low: Optional[float] = Field(None, description="24h low price", gt=0)
-    open: Optional[float] = Field(None, description="24h opening price", gt=0)
-    close: Optional[float] = Field(None, description="24h closing price", gt=0)
-    change: Optional[float] = Field(None, description="24h price change")
-    percentage: Optional[float] = Field(
-        None, description="24h percentage change")
-    volume: Optional[float] = Field(
-        None, description="24h trading volume", ge=0)
-    quote_volume: Optional[float] = Field(
-        None, description="24h quote volume", ge=0)
-    timestamp: datetime = Field(...,
-                                description="Timestamp of the ticker data")
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "symbol": "BTCUSDT",
-                "last": 43250.00,
-                "bid": 43249.50,
-                "ask": 43250.50,
-                "high": 43500.00,
-                "low": 43000.00,
-                "open": 43100.00,
-                "close": 43250.00,
-                "change": 150.00,
-                "percentage": 0.35,
-                "volume": 1250.75,
-                "quote_volume": 54125000.00,
-                "timestamp": "2024-01-01T12:00:00Z",
-            }
-        }
-    )
 
 
 class Trade(BaseModel):

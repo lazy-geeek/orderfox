@@ -2,7 +2,7 @@
 WebSocket Connection Manager for real-time data streaming.
 
 This module provides the ConnectionManager class that handles WebSocket connections
-for real-time market data streaming including order books, tickers, and candles.
+for real-time market data streaming including order books and candles.
 """
 
 from typing import List, Dict
@@ -208,7 +208,7 @@ class ConnectionManager:
             parts = stream_key.split(":")
             if len(parts) >= 2:
                 return ":".join(parts[:-1])
-        elif stream_type == "orderbook" or stream_type == "ticker" or stream_type == "trades":
+        elif stream_type == "orderbook" or stream_type == "trades":
             # For trades, handle format "SYMBOL:trades" -> "SYMBOL"
             if stream_type == "trades" and stream_key.endswith(":trades"):
                 return stream_key.replace(":trades", "")
@@ -259,12 +259,6 @@ class ConnectionManager:
 
         if stream_type == "orderbook":
             task = asyncio.create_task(self._stream_orderbook(stream_key))
-        elif stream_type == "ticker":
-            # For ticker streams, extract symbol from stream_key (format:
-            # "SYMBOL:ticker" -> "SYMBOL")
-            symbol = stream_key.replace(
-                ":ticker", "") if stream_key.endswith(":ticker") else stream_key
-            task = asyncio.create_task(self._stream_ticker(symbol))
         elif stream_type == "trades":
             # For trades streams, extract symbol from stream_key (format:
             # "SYMBOL:trades" -> "SYMBOL")
@@ -722,126 +716,6 @@ class ConnectionManager:
 
         logger.info(f"Mock aggregated orderbook stream ended for {symbol}")
 
-    async def _stream_ticker(self, symbol: str):
-        """Stream ticker updates using ccxtpro."""
-        exchange_pro = None
-        try:
-            logger.info(f"Initializing ticker stream for {symbol}")
-            exchange_pro = exchange_service.get_exchange_pro()
-
-            # Test connection before starting stream
-            if exchange_pro is None:
-                logger.warning(
-                    f"CCXT Pro not available for {symbol}, using mock data")
-                await self._stream_mock_ticker(symbol)
-                return
-
-            try:
-                await exchange_pro.fetch_ticker(symbol)
-                logger.info(
-                    f"Exchange connection test successful for ticker {symbol}")
-            except Exception as e:
-                logger.error(
-                    f"Exchange connection test failed for ticker {symbol}: {
-                        str(e)}")
-                logger.info(f"Falling back to mock ticker data for {symbol}")
-                await self._stream_mock_ticker(symbol)
-                return
-
-            while symbol in self.active_connections and self.active_connections[symbol]:
-                try:
-                    # Watch ticker updates
-                    ticker_data = await exchange_pro.watch_ticker(symbol)
-
-                    # Use display symbol if available, otherwise use the stream
-                    # symbol
-                    display_symbol = getattr(self, "_display_symbols", {}).get(
-                        symbol, symbol
-                    )
-                    # Convert to our schema format
-                    formatted_data = {
-                        "type": "ticker_update",
-                        "symbol": display_symbol,
-                        "last": (
-                            float(ticker_data.get("last", 0))
-                            if ticker_data.get("last")
-                            else None
-                        ),
-                        "bid": (
-                            float(ticker_data.get("bid", 0))
-                            if ticker_data.get("bid")
-                            else None
-                        ),
-                        "ask": (
-                            float(ticker_data.get("ask", 0))
-                            if ticker_data.get("ask")
-                            else None
-                        ),
-                        "high": (
-                            float(ticker_data.get("high", 0))
-                            if ticker_data.get("high")
-                            else None
-                        ),
-                        "low": (
-                            float(ticker_data.get("low", 0))
-                            if ticker_data.get("low")
-                            else None
-                        ),
-                        "open": (
-                            float(ticker_data.get("open", 0))
-                            if ticker_data.get("open")
-                            else None
-                        ),
-                        "close": (
-                            float(ticker_data.get("close", 0))
-                            if ticker_data.get("close")
-                            else None
-                        ),
-                        "change": (
-                            float(ticker_data.get("change", 0))
-                            if ticker_data.get("change")
-                            else None
-                        ),
-                        "percentage": (
-                            float(ticker_data.get("percentage", 0))
-                            if ticker_data.get("percentage")
-                            else None
-                        ),
-                        "volume": (
-                            float(ticker_data.get("baseVolume", 0))
-                            if ticker_data.get("baseVolume")
-                            else None
-                        ),
-                        "quote_volume": (
-                            float(ticker_data.get("quoteVolume", 0))
-                            if ticker_data.get("quoteVolume")
-                            else None
-                        ),
-                        "timestamp": ticker_data.get("timestamp"),
-                    }
-
-                    # Broadcast to all connected clients for this symbol
-                    await self.broadcast_to_stream(symbol, formatted_data)
-
-                except Exception as e:
-                    error_data = {
-                        "type": "error",
-                        "message": f"Error streaming ticker for {symbol}: {
-                            str(e)}",
-                    }
-                    await self.broadcast_to_stream(symbol, error_data)
-                    await asyncio.sleep(5)  # Wait before retrying
-
-        except Exception as e:
-            error_data = {
-                "type": "error",
-                "message": f"Failed to initialize ticker streaming for {symbol}: {
-                    str(e)}",
-            }
-            await self.broadcast_to_stream(symbol, error_data)
-        finally:
-            # Do NOT close exchange_pro here. It should be managed globally.
-            pass
 
     async def _stream_candles(
             self,
@@ -1017,74 +891,6 @@ class ConnectionManager:
 
         logger.info(f"Mock candles stream ended for {symbol}/{timeframe}")
 
-    async def _stream_mock_ticker(self, symbol: str):
-        """Stream mock ticker data when CCXT Pro is not available."""
-        logger.info(f"Starting mock ticker stream for {symbol}")
-        import random
-        import time
-
-        base_price = 50000.0  # Base price for mock data
-        current_price = base_price
-
-        while symbol in self.active_connections and self.active_connections[symbol]:
-            try:
-                # Generate mock ticker data
-                current_time = int(time.time() * 1000)
-
-                # Simulate price movement
-                price_change = random.uniform(-0.005, 0.005)  # ±0.5% change
-                current_price *= 1 + price_change
-
-                # Generate ticker data
-                last_price = current_price
-                bid_price = current_price * random.uniform(0.9995, 0.9999)
-                ask_price = current_price * random.uniform(1.0001, 1.0005)
-                high_price = current_price * random.uniform(1.0, 1.02)
-                low_price = current_price * random.uniform(0.98, 1.0)
-                open_price = current_price * random.uniform(0.99, 1.01)
-                close_price = current_price
-                change = close_price - open_price
-                percentage = (change / open_price) * \
-                    100 if open_price > 0 else 0
-                volume = random.uniform(100.0, 1000.0)
-                quote_volume = volume * current_price
-
-                # Use display symbol if available, otherwise use the stream
-                # symbol
-                display_symbol = getattr(self, "_display_symbols", {}).get(
-                    symbol, symbol
-                )
-                formatted_data = {
-                    "type": "ticker_update",
-                    "symbol": display_symbol,
-                    "last": round(last_price, 2),
-                    "bid": round(bid_price, 2),
-                    "ask": round(ask_price, 2),
-                    "high": round(high_price, 2),
-                    "low": round(low_price, 2),
-                    "open": round(open_price, 2),
-                    "close": round(close_price, 2),
-                    "change": round(change, 2),
-                    "percentage": round(percentage, 4),
-                    "volume": round(volume, 4),
-                    "quote_volume": round(quote_volume, 2),
-                    "timestamp": current_time,
-                    "mock": True,  # Indicate this is mock data
-                }
-
-                # Broadcast to all connected clients for this symbol
-                await self.broadcast_to_stream(symbol, formatted_data)
-
-                # Wait before next update (simulate real-time updates)
-                await asyncio.sleep(1.5)
-
-            except Exception as e:
-                logger.error(
-                    f"Error in mock ticker stream for {symbol}: {
-                        str(e)}")
-                await asyncio.sleep(5)  # Wait before retrying
-
-        logger.info(f"Mock ticker stream ended for {symbol}")
 
     async def _stream_trades(self, symbol: str, stream_key: str):
         """Stream real-time trades via CCXT Pro."""

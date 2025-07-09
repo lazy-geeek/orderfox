@@ -146,24 +146,6 @@ class TestConnectionManagerExtended:
         self.connection_manager = ConnectionManager()
 
     @pytest.mark.asyncio
-    async def test_connection_manager_ticker_stream(self):
-        """Test connection manager ticker streaming functionality."""
-        # Mock WebSocket
-        mock_websocket = AsyncMock()
-        mock_websocket.accept = AsyncMock()
-
-        symbol = "BTCUSDT"
-
-        # Test connect for ticker
-        with patch.object(
-            self.connection_manager, "_start_streaming"
-        ) as mock_start_streaming:
-            await self.connection_manager.connect(mock_websocket, symbol, "ticker")
-
-            # Verify connection was added and streaming started
-            assert symbol in self.connection_manager.active_connections
-            assert mock_websocket in self.connection_manager.active_connections[symbol]
-            mock_start_streaming.assert_called_once_with(symbol, "ticker")
 
     @pytest.mark.asyncio
     async def test_connection_manager_candles_stream(self):
@@ -706,16 +688,16 @@ class TestConnectionManagerRaceConditionFixes:
     async def test_message_filtering_by_stream_type(self):
         """Test that messages are properly filtered by stream type to prevent cross-contamination."""
         mock_websocket_candles = AsyncMock()
-        mock_websocket_ticker = AsyncMock()
+        mock_websocket_trades = AsyncMock()
         mock_websocket_candles.send_text = AsyncMock()
-        mock_websocket_ticker.send_text = AsyncMock()
+        mock_websocket_trades.send_text = AsyncMock()
         
         # Set up different stream types
         candle_stream_key = "BTCUSDT:1m"
-        ticker_stream_key = "BTCUSDT"
+        trades_stream_key = "BTCUSDT:trades"
         
         self.connection_manager.active_connections[candle_stream_key] = [mock_websocket_candles]
-        self.connection_manager.active_connections[ticker_stream_key] = [mock_websocket_ticker]
+        self.connection_manager.active_connections[trades_stream_key] = [mock_websocket_trades]
         
         # Send candle data
         candle_data = {
@@ -725,27 +707,26 @@ class TestConnectionManagerRaceConditionFixes:
             "candle": {"open": 50000, "high": 51000, "low": 49000, "close": 50500}
         }
         
-        # Send ticker data
-        ticker_data = {
-            "type": "ticker_update", 
+        # Send trades data
+        trades_data = {
+            "type": "trades_update", 
             "symbol": "BTCUSDT",
-            "price": 50250.0,
-            "volume": 1234.5
+            "trades": [{"price": 50250.0, "amount": 1.5, "side": "buy"}]
         }
         
         # Broadcast to appropriate streams
         await self.connection_manager.broadcast_to_symbol(candle_stream_key, candle_data)
-        await self.connection_manager.broadcast_to_symbol(ticker_stream_key, ticker_data)
+        await self.connection_manager.broadcast_to_symbol(trades_stream_key, trades_data)
         
         # Verify each connection only received its appropriate message type
         mock_websocket_candles.send_text.assert_called_once()
-        mock_websocket_ticker.send_text.assert_called_once()
+        mock_websocket_trades.send_text.assert_called_once()
         
         # Verify message content isolation
         candle_sent = json.loads(mock_websocket_candles.send_text.call_args[0][0])
-        ticker_sent = json.loads(mock_websocket_ticker.send_text.call_args[0][0])
+        trades_sent = json.loads(mock_websocket_trades.send_text.call_args[0][0])
         
         assert candle_sent["type"] == "candle_update"
         assert "timeframe" in candle_sent
-        assert ticker_sent["type"] == "ticker_update"
-        assert "timeframe" not in ticker_sent
+        assert trades_sent["type"] == "trades_update"
+        assert "trades" in trades_sent

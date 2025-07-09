@@ -2,7 +2,7 @@
 Market Data WebSocket API endpoints.
 
 This module provides FastAPI WebSocket endpoints for real-time market data
-streaming including order books, tickers, and candlestick data.
+streaming including order books and candlestick data.
 """
 
 import json
@@ -229,132 +229,6 @@ async def websocket_orderbook(
                 f"Error closing WebSocket for {symbol}: {
                     str(close_error)}")
 
-
-@router.websocket("/ws/ticker/{symbol}")
-async def websocket_ticker(websocket: WebSocket, symbol: str):
-    """
-    WebSocket endpoint for real-time ticker updates.
-
-    Args:
-        websocket: WebSocket connection
-        symbol: Trading symbol (e.g., 'BTCUSDT')
-
-    The WebSocket will send JSON messages with the following format:
-    {
-        "type": "ticker_update",
-        "symbol": "BTCUSDT",
-        "last": 50000.0,
-        "bid": 49999.5,
-        "ask": 50000.5,
-        "high": 51000.0,
-        "low": 49000.0,
-        "open": 49500.0,
-        "close": 50000.0,
-        "change": 500.0,
-        "percentage": 1.01,
-        "volume": 1250.75,
-        "quote_volume": 62537500.0,
-        "timestamp": 1640995200000
-    }
-
-    Error messages have the format:
-    {
-        "type": "error",
-        "message": "Error description"
-    }
-    """
-    logger.info(
-        f"WebSocket ticker connection attempt for {symbol} from {
-            websocket.client}")
-
-    try:
-        # Accept connection first
-        await websocket.accept()
-        logger.info(f"WebSocket ticker connection accepted for {symbol}")
-
-        # Validate and convert symbol using symbol service
-        exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(
-            symbol)
-        if not exchange_symbol:
-            # Get suggestions for invalid symbol
-            suggestions = symbol_service.get_symbol_suggestions(symbol)
-            error_msg = f"Symbol {symbol} not found"
-            if suggestions:
-                error_msg += f". Did you mean: {', '.join(suggestions[:3])}?"
-
-            logger.warning(f"WebSocket ticker error: {error_msg}")
-            await websocket.send_text(
-                json.dumps({"type": "error", "message": error_msg})
-            )
-            await websocket.close(code=4000, reason=error_msg)
-            return
-
-        # Connect to the connection manager using unique ticker stream key
-        ticker_stream_key = f"{exchange_symbol}:ticker"
-        await connection_manager.connect(websocket, ticker_stream_key, "ticker", symbol)
-        logger.info(
-            f"WebSocket ticker streaming started for {symbol} (exchange: {exchange_symbol})"
-        )
-
-        try:
-            # Keep the connection alive
-            while True:
-                try:
-                    # Use receive() instead of receive_text() to handle all
-                    # message types
-                    message = await websocket.receive()
-
-                    # Check if it's a disconnect message
-                    if message["type"] == "websocket.disconnect":
-                        logger.info(
-                            f"WebSocket ticker client disconnected for {symbol}")
-                        break
-
-                    # Handle text messages
-                    elif message["type"] == "websocket.receive":
-                        if "text" in message:
-                            try:
-                                data = json.loads(message["text"])
-                                if data.get("type") == "ping":
-                                    await websocket.send_text(
-                                        json.dumps({"type": "pong"})
-                                    )
-                            except json.JSONDecodeError:
-                                logger.warning(
-                                    f"Invalid JSON received from client for {symbol}")
-
-                except WebSocketDisconnect:
-                    logger.info(
-                        f"WebSocket ticker client disconnected for {symbol}")
-                    break
-                except Exception as e:
-                    logger.error(
-                        f"Error in WebSocket receive loop for {symbol}: {
-                            str(e)}")
-                    break
-
-        except WebSocketDisconnect:
-            logger.info(f"WebSocket ticker client disconnected for {symbol}")
-        finally:
-            connection_manager.disconnect(websocket, exchange_symbol)
-            logger.info(f"WebSocket ticker connection cleaned up for {symbol}")
-
-    except Exception as e:
-        logger.error(
-            f"WebSocket ticker error for {symbol}: {
-                str(e)}", exc_info=True)
-        try:
-            if websocket.client_state.name != "DISCONNECTED":
-                await websocket.send_text(
-                    json.dumps(
-                        {"type": "error", "message": f"Connection error: {str(e)}"}
-                    )
-                )
-                await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
-        except Exception as close_error:
-            logger.error(
-                f"Error closing WebSocket for {symbol}: {
-                    str(close_error)}")
 
 
 @router.websocket("/ws/candles/{symbol}/{timeframe}")

@@ -274,7 +274,7 @@ Optional settings:
 ### Symbol Service & Performance Optimization
 - **Architecture Pattern**: Frontend → Backend API → Symbol Service → Exchange (proper layering)
 - **Single Source of Truth**: Symbol Service is the centralized authority for all symbol operations
-- **Performance Optimization**: Ticker caching with 5-minute TTL reduces API calls by 10x
+- **Performance Optimization**: Symbol caching with 5-minute TTL reduces API calls by 10x
 - **Deduplication**: Only ONE `exchange.load_markets()` call during application startup
 - **Exchange Call Monitoring**: Built-in monitoring tracks and prevents duplicate API calls
 - **Centralized Business Logic**: All symbol filtering, processing, and formatting happens in Symbol Service
@@ -284,7 +284,7 @@ Optional settings:
 - **TradingView Integration**: Backend generates complete `priceFormat` objects with precision and minMove for charts
 - **camelCase Fields**: API returns JavaScript-friendly field names (`uiName`, `volume24hFormatted`, `pricePrecision`)
 - **Testing Strategy**: Mock Symbol Service methods instead of direct exchange calls for better isolation
-- **Cache Management**: Symbol and ticker caches with proper TTL and invalidation mechanisms
+- **Cache Management**: Symbol caches with proper TTL and invalidation mechanisms
 - **Critical Rule**: Never bypass Symbol Service - always use it for symbol-related operations
 
 ### WebSocket Protocol
@@ -299,10 +299,15 @@ Connect to trades stream:
 ws://localhost:8000/api/v1/ws/trades/BTCUSDT
 ```
 
-Connect to candles stream (NEW - container-width optimization):
+Connect to candles stream (container-width optimization):
 ```
 ws://localhost:8000/api/v1/ws/candles/BTCUSDT?timeframe=1m&container_width=800
 ```
+
+**Available WebSocket Endpoints:**
+- **Order Book**: Real-time aggregated order book with dynamic parameters
+- **Trades**: Live trade stream with historical + real-time merge
+- **Candles**: OHLCV data with container-width optimization
 
 Update parameters without reconnecting:
 ```json
@@ -376,7 +381,8 @@ Update parameters without reconnecting:
 - **Backend**: Connection management in `connection_manager.py`
 - **Frontend**: Centralized WebSocket management via `WebSocketManager` class
 - **Low-level operations**: `websocketService.js` handles message processing
-- Dynamic parameter updates supported without reconnection
+- **Dynamic parameter updates**: Supported without reconnection for order book streams
+- **Testing**: Use `symbol_service` mocks for WebSocket tests, not `exchange_service`
 
 ## Testing
 
@@ -394,12 +400,21 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_ch
 # Trade service tests
 cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_trade_service.py -v
 
+# WebSocket API tests
+cd /home/bail/github/orderfox/backend && python -m pytest tests/api/v1/test_market_data_ws.py -v
+
 # Integration tests
 cd /home/bail/github/orderfox/backend && python -m pytest tests/integration/ -v
 
 # Performance tests
 cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 ```
+
+**WebSocket Testing Guidelines:**
+- **Mock Services**: Use `symbol_service` mocks for WebSocket tests, not `exchange_service`
+- **Async Mocks**: Use `AsyncMock()` for async methods like `chart_data_service.get_initial_chart_data`
+- **Method Signatures**: Update connection manager calls to use `display_symbol` parameter
+- **Test Data**: Include `volume24h_formatted` and `priceFormat` fields in symbol mock data
 
 ### Frontend Testing
 ```bash
