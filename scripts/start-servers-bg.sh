@@ -22,6 +22,11 @@ is_port_in_use() {
 # Create logs directory if it doesn't exist
 mkdir -p "$PROJECT_ROOT/logs"
 
+# Clean up log files when starting servers
+echo -e "${YELLOW}Cleaning up log files...${NC}"
+> "$PROJECT_ROOT/logs/backend.log"
+> "$PROJECT_ROOT/logs/frontend.log"
+
 SERVERS_STARTED=false
 
 # Check backend server (port 8000)
