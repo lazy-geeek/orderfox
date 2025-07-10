@@ -111,6 +111,63 @@ code {
   overflow: hidden;
 }
 
+/* Shared Table Row Styles */
+.display-row {
+  display: grid;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  transition: background-color 0.1s ease;
+}
+
+.display-row:hover {
+  background: var(--hover-bg);
+}
+
+/* Shared Price Styles */
+.price-buy,
+.bid-price {
+  color: var(--color-buy);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.price-sell,
+.ask-price {
+  color: var(--color-sell);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Shared Column Styles */
+.display-price {
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.display-amount {
+  text-align: right;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.display-time {
+  text-align: right;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.display-total {
+  text-align: right;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
 .display-header {
   display: flex;
   justify-content: space-between;
@@ -168,7 +225,6 @@ code {
 
 .section-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   padding: 10px 16px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-primary);
@@ -179,13 +235,28 @@ code {
   letter-spacing: 0.5px;
 }
 
+/* Default 3-column layout for headers */
+.section-header.three-columns {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 4-column layout for liquidations */
+.section-header.four-columns {
+  grid-template-columns: 60px 1fr 1fr 60px;
+}
+
 .price-header {
   text-align: left;
 }
 
 .amount-header,
-.time-header {
+.time-header,
+.quantity-header {
   text-align: right;
+}
+
+.side-header {
+  text-align: left;
 }
 
 .display-footer {
@@ -293,49 +364,7 @@ code {
 }
 
 .orderfox-order-book-display .order-level {
-  display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 12px;
-  line-height: 1.4;
-  transition: background-color 0.1s ease;
-}
-
-.orderfox-order-book-display .order-level .price {
-  text-align: left;
-}
-
-.orderfox-order-book-display .order-level .amount,
-.orderfox-order-book-display .order-level .total {
-  text-align: right;
-}
-
-.orderfox-order-book-display .order-level:hover {
-  background: var(--hover-bg);
-}
-
-.orderfox-order-book-display .ask-level .price,
-.orderfox-order-book-display .ask-price {
-  color: var(--color-sell);
-  font-weight: 600;
-  text-align: left;
-  font-size: 13px;
-}
-
-.orderfox-order-book-display .bid-level .price,
-.orderfox-order-book-display .bid-price {
-  color: var(--color-buy);
-  font-weight: 600;
-  text-align: left;
-  font-size: 13px;
-}
-
-.orderfox-order-book-display .amount, 
-.orderfox-order-book-display .total {
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 12px;
 }
 
 .orderfox-order-book-display .current-price-section {
@@ -780,44 +809,7 @@ body {
 }
 
 .orderfox-last-trades-display .trade-level {
-  display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 12px;
-  line-height: 1.4;
-  transition: background-color 0.1s ease;
-}
-
-.orderfox-last-trades-display .trade-level:hover {
-  background: var(--hover-bg);
-}
-
-.orderfox-last-trades-display .trade-level .price {
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.orderfox-last-trades-display .trade-level .amount {
-  text-align: right;
-  font-weight: 500;
-  font-size: 12px;
-}
-
-.orderfox-last-trades-display .trade-level .time {
-  text-align: right;
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 12px;
-}
-
-.orderfox-last-trades-display .bid-price {
-  color: var(--color-buy) !important;
-}
-
-.orderfox-last-trades-display .ask-price {
-  color: var(--color-sell) !important;
 }
 
 /* Liquidation Display CSS - Component-specific styles */
@@ -826,13 +818,7 @@ body {
 }
 
 .liquidation-header {
-  display: grid;
   grid-template-columns: 60px 1fr 1fr 60px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
   background: rgba(246, 70, 93, 0.05); /* Liquidations use sell color theme */
 }
 
@@ -842,31 +828,7 @@ body {
 }
 
 .liquidation-item {
-  display: grid;
   grid-template-columns: 60px 1fr 1fr 60px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 0.875rem;
-  transition: background-color 0.2s;
-}
-
-.liquidation-item:hover {
-  background-color: var(--hover-bg);
-}
-
-.liquidation-side {
-  font-weight: 600;
-}
-
-.liquidation-quantity,
-.liquidation-price {
-  text-align: right;
-}
-
-.liquidation-time {
-  text-align: right;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
 }
 
 /* Update grid layout for three components */
@@ -895,13 +857,10 @@ body {
     gap: 10px;
   }
   
-  .liquidation-header,
-  .liquidation-item {
-    font-size: 0.75rem;
-  }
-  
-  .liquidation-time {
-    display: none;  /* Hide time on mobile */
+  /* Hide time column on mobile for liquidations */
+  .liquidation-header .time-header,
+  .liquidation-item .display-time {
+    display: none;
   }
   
   .liquidation-header,
@@ -934,11 +893,9 @@ body {
   font-style: italic;
 }
 
-/* Use existing bid/ask price classes for color coding liquidation sides */
-.orderfox-liquidation-display .bid-price {
-  color: var(--color-buy) !important;
-}
-
-.orderfox-liquidation-display .ask-price {
-  color: var(--color-sell) !important;
+/* Liquidation-specific styles */
+.liquidation-side {
+  font-weight: 600;
+  font-size: 12px;
+  text-align: left;
 }

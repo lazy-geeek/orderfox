@@ -65,7 +65,7 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         await websocket.send_json(initial_data)
         
         # Connect to liquidation stream
-        await liquidation_service.connect_to_liquidation_stream(exchange_symbol, liquidation_callback)
+        await liquidation_service.connect_to_liquidation_stream(display_symbol, liquidation_callback)
         
         # Stream liquidation data
         while True:
@@ -107,7 +107,7 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
     finally:
         # Disconnect liquidation stream for this symbol
         try:
-            await liquidation_service.disconnect_stream(exchange_symbol)
+            await liquidation_service.disconnect_stream(display_symbol)
         except Exception as e:
             logger.error(f"Error disconnecting liquidation stream: {e}")
         pass

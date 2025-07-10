@@ -26,7 +26,7 @@ function createLastTradesDisplay() {
     </div>
     <div class="display-content">
       <div class="trades-section">
-        <div class="section-header trades-header">
+        <div class="section-header three-columns trades-header">
           <span class="price-header" id="trades-price-header">Price</span>
           <span class="amount-header" id="trades-amount-header">Amount</span>
           <span class="time-header">Time</span>
@@ -95,15 +95,15 @@ function updateLastTradesDisplay(container, data) {
       // Display trades exactly as received from backend
       trades.forEach((trade) => {
         const row = document.createElement('div');
-        row.className = 'trade-level';
+        row.className = 'display-row trade-level';
         
         // Use existing bid/ask price classes for color coding
         const sideClass = trade.side === 'buy' ? 'bid-price' : 'ask-price';
         
         row.innerHTML = `
-          <span class="price ${sideClass}">${trade.price_formatted}</span>
-          <span class="amount ${sideClass}">${trade.amount_formatted}</span>
-          <span class="time">${trade.time_formatted}</span>
+          <span class="display-price ${sideClass}">${trade.price_formatted}</span>
+          <span class="display-amount">${trade.amount_formatted}</span>
+          <span class="display-time">${trade.time_formatted}</span>
         `;
         tradesList.appendChild(row);
       });
@@ -161,15 +161,15 @@ function updateLastTradesData(trades) {
   // Add each trade
   trades.forEach(trade => {
     const row = document.createElement('div');
-    row.className = 'trade-level';
+    row.className = 'display-row trade-level';
     
     // Use existing bid/ask price classes for color coding
     const sideClass = trade.side === 'buy' ? 'bid-price' : 'ask-price';
     
     row.innerHTML = `
-      <span class="price ${sideClass}">${trade.price_formatted}</span>
-      <span class="amount ${sideClass}">${trade.amount_formatted}</span>
-      <span class="time">${trade.time_formatted}</span>
+      <span class="display-price ${sideClass}">${trade.price_formatted}</span>
+      <span class="display-amount">${trade.amount_formatted}</span>
+      <span class="display-time">${trade.time_formatted}</span>
     `;
     
     tradesList.appendChild(row);

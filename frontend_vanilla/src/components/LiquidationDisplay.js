@@ -30,18 +30,21 @@ export class LiquidationDisplay {
         this.container.innerHTML = `
             <div class="orderfox-liquidation-display orderfox-display-base">
                 <div class="display-header">
-                    <span class="display-title">Liquidations</span>
-                    <div class="connection-status disconnected">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Disconnected</span>
+                    <h3>Liquidations</h3>
+                    <div class="header-controls">
+                        <span class="symbol-label"></span>
+                        <div class="connection-status">
+                            <span class="status-indicator disconnected">○</span>
+                            <span class="status-text">Disconnected</span>
+                        </div>
                     </div>
                 </div>
                 <div class="display-content">
-                    <div class="liquidation-header">
-                        <span>Side</span>
-                        <span>Quantity</span>
-                        <span>Price (USDT)</span>
-                        <span>Time</span>
+                    <div class="section-header four-columns liquidation-header">
+                        <span class="side-header">Side</span>
+                        <span class="quantity-header">Quantity</span>
+                        <span class="price-header">Price (USDT)</span>
+                        <span class="time-header">Time</span>
                     </div>
                     <div id="liquidation-list" class="liquidation-list">
                         <div class="empty-state">Waiting for liquidations...</div>
@@ -59,6 +62,12 @@ export class LiquidationDisplay {
             // Update connection status to show we're waiting for symbol selection
             this.updateConnectionStatus(false);
             return;
+        }
+        
+        // Update symbol label
+        const symbolLabel = this.container.querySelector('.symbol-label');
+        if (symbolLabel) {
+            symbolLabel.textContent = symbol || '';
         }
         
         // Clean up existing connection for old symbol
@@ -110,15 +119,15 @@ export class LiquidationDisplay {
     
     createLiquidationElement(liquidation) {
         const div = document.createElement('div');
-        div.className = 'liquidation-item';
+        div.className = 'display-row liquidation-item';
         
         const sideClass = liquidation.side === 'BUY' ? 'bid-price' : 'ask-price';
         
         div.innerHTML = `
             <span class="liquidation-side ${sideClass}">${liquidation.side}</span>
-            <span class="liquidation-quantity">${liquidation.quantityFormatted}</span>
-            <span class="liquidation-price">${liquidation.priceUsdtFormatted}</span>
-            <span class="liquidation-time">${liquidation.displayTime}</span>
+            <span class="display-amount">${liquidation.quantityFormatted}</span>
+            <span class="display-amount">${liquidation.priceUsdtFormatted}</span>
+            <span class="display-time">${liquidation.displayTime}</span>
         `;
         
         return div;
@@ -134,11 +143,11 @@ export class LiquidationDisplay {
             .map(liq => {
                 const sideClass = liq.side === 'BUY' ? 'bid-price' : 'ask-price';
                 return `
-                    <div class="liquidation-item">
+                    <div class="display-row liquidation-item">
                         <span class="liquidation-side ${sideClass}">${liq.side}</span>
-                        <span class="liquidation-quantity">${liq.quantityFormatted}</span>
-                        <span class="liquidation-price">${liq.priceUsdtFormatted}</span>
-                        <span class="liquidation-time">${liq.displayTime}</span>
+                        <span class="display-amount">${liq.quantityFormatted}</span>
+                        <span class="display-amount">${liq.priceUsdtFormatted}</span>
+                        <span class="display-time">${liq.displayTime}</span>
                     </div>
                 `;
             })
@@ -147,17 +156,19 @@ export class LiquidationDisplay {
     
     updateConnectionStatus(connected) {
         this.isConnected = connected;
-        const statusEl = this.container.querySelector('.connection-status');
-        const statusTextEl = this.container.querySelector('.status-text');
+        const statusIndicator = this.container.querySelector('.status-indicator');
+        const statusText = this.container.querySelector('.status-text');
         
-        if (connected) {
-            statusEl.classList.remove('disconnected');
-            statusEl.classList.add('connected');
-            statusTextEl.textContent = 'Connected';
-        } else {
-            statusEl.classList.remove('connected');
-            statusEl.classList.add('disconnected');
-            statusTextEl.textContent = 'Disconnected';
+        if (statusIndicator && statusText) {
+            if (connected) {
+                statusIndicator.className = 'status-indicator connected';
+                statusIndicator.textContent = '●';
+                statusText.textContent = 'Live';
+            } else {
+                statusIndicator.className = 'status-indicator disconnected';
+                statusIndicator.textContent = '○';
+                statusText.textContent = 'Disconnected';
+            }
         }
     }
     
@@ -169,6 +180,12 @@ export class LiquidationDisplay {
                 this.liquidations = [];  // Clear old data
                 this.renderLiquidations();
                 this.setupWebSocket();
+                
+                // Update symbol label
+                const symbolLabel = this.container.querySelector('.symbol-label');
+                if (symbolLabel) {
+                    symbolLabel.textContent = state.selectedSymbol || '';
+                }
             }
         });
         
@@ -198,47 +215,3 @@ export class LiquidationDisplay {
     }
 }
 
-/**
- * Create the Liquidation display component
- * @returns {HTMLElement} The created component container
- */
-function createLiquidationDisplay() {
-  const container = document.createElement('div');
-  container.className = 'orderfox-display-base orderfox-liquidation-display';
-
-  container.innerHTML = `
-    <div class="display-header">
-      <h3>Liquidations</h3>
-      <div class="header-controls">
-        <span class="symbol-label"></span>
-        <div class="connection-status">
-          <span class="status-indicator disconnected">○</span>
-          <span class="status-text">Disconnected</span>
-        </div>
-      </div>
-    </div>
-    <div class="display-content">
-      <div class="liquidation-section">
-        <div class="section-header liquidation-header">
-          <span class="side-header">Side</span>
-          <span class="quantity-header">Quantity</span>
-          <span class="price-header">Price (USDT)</span>
-        </div>
-        <div class="liquidation-container">
-          <div class="liquidation-list" id="liquidation-list">
-            <!-- Liquidations will be inserted here -->
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="display-footer">
-      <span class="timestamp"></span>
-    </div>
-  `;
-
-  return container;
-}
-
-export { 
-  createLiquidationDisplay
-};
