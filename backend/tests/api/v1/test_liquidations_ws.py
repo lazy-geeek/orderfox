@@ -24,22 +24,33 @@ class TestLiquidationsWebSocket:
         """Test WebSocket connection and initial data"""
         client = TestClient(app)
         
+        symbol_info = {
+            'symbol': 'BTCUSDT',
+            'baseAsset': 'BTC',
+            'pricePrecision': 1,
+            'amountPrecision': 3
+        }
+        
         with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
             with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="BTCUSDT"):
-                with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream') as mock_connect:
-                    
-                    with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT") as websocket:
-                        # Receive initial data
-                        data = websocket.receive_json()
+                with patch('app.services.symbol_service.symbol_service.get_symbol_info', return_value=symbol_info):
+                    with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream') as mock_connect:
                         
-                        assert data["type"] == "liquidations"
-                        assert data["symbol"] == "BTCUSDT"
-                        assert data["initial"] is True
-                        assert isinstance(data["data"], list)
-                        assert "timestamp" in data
-                        
-                        # Verify liquidation service was called
-                        mock_connect.assert_called_once()
+                        with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT") as websocket:
+                            # Receive initial data
+                            data = websocket.receive_json()
+                            
+                            assert data["type"] == "liquidations"
+                            assert data["symbol"] == "BTCUSDT"
+                            assert data["initial"] is True
+                            assert isinstance(data["data"], list)
+                            assert "timestamp" in data
+                            
+                            # Verify liquidation service was called with symbol_info
+                            mock_connect.assert_called_once()
+                            call_args = mock_connect.call_args
+                            assert call_args[0][0] == "BTCUSDT"  # symbol
+                            assert call_args[0][2] == symbol_info  # symbol_info
     
     @pytest.mark.asyncio
     async def test_liquidation_websocket_invalid_symbol(self):
@@ -144,3 +155,46 @@ class TestLiquidationsWebSocket:
         assert expected_heartbeat["type"] == "heartbeat"
         assert "symbol" in expected_heartbeat
         assert "timestamp" in expected_heartbeat
+    
+    @pytest.mark.asyncio
+    async def test_liquidation_websocket_with_symbol_info(self):
+        """Test WebSocket liquidation data includes baseAsset from symbol_info"""
+        client = TestClient(app)
+        
+        symbol_info = {
+            'symbol': 'SOLUSDT',
+            'baseAsset': 'SOL',
+            'pricePrecision': 2,
+            'amountPrecision': 6
+        }
+        
+        with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
+            with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="SOLUSDT"):
+                with patch('app.services.symbol_service.symbol_service.get_symbol_info', return_value=symbol_info):
+                    with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream') as mock_connect:
+                        
+                        with client.websocket_connect("/api/v1/ws/liquidations/SOLUSDT") as websocket:
+                            # Receive initial data
+                            data = websocket.receive_json()
+                            
+                            # Verify connect was called with symbol_info
+                            assert mock_connect.call_args[0][2]['baseAsset'] == 'SOL'
+    
+    def test_liquidation_data_format_with_base_asset(self):
+        """Test liquidation data format includes baseAsset"""
+        expected_liquidation_format = {
+            "symbol": "BTCUSDT",
+            "side": "SELL",
+            "quantity": "0.014",
+            "quantityFormatted": "0.014",
+            "priceUsdt": "138.74",
+            "priceUsdtFormatted": "139",  # Rounded to whole number (no comma for 3 digits)
+            "timestamp": 1568014460893,
+            "displayTime": "14:27:40",
+            "avgPrice": "9910",
+            "baseAsset": "BTC"  # New field
+        }
+        
+        # Verify baseAsset is included
+        assert "baseAsset" in expected_liquidation_format
+        assert expected_liquidation_format["baseAsset"] == "BTC"

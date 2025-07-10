@@ -12,6 +12,7 @@ from typing import Optional, Dict, List, Callable, Any
 from datetime import datetime
 import logging
 from decimal import Decimal
+from app.services.formatting_service import formatting_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +25,16 @@ class LiquidationService:
         self.data_callbacks: Dict[str, List[Callable]] = {}
         self.running_streams: Dict[str, bool] = {}
         self.retry_delays = [1, 2, 5, 10, 30]  # Exponential backoff
+        self.symbol_info_cache: Dict[str, Optional[Dict]] = {}  # Store symbol info per symbol
         
-    async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any]):
+    async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any], symbol_info: Optional[Dict] = None):
         """
         Connect to Binance liquidation stream for a specific symbol
         
         Args:
             symbol: Trading symbol (e.g., 'BTCUSDT')
             callback: Callback function to handle liquidation data
+            symbol_info: Optional symbol information for formatting
         """
         # Convert symbol to lowercase for Binance
         stream_symbol = symbol.lower()
@@ -41,6 +44,9 @@ class LiquidationService:
         if symbol not in self.data_callbacks:
             self.data_callbacks[symbol] = []
         self.data_callbacks[symbol].append(callback)
+        
+        # Store symbol info
+        self.symbol_info_cache[symbol] = symbol_info
         
         # If already connected, just add callback
         if symbol in self.active_connections:
@@ -92,7 +98,8 @@ class LiquidationService:
                         
                         # Process liquidation data
                         if data.get('e') == 'forceOrder':
-                            formatted_data = self.format_liquidation_data(data, symbol)
+                            symbol_info = self.symbol_info_cache.get(symbol)
+                            formatted_data = self.format_liquidation_data(data, symbol, symbol_info)
                             await self._notify_callbacks(symbol, formatted_data)
                             
                     except asyncio.TimeoutError:
@@ -120,7 +127,7 @@ class LiquidationService:
         except asyncio.CancelledError:
             pass
             
-    def format_liquidation_data(self, raw_data: Dict, display_symbol: str) -> Dict:
+    def format_liquidation_data(self, raw_data: Dict, display_symbol: str, symbol_info: Optional[Dict] = None) -> Dict:
         """
         Format liquidation data for frontend display
         
@@ -131,15 +138,17 @@ class LiquidationService:
             "quantity": "0.014",
             "quantityFormatted": "0.014000",
             "priceUsdt": "138.74",
-            "priceUsdtFormatted": "138.74",
+            "priceUsdtFormatted": "138",
             "timestamp": 1568014460893,
             "displayTime": "14:27:40",
-            "avgPrice": "9910"
+            "avgPrice": "9910",
+            "baseAsset": "BTC"
         }
         
         Args:
             raw_data: Raw liquidation message from Binance
             display_symbol: Symbol for display purposes
+            symbol_info: Optional symbol information for formatting
             
         Returns:
             Formatted liquidation data for frontend
@@ -160,15 +169,17 @@ class LiquidationService:
         display_time = dt.strftime('%H:%M:%S')
         
         # Format numbers
-        if quantity >= 1:
-            quantity_formatted = f"{quantity:.3f}"
+        if symbol_info:
+            quantity_formatted = formatting_service.format_amount(float(quantity), symbol_info)
         else:
-            quantity_formatted = f"{quantity:.6f}"
+            # Fallback to existing logic if no symbol info
+            if quantity >= 1:
+                quantity_formatted = f"{quantity:.3f}"
+            else:
+                quantity_formatted = f"{quantity:.6f}"
             
-        if price_usdt >= 1000:
-            price_formatted = f"{price_usdt:,.2f}"
-        else:
-            price_formatted = f"{price_usdt:.2f}"
+        # Format price to whole USDT with thousand separators
+        price_formatted = f"{int(round(float(price_usdt))):,}"
         
         return {
             "symbol": display_symbol,
@@ -179,7 +190,8 @@ class LiquidationService:
             "priceUsdtFormatted": price_formatted,
             "timestamp": timestamp,
             "displayTime": display_time,
-            "avgPrice": str(avg_price)
+            "avgPrice": str(avg_price),
+            "baseAsset": symbol_info.get('baseAsset', '') if symbol_info else ''
         }
         
     async def _notify_callbacks(self, symbol: str, data: Dict):
@@ -219,6 +231,10 @@ class LiquidationService:
         # Clear callbacks
         if symbol in self.data_callbacks:
             del self.data_callbacks[symbol]
+            
+        # Clear symbol info cache
+        if symbol in self.symbol_info_cache:
+            del self.symbol_info_cache[symbol]
             
     async def disconnect_all(self):
         """Disconnect all active streams"""

@@ -265,6 +265,11 @@ Optional settings:
   - Shared components: `.display-header`, `.display-content`, `.display-footer`
   - Component-specific: `.orderfox-[component]-display`
 - **Theme Support**: All components inherit CSS custom properties for consistent theming
+- **Grid Layouts**: 
+  - Use `.three-columns` for 3-column layouts (e.g., liquidations)
+  - Use `.four-columns` for 4-column layouts (e.g., order book)
+- **Color Inheritance**: Amount values inherit color from `.bid-price` (green) and `.ask-price` (red) classes
+- **Alignment**: Numeric columns use `text-align: right` for consistent visual alignment
 
 ### WebSocket Connection Management
 - **Centralized Manager**: `WebSocketManager` class eliminates duplicate connection logic across UI components
@@ -290,8 +295,13 @@ Optional settings:
 ### Liquidation Data Stream System
 - **Binance Futures Integration**: Direct WebSocket connection to Binance @forceOrder stream for real-time liquidation data
 - **Backend Processing**: Liquidation service handles WebSocket connections, data formatting, and symbol conversion
-- **Display Components**: LiquidationDisplay component shows Side (Buy/Sell), Quantity, Price (USDT), and Time
-- **Color Coding**: Red for sell liquidations, green for buy liquidations with consistent styling
+- **Display Components**: LiquidationDisplay component shows Amount (USDT), Quantity, and Time in a 3-column layout
+- **Color Coding**: Amount column color-coded - green for buy liquidations, red for sell liquidations
+- **Dynamic Headers**: Quantity header updates dynamically to show base asset (e.g., "Quantity (BTC)" for BTCUSDT)
+- **Number Formatting**: 
+  - Amount (USDT) rounded to whole numbers with comma thousand separators
+  - Quantity formatted using `formatting_service` based on symbol's `amountPrecision`
+  - Backend provides `baseAsset` field for dynamic header updates
 - **Thin Client Architecture**: Backend provides formatted data with `quantityFormatted`, `priceUsdtFormatted`, and `displayTime`
 - **WebSocket Management**: Integrated with existing WebSocket service patterns and connection lifecycle
 - **Layout Integration**: Positioned right of trades display, below chart in responsive grid layout

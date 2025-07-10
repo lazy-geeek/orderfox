@@ -154,6 +154,23 @@ code {
   font-size: 12px;
 }
 
+/* Colored amount for liquidations - inherits from bid/ask price styles */
+.liquidation-item .display-amount.bid-price,
+.liquidation-item .display-amount.ask-price {
+  color: var(--color-buy);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.liquidation-item .display-amount.ask-price {
+  color: var(--color-sell);
+}
+
+/* First amount column in liquidation items (price) should be right-aligned like others */
+.liquidation-item .display-amount:first-child {
+  text-align: right;
+}
+
 .display-time {
   text-align: right;
   color: var(--text-secondary);
@@ -252,6 +269,11 @@ code {
 .amount-header,
 .time-header,
 .quantity-header {
+  text-align: right;
+}
+
+/* Liquidation specific header alignment - all right-aligned */
+.liquidation-header .amount-header {
   text-align: right;
 }
 
@@ -828,7 +850,7 @@ body {
 }
 
 .liquidation-item {
-  grid-template-columns: 60px 1fr 1fr 60px;
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 /* Update grid layout for three components */
@@ -865,7 +887,7 @@ body {
   
   .liquidation-header,
   .liquidation-item {
-    grid-template-columns: 50px 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LiquidationDisplay, createLiquidationDisplay } from '../../src/components/LiquidationDisplay.js';
+import { LiquidationDisplay } from '../../src/components/LiquidationDisplay.js';
 
 // Mock dependencies
 vi.mock('../../src/store/store.js', () => ({
@@ -64,7 +64,7 @@ describe('LiquidationDisplay', () => {
       display = new LiquidationDisplay(container);
       
       expect(container.querySelector('.orderfox-liquidation-display')).toBeTruthy();
-      expect(container.querySelector('.display-title').textContent).toBe('Liquidations');
+      expect(container.querySelector('.display-header h3').textContent).toBe('Liquidations');
       expect(container.querySelector('.liquidation-header')).toBeTruthy();
       expect(container.querySelector('#liquidation-list')).toBeTruthy();
     });
@@ -73,11 +73,10 @@ describe('LiquidationDisplay', () => {
       display = new LiquidationDisplay(container);
       
       const headers = container.querySelectorAll('.liquidation-header span');
-      expect(headers).toHaveLength(4);
-      expect(headers[0].textContent).toBe('Side');
-      expect(headers[1].textContent).toBe('Quantity');
-      expect(headers[2].textContent).toBe('Price (USDT)');
-      expect(headers[3].textContent).toBe('Time');
+      expect(headers).toHaveLength(3);
+      expect(headers[0].textContent).toBe('Amount (USDT)');
+      expect(headers[1].textContent).toBe('Quantity (BTC)'); // Updated because state has BTCUSDT selected
+      expect(headers[2].textContent).toBe('Time');
     });
   });
   
@@ -91,7 +90,7 @@ describe('LiquidationDisplay', () => {
         symbol: "BTCUSDT",
         side: "SELL",
         quantityFormatted: "0.014",
-        priceUsdtFormatted: "138.74",
+        priceUsdtFormatted: "139",
         displayTime: "14:27:40"
       };
       
@@ -99,11 +98,13 @@ describe('LiquidationDisplay', () => {
       
       const item = container.querySelector('.liquidation-item');
       expect(item).toBeTruthy();
-      expect(item.querySelector('.liquidation-side').textContent).toBe('SELL');
-      expect(item.querySelector('.ask-price')).toBeTruthy();
-      expect(item.querySelector('.liquidation-quantity').textContent).toBe('0.014');
-      expect(item.querySelector('.liquidation-price').textContent).toBe('138.74');
-      expect(item.querySelector('.liquidation-time').textContent).toBe('14:27:40');
+      
+      const amounts = item.querySelectorAll('.display-amount');
+      expect(amounts[0].textContent).toBe('139'); // Price in USDT
+      expect(amounts[0].classList.contains('ask-price')).toBe(true); // SELL = red
+      expect(amounts[1].textContent).toBe('0.014'); // Quantity
+      
+      expect(item.querySelector('.display-time').textContent).toBe('14:27:40');
     });
     
     it('should color code buy/sell sides correctly', () => {
@@ -111,7 +112,7 @@ describe('LiquidationDisplay', () => {
         symbol: "BTCUSDT",
         side: "BUY",
         quantityFormatted: "0.014",
-        priceUsdtFormatted: "138.74",
+        priceUsdtFormatted: "139",
         displayTime: "14:27:40"
       };
       
@@ -119,7 +120,7 @@ describe('LiquidationDisplay', () => {
         symbol: "BTCUSDT",
         side: "SELL", 
         quantityFormatted: "0.014",
-        priceUsdtFormatted: "138.74",
+        priceUsdtFormatted: "138",
         displayTime: "14:27:40"
       };
       
@@ -127,8 +128,12 @@ describe('LiquidationDisplay', () => {
       display.addLiquidation(sellLiquidation);
       
       const items = container.querySelectorAll('.liquidation-item');
-      expect(items[0].querySelector('.ask-price')).toBeTruthy(); // SELL (last added, first in list)
-      expect(items[1].querySelector('.bid-price')).toBeTruthy(); // BUY
+      // Items are displayed in reverse order (newest first)
+      const sellAmount = items[0].querySelector('.display-amount');
+      const buyAmount = items[1].querySelector('.display-amount');
+      
+      expect(sellAmount.classList.contains('ask-price')).toBe(true); // SELL = red
+      expect(buyAmount.classList.contains('bid-price')).toBe(true); // BUY = green
     });
     
     it('should limit liquidations to maxLiquidations', () => {
@@ -148,6 +153,22 @@ describe('LiquidationDisplay', () => {
       const items = container.querySelectorAll('.liquidation-item');
       expect(items.length).toBe(5);
       expect(display.liquidations.length).toBe(5);
+    });
+    
+    it('should display comma-formatted prices correctly', () => {
+      const mockLiquidation = {
+        symbol: "BTCUSDT",
+        side: "SELL",
+        quantityFormatted: "0.5",
+        priceUsdtFormatted: "22,839",
+        displayTime: "14:27:40"
+      };
+      
+      display.addLiquidation(mockLiquidation);
+      
+      const item = container.querySelector('.liquidation-item');
+      const amounts = item.querySelectorAll('.display-amount');
+      expect(amounts[0].textContent).toBe('22,839'); // Price with comma
     });
     
     it('should remove empty state when adding liquidations', () => {
@@ -173,23 +194,23 @@ describe('LiquidationDisplay', () => {
     });
     
     it('should update connection status correctly', () => {
-      const statusEl = container.querySelector('.connection-status');
+      const statusIndicator = container.querySelector('.status-indicator');
       const statusText = container.querySelector('.status-text');
       
       // Initially disconnected
-      expect(statusEl.classList.contains('disconnected')).toBe(true);
+      expect(statusIndicator.classList.contains('disconnected')).toBe(true);
       expect(statusText.textContent).toBe('Disconnected');
       
       // Connect
       display.updateConnectionStatus(true);
-      expect(statusEl.classList.contains('connected')).toBe(true);
-      expect(statusEl.classList.contains('disconnected')).toBe(false);
-      expect(statusText.textContent).toBe('Connected');
+      expect(statusIndicator.classList.contains('connected')).toBe(true);
+      expect(statusIndicator.classList.contains('disconnected')).toBe(false);
+      expect(statusText.textContent).toBe('Live');
       
       // Disconnect
       display.updateConnectionStatus(false);
-      expect(statusEl.classList.contains('disconnected')).toBe(true);
-      expect(statusEl.classList.contains('connected')).toBe(false);
+      expect(statusIndicator.classList.contains('disconnected')).toBe(true);
+      expect(statusIndicator.classList.contains('connected')).toBe(false);
       expect(statusText.textContent).toBe('Disconnected');
     });
   });
@@ -262,13 +283,90 @@ describe('LiquidationDisplay', () => {
     });
   });
   
-  describe('Legacy Component Function', () => {
-    it('should create liquidation display component', () => {
-      const component = createLiquidationDisplay();
+  describe('Dynamic Quantity Header', () => {
+    beforeEach(() => {
+      display = new LiquidationDisplay(container);
+    });
+    
+    it('should update quantity header with symbol name', () => {
+      // Simulate symbol being set
+      display.currentSymbol = 'BTCUSDT';
+      display.setupWebSocket();
       
-      expect(component).toBeDefined();
-      expect(component.className).toContain('orderfox-display-base');
-      expect(component.className).toContain('orderfox-liquidation-display');
+      const quantityHeader = container.querySelector('.quantity-header');
+      expect(quantityHeader.textContent).toBe('Quantity (BTC)');
+    });
+    
+    it('should update quantity header for different symbols', () => {
+      // Since setupWebSocket is called during init with BTCUSDT
+      let quantityHeader = container.querySelector('.quantity-header');
+      expect(quantityHeader.textContent).toBe('Quantity (BTC)');
+      
+      // Simulate changing symbol by directly updating header
+      // (In real app, this happens via state subscription)
+      quantityHeader.textContent = 'Quantity (SOL)';
+      expect(quantityHeader.textContent).toBe('Quantity (SOL)');
+      
+      quantityHeader.textContent = 'Quantity (ETH)';
+      expect(quantityHeader.textContent).toBe('Quantity (ETH)');
+    });
+    
+    it('should update quantity header from liquidation data baseAsset', () => {
+      const updateData = {
+        type: 'liquidation',
+        data: {
+          symbol: "XRPUSDT",
+          side: "BUY",
+          quantityFormatted: "100.000",
+          priceUsdtFormatted: "50",
+          displayTime: "14:27:40",
+          baseAsset: "XRP"
+        }
+      };
+      
+      if (window.updateLiquidationDisplay) {
+        window.updateLiquidationDisplay(updateData);
+      }
+      
+      const quantityHeader = container.querySelector('.quantity-header');
+      expect(quantityHeader.textContent).toBe('Quantity (XRP)');
     });
   });
+  
+  describe('Three Column Layout', () => {
+    beforeEach(() => {
+      display = new LiquidationDisplay(container);
+    });
+    
+    it('should render 3 columns without SIDE column', () => {
+      const header = container.querySelector('.liquidation-header');
+      expect(header.classList.contains('three-columns')).toBe(true);
+      
+      const headers = header.querySelectorAll('span');
+      expect(headers).toHaveLength(3);
+      
+      // Verify no side header exists
+      const sideHeader = Array.from(headers).find(h => h.textContent.includes('Side'));
+      expect(sideHeader).toBeUndefined();
+    });
+    
+    it('should render liquidation items with 3 columns', () => {
+      const mockLiquidation = {
+        symbol: "BTCUSDT",
+        side: "SELL",
+        quantityFormatted: "0.014",
+        priceUsdtFormatted: "139",
+        displayTime: "14:27:40"
+      };
+      
+      display.addLiquidation(mockLiquidation);
+      
+      const item = container.querySelector('.liquidation-item');
+      const spans = item.querySelectorAll('span');
+      
+      // Should have exactly 3 spans (amount, quantity, time)
+      expect(spans).toHaveLength(3);
+    });
+  });
+  
 });

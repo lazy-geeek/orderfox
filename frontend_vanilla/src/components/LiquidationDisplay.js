@@ -40,10 +40,9 @@ export class LiquidationDisplay {
                     </div>
                 </div>
                 <div class="display-content">
-                    <div class="section-header four-columns liquidation-header">
-                        <span class="side-header">Side</span>
+                    <div class="section-header three-columns liquidation-header">
+                        <span class="amount-header">Amount (USDT)</span>
                         <span class="quantity-header">Quantity</span>
-                        <span class="price-header">Price (USDT)</span>
                         <span class="time-header">Time</span>
                     </div>
                     <div id="liquidation-list" class="liquidation-list">
@@ -68,6 +67,14 @@ export class LiquidationDisplay {
         const symbolLabel = this.container.querySelector('.symbol-label');
         if (symbolLabel) {
             symbolLabel.textContent = symbol || '';
+        }
+        
+        // Update quantity header with symbol name
+        const quantityHeader = this.container.querySelector('.quantity-header');
+        if (quantityHeader && symbol) {
+            // Extract base asset from symbol (e.g., SOL from SOLUSDT)
+            const baseAsset = symbol.replace('USDT', '').replace('USDC', '');
+            quantityHeader.textContent = `Quantity (${baseAsset})`;
         }
         
         // Clean up existing connection for old symbol
@@ -124,9 +131,8 @@ export class LiquidationDisplay {
         const sideClass = liquidation.side === 'BUY' ? 'bid-price' : 'ask-price';
         
         div.innerHTML = `
-            <span class="liquidation-side ${sideClass}">${liquidation.side}</span>
+            <span class="display-amount ${sideClass}">${liquidation.priceUsdtFormatted}</span>
             <span class="display-amount">${liquidation.quantityFormatted}</span>
-            <span class="display-amount">${liquidation.priceUsdtFormatted}</span>
             <span class="display-time">${liquidation.displayTime}</span>
         `;
         
@@ -144,9 +150,8 @@ export class LiquidationDisplay {
                 const sideClass = liq.side === 'BUY' ? 'bid-price' : 'ask-price';
                 return `
                     <div class="display-row liquidation-item">
-                        <span class="liquidation-side ${sideClass}">${liq.side}</span>
+                        <span class="display-amount ${sideClass}">${liq.priceUsdtFormatted}</span>
                         <span class="display-amount">${liq.quantityFormatted}</span>
-                        <span class="display-amount">${liq.priceUsdtFormatted}</span>
                         <span class="display-time">${liq.displayTime}</span>
                     </div>
                 `;
@@ -186,6 +191,13 @@ export class LiquidationDisplay {
                 if (symbolLabel) {
                     symbolLabel.textContent = state.selectedSymbol || '';
                 }
+                
+                // Update quantity header
+                const quantityHeader = this.container.querySelector('.quantity-header');
+                if (quantityHeader && state.selectedSymbol) {
+                    const baseAsset = state.selectedSymbol.replace('USDT', '').replace('USDC', '');
+                    quantityHeader.textContent = `Quantity (${baseAsset})`;
+                }
             }
         });
         
@@ -196,8 +208,17 @@ export class LiquidationDisplay {
                 this.renderLiquidations();
                 this.updateConnectionStatus(true);
             } else if (data.type === 'liquidation') {
-                this.addLiquidation(data.data);
+                const liquidation = data.data;
+                this.addLiquidation(liquidation);
                 this.updateConnectionStatus(true);
+                
+                // Update quantity header with baseAsset if provided
+                if (liquidation.baseAsset) {
+                    const quantityHeader = this.container.querySelector('.quantity-header');
+                    if (quantityHeader) {
+                        quantityHeader.textContent = `Quantity (${liquidation.baseAsset})`;
+                    }
+                }
             } else if (data.type === 'error') {
                 console.error('Liquidation stream error:', data.message);
                 this.updateConnectionStatus(false);

@@ -54,6 +54,9 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         # Convert to exchange format
         exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(display_symbol)
         
+        # Get symbol info for formatting
+        symbol_info = symbol_service.get_symbol_info(display_symbol)
+        
         # Send initial data with recent liquidations
         initial_data = {
             "type": "liquidations",
@@ -64,8 +67,8 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         }
         await websocket.send_json(initial_data)
         
-        # Connect to liquidation stream
-        await liquidation_service.connect_to_liquidation_stream(display_symbol, liquidation_callback)
+        # Connect to liquidation stream with symbol info
+        await liquidation_service.connect_to_liquidation_stream(display_symbol, liquidation_callback, symbol_info)
         
         # Stream liquidation data
         while True:
