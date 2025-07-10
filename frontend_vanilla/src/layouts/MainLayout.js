@@ -72,11 +72,11 @@ export function createMainLayout() {
   candlestickChartPlaceholder.textContent = 'CandlestickChart';
   chartSection.appendChild(candlestickChartPlaceholder);
 
-  // Bottom Section - OrderBook and Trades Side by Side
+  // Bottom Section - OrderBook, Trades, and Liquidations Side by Side
   const bottomSection = document.createElement('div');
   bottomSection.className = 'bottom-section';
   bottomSection.style.display = 'grid';
-  bottomSection.style.gridTemplateColumns = '1fr 1fr';
+  bottomSection.style.gridTemplateColumns = '1fr 1fr 1fr';
   bottomSection.style.gap = '1rem';
   bottomSection.style.width = '100%';
 
@@ -88,8 +88,13 @@ export function createMainLayout() {
   lastTradesPlaceholder.id = 'last-trades-container';
   lastTradesPlaceholder.textContent = 'LastTradesDisplay';
 
+  const liquidationPlaceholder = document.createElement('div');
+  liquidationPlaceholder.id = 'liquidation-container';
+  liquidationPlaceholder.textContent = 'LiquidationDisplay';
+
   bottomSection.appendChild(orderBookPlaceholder);
   bottomSection.appendChild(lastTradesPlaceholder);
+  bottomSection.appendChild(liquidationPlaceholder);
 
   mainContent.appendChild(chartSection);
   mainContent.appendChild(bottomSection);

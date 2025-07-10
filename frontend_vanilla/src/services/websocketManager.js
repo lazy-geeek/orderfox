@@ -87,6 +87,7 @@ export class WebSocketManager {
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(newSymbol, 'trades');
+    connectWebSocketStream(newSymbol, 'liquidations');
   }
 
   /**
@@ -158,6 +159,7 @@ export class WebSocketManager {
     connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(symbol, 'trades');
+    connectWebSocketStream(symbol, 'liquidations');
   }
 
   /**

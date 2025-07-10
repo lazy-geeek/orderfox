@@ -6,6 +6,7 @@ import { createSymbolSelector, updateSymbolSelector } from './components/SymbolS
 import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
+import { LiquidationDisplay } from './components/LiquidationDisplay.js';
 import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 
@@ -41,6 +42,7 @@ const symbolSelectorPlaceholder = document.querySelector('#symbol-selector-place
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
 const lastTradesPlaceholder = document.querySelector('#last-trades-container');
+const liquidationPlaceholder = document.querySelector('#liquidation-container');
 const tradingModeTogglePlaceholder = document.querySelector('#trading-mode-toggle-placeholder');
 const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 
@@ -57,6 +59,9 @@ orderBookPlaceholder.replaceWith(orderBookDisplay);
 
 const lastTradesDisplay = createLastTradesDisplay();
 lastTradesPlaceholder.replaceWith(lastTradesDisplay);
+
+// Initialize liquidation display
+const liquidationDisplay = new LiquidationDisplay(liquidationPlaceholder); // eslint-disable-line no-unused-vars
 
 const tradingModeToggle = createTradingModeToggle();
 tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);

@@ -258,7 +258,7 @@ Optional settings:
 ### CSS Architecture & Component Styling
 - **Shared Base Classes**: Use `.orderfox-display-base` for all display components (order book, trades, charts)
 - **Semantic Class Names**: Use semantic names like `.display-header`, `.display-content`, `.display-footer` instead of component-specific names
-- **Component-Specific Overrides**: Keep only unique styles in component-specific classes (e.g., `.orderfox-order-book-display`, `.orderfox-last-trades-display`)
+- **Component-Specific Overrides**: Keep only unique styles in component-specific classes (e.g., `.orderfox-order-book-display`, `.orderfox-last-trades-display`, `.orderfox-liquidation-display`)
 - **DRY Principle**: Avoid duplicating common styles like headers, footers, loading states, and connection status
 - **Naming Convention**: 
   - Base classes: `.orderfox-display-base`
@@ -286,6 +286,16 @@ Optional settings:
 - **Exchange Data Only**: No mock data fallbacks - proper error handling when exchange unavailable
 - **Historical + Real-time Merge**: Backend maintains unified trade history combining historical data with live streaming
 - **Component Architecture**: Follows OrderBookDisplay patterns for consistency
+
+### Liquidation Data Stream System
+- **Binance Futures Integration**: Direct WebSocket connection to Binance @forceOrder stream for real-time liquidation data
+- **Backend Processing**: Liquidation service handles WebSocket connections, data formatting, and symbol conversion
+- **Display Components**: LiquidationDisplay component shows Side (Buy/Sell), Quantity, Price (USDT), and Time
+- **Color Coding**: Red for sell liquidations, green for buy liquidations with consistent styling
+- **Thin Client Architecture**: Backend provides formatted data with `quantityFormatted`, `priceUsdtFormatted`, and `displayTime`
+- **WebSocket Management**: Integrated with existing WebSocket service patterns and connection lifecycle
+- **Layout Integration**: Positioned right of trades display, below chart in responsive grid layout
+- **Error Handling**: Graceful fallback and reconnection logic for Binance connection issues
 
 ### Exchange Service Patterns
 - **CCXT Standard**: Regular CCXT exchange uses synchronous methods (`exchange.fetch_trades()`, `exchange.fetch_ohlcv()`)
@@ -327,10 +337,16 @@ Connect to candles stream (container-width optimization):
 ws://localhost:8000/api/v1/ws/candles/BTCUSDT?timeframe=1m&container_width=800
 ```
 
+Connect to liquidations stream:
+```
+ws://localhost:8000/api/v1/ws/liquidations/BTCUSDT
+```
+
 **Available WebSocket Endpoints:**
 - **Order Book**: Real-time aggregated order book with dynamic parameters
 - **Trades**: Live trade stream with historical + real-time merge
 - **Candles**: OHLCV data with container-width optimization
+- **Liquidations**: Real-time liquidation orders from Binance futures with formatted display data
 
 Update parameters without reconnecting:
 ```json
@@ -386,6 +402,12 @@ Update parameters without reconnecting:
 2. Backend: Adjust WebSocket streaming in `trades_ws.py`
 3. Frontend: Update display in `LastTradesDisplay.js`
 4. Note: Follows OrderBookDisplay patterns for consistency
+
+### Modifying Liquidation Display
+1. Backend: Update liquidation processing in `liquidation_service.py`
+2. Backend: Adjust WebSocket endpoint in `liquidations_ws.py`
+3. Frontend: Update display in `LiquidationDisplay.js`
+4. Note: Uses Binance futures API directly, not CCXT, for @forceOrder stream
 
 ### Modifying Chart Display
 1. Backend: Update chart data processing in `chart_data_service.py`

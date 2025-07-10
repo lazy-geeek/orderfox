@@ -819,3 +819,126 @@ body {
 .orderfox-last-trades-display .ask-price {
   color: var(--color-sell) !important;
 }
+
+/* Liquidation Display CSS - Component-specific styles */
+.orderfox-liquidation-display {
+  /* Inherits from .orderfox-display-base */
+}
+
+.liquidation-header {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr 60px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  background: rgba(246, 70, 93, 0.05); /* Liquidations use sell color theme */
+}
+
+.liquidation-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.liquidation-item {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr 60px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.liquidation-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.liquidation-side {
+  font-weight: 600;
+}
+
+.liquidation-quantity,
+.liquidation-price {
+  text-align: right;
+}
+
+.liquidation-time {
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+/* Update grid layout for three components */
+@media (min-width: 1200px) {
+  .bottom-section {
+    grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr) minmax(350px, 1fr);
+    gap: 10px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .bottom-section {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 10px;
+  }
+  
+  #liquidation-container {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .bottom-section {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .liquidation-header,
+  .liquidation-item {
+    font-size: 0.75rem;
+  }
+  
+  .liquidation-time {
+    display: none;  /* Hide time on mobile */
+  }
+  
+  .liquidation-header,
+  .liquidation-item {
+    grid-template-columns: 50px 1fr 1fr;
+  }
+}
+
+/* Animation for new liquidations */
+.liquidation-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Empty state */
+.liquidation-list .empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Use existing bid/ask price classes for color coding liquidation sides */
+.orderfox-liquidation-display .bid-price {
+  color: var(--color-buy) !important;
+}
+
+.orderfox-liquidation-display .ask-price {
+  color: var(--color-sell) !important;
+}
