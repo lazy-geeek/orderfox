@@ -21,8 +21,6 @@ let userHasZoomed = false;
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
   chartContainer.className = 'chart-container';
-  chartContainer.style.height = '500px';
-  chartContainer.style.width = '100%';
   container.appendChild(chartContainer);
 
   // Get current theme

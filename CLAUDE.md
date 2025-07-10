@@ -349,6 +349,17 @@ Update parameters without reconnecting:
 - **Zero Processing**: State update functions simplified to direct assignment (`state.currentCandles = payload.data`)
 - **Backend Trust**: Frontend trusts backend data completely - no client-side validation required
 
+### Responsive Layout Architecture
+- **Full-Width Chart**: Chart and timeframe selector span 100% width for better visibility
+- **Stacked Layout**: Orderbook and trades positioned below chart in a responsive grid
+- **Breakpoints**:
+  - Desktop (>1024px): Orderbook and trades side-by-side
+  - Tablet (768-1024px): Adjusted spacing, 50vh chart height
+  - Mobile (<768px): Vertical stacking, 40vh chart height
+  - Small Mobile (<480px): Wrapped header controls, 35vh chart height
+- **Viewport-Based Sizing**: Chart height uses vh units (60vh default) with min/max constraints
+- **Preserved Margins**: Display components maintain 10px margins for proper spacing from browser edges
+
 ## Common Tasks
 
 ### Adding a New API Endpoint

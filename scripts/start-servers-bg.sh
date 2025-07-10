@@ -30,7 +30,8 @@ if is_port_in_use 8000; then
 else
     echo -e "${YELLOW}Starting backend server on port 8000...${NC}"
     cd "$PROJECT_ROOT/backend"
-    nohup python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > "$PROJECT_ROOT/logs/backend.log" 2>&1 &
+    # Activate conda environment and start backend
+    nohup bash -c "source ~/miniconda3/etc/profile.d/conda.sh && conda activate orderfox && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" > "$PROJECT_ROOT/logs/backend.log" 2>&1 &
     BACKEND_PID=$!
     echo "$BACKEND_PID" > "$PROJECT_ROOT/logs/backend.pid"
     echo -e "${GREEN}✓ Backend server started (PID: $BACKEND_PID)${NC}"
