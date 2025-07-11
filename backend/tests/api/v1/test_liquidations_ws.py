@@ -10,6 +10,7 @@ import json
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch
 from app.main import app
+from collections import deque
 
 class TestLiquidationsWebSocket:
     """Test suite for liquidations WebSocket endpoint"""
@@ -198,3 +199,134 @@ class TestLiquidationsWebSocket:
         # Verify baseAsset is included
         assert "baseAsset" in expected_liquidation_format
         assert expected_liquidation_format["baseAsset"] == "BTC"
+    
+    @pytest.mark.asyncio
+    async def test_liquidation_websocket_historical_data_integration(self):
+        """Test WebSocket fetches and sends historical liquidations on connection"""
+        client = TestClient(app)
+        
+        # Mock historical liquidations from API
+        mock_historical = [
+            {
+                "symbol": "HYPERUSDT",
+                "side": "SELL",
+                "quantity": "1000",
+                "quantityFormatted": "1000.000",
+                "priceUsdt": "250.0",
+                "priceUsdtFormatted": "250",
+                "timestamp": 1609459200000,
+                "displayTime": "12:00:00",
+                "avgPrice": "0.2500",
+                "baseAsset": "HYPER"
+            },
+            {
+                "symbol": "HYPERUSDT",
+                "side": "BUY",
+                "quantity": "500",
+                "quantityFormatted": "500.000",
+                "priceUsdt": "150.0",
+                "priceUsdtFormatted": "150",
+                "timestamp": 1609459300000,
+                "displayTime": "12:01:40",
+                "avgPrice": "0.3000",
+                "baseAsset": "HYPER"
+            }
+        ]
+        
+        symbol_info = {
+            'symbol': 'HYPERUSDT',
+            'baseAsset': 'HYPER',
+            'pricePrecision': 4,
+            'amountPrecision': 3
+        }
+        
+        with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
+            with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="HYPERUSDT"):
+                with patch('app.services.symbol_service.symbol_service.get_symbol_info', return_value=symbol_info):
+                    with patch('app.services.liquidation_service.liquidation_service.fetch_historical_liquidations', 
+                               return_value=mock_historical) as mock_fetch:
+                        with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream'):
+                            
+                            with client.websocket_connect("/api/v1/ws/liquidations/HYPERUSDT") as websocket:
+                                # Receive initial data with historical liquidations
+                                data = websocket.receive_json()
+                                
+                                assert data["type"] == "liquidations"
+                                assert data["symbol"] == "HYPERUSDT"
+                                assert data["initial"] is True
+                                assert len(data["data"]) == 2
+                                
+                                # Verify historical data is in correct order (newest first)
+                                assert data["data"][0]["timestamp"] == 1609459300000  # Newer
+                                assert data["data"][1]["timestamp"] == 1609459200000  # Older
+                                
+                                # Verify fetch_historical_liquidations was called
+                                mock_fetch.assert_called_once_with("HYPERUSDT", limit=50)
+    
+    @pytest.mark.asyncio
+    async def test_liquidation_websocket_caches_historical_data(self):
+        """Test that historical data is only fetched once per symbol"""
+        client = TestClient(app)
+        
+        from app.api.v1.endpoints import liquidations_ws
+        
+        # Clear the cache first
+        liquidations_ws.liquidations_cache.clear()
+        
+        mock_historical = [{
+            "symbol": "BTCUSDT",
+            "side": "SELL",
+            "quantity": "0.1",
+            "priceUsdt": "4500.0",
+            "timestamp": 1609459200000
+        }]
+        
+        with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
+            with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="BTCUSDT"):
+                with patch('app.services.symbol_service.symbol_service.get_symbol_info', return_value={}):
+                    with patch('app.services.liquidation_service.liquidation_service.fetch_historical_liquidations', 
+                               return_value=mock_historical) as mock_fetch:
+                        with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream'):
+                            
+                            # First connection - should fetch historical data
+                            with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT") as websocket:
+                                data = websocket.receive_json()
+                                assert len(data["data"]) == 1
+                            
+                            # Verify fetch was called once
+                            assert mock_fetch.call_count == 1
+                            
+                            # Second connection - should use cached data
+                            with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT") as websocket:
+                                data = websocket.receive_json()
+                                assert len(data["data"]) == 1
+                            
+                            # Verify fetch was NOT called again
+                            assert mock_fetch.call_count == 1  # Still only once
+    
+    @pytest.mark.asyncio
+    async def test_liquidation_websocket_handles_api_failure_gracefully(self):
+        """Test WebSocket handles historical API failure gracefully"""
+        client = TestClient(app)
+        
+        from app.api.v1.endpoints import liquidations_ws
+        liquidations_ws.liquidations_cache.clear()
+        
+        with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
+            with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="BTCUSDT"):
+                with patch('app.services.symbol_service.symbol_service.get_symbol_info', return_value={}):
+                    with patch('app.services.liquidation_service.liquidation_service.fetch_historical_liquidations', 
+                               return_value=[]) as mock_fetch:  # Empty list on API failure
+                        with patch('app.services.liquidation_service.liquidation_service.connect_to_liquidation_stream'):
+                            
+                            with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT") as websocket:
+                                # Should still receive initial message, just with empty data
+                                data = websocket.receive_json()
+                                
+                                assert data["type"] == "liquidations"
+                                assert data["symbol"] == "BTCUSDT"
+                                assert data["initial"] is True
+                                assert data["data"] == []  # Empty when API fails
+                                
+                                # Verify API was attempted
+                                mock_fetch.assert_called_once()

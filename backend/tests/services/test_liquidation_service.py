@@ -7,8 +7,10 @@ data formatting, error handling, and reconnection logic.
 
 import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
+import aiohttp
 from app.services.liquidation_service import liquidation_service
+from app.core.config import settings
 
 class TestLiquidationService:
     """Test suite for LiquidationService"""
@@ -320,3 +322,174 @@ class TestLiquidationService:
         formatted = liquidation_service.format_liquidation_data(raw_data, "BTCUSDT", symbol_info)
         
         assert formatted["priceUsdtFormatted"] == "50,000,000,000"  # Very large number with commas
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_success(self):
+        """Test successful API call for historical liquidations"""
+        # Mock API response
+        mock_response = [
+            {
+                "symbol": "HYPERUSDT",
+                "side": "sell",
+                "order_filled_accumulated_quantity": "1000",
+                "average_price": "0.2500",
+                "order_trade_time": 1609459200000
+            },
+            {
+                "symbol": "HYPERUSDT",
+                "side": "buy",
+                "order_filled_accumulated_quantity": "500",
+                "average_price": "0.3000",
+                "order_trade_time": 1609459300000
+            }
+        ]
+        
+        # Mock the HTTP session and response
+        mock_session = AsyncMock()
+        mock_response_obj = AsyncMock()
+        mock_response_obj.status = 200
+        mock_response_obj.json = AsyncMock(return_value=mock_response)
+        
+        # Create async context manager mock using MagicMock for context manager protocol
+        from unittest.mock import MagicMock
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response_obj)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = MagicMock(return_value=mock_context_manager)
+        
+        with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
+            result = await liquidation_service.fetch_historical_liquidations("HYPERUSDT")
+        
+        assert len(result) == 2
+        assert result[0]["symbol"] == "HYPERUSDT"
+        assert result[0]["side"] == "SELL"  # Uppercase
+        assert float(result[0]["priceUsdt"]) == 250.0  # 1000 * 0.25
+        assert result[0]["priceUsdtFormatted"] == "250"
+        assert result[1]["side"] == "BUY"
+        assert float(result[1]["priceUsdt"]) == 150.0  # 500 * 0.30
+        
+        # Verify the API was called correctly
+        mock_session.get.assert_called_once_with(
+            f"{settings.LIQUIDATION_API_BASE_URL}/liquidation-orders",
+            params={"symbol": "HYPERUSDT", "limit": 50},
+            timeout=15
+        )
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_api_error(self):
+        """Test graceful handling of API errors"""
+        # Mock HTTP session with error response
+        mock_session = AsyncMock()
+        mock_response_obj = AsyncMock()
+        mock_response_obj.status = 500
+        
+        # Create async context manager mock using MagicMock
+        from unittest.mock import MagicMock
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response_obj)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = MagicMock(return_value=mock_context_manager)
+        
+        with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
+            result = await liquidation_service.fetch_historical_liquidations("HYPERUSDT")
+        
+        assert result == []  # Empty list on error
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_timeout(self):
+        """Test handling of timeout errors"""
+        # Mock HTTP session that raises timeout
+        mock_session = AsyncMock()
+        mock_session.get.side_effect = asyncio.TimeoutError()
+        
+        with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
+            result = await liquidation_service.fetch_historical_liquidations("HYPERUSDT")
+        
+        assert result == []  # Empty list on timeout
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_no_api_url(self):
+        """Test behavior when API URL is not configured"""
+        # Temporarily clear the API URL
+        original_url = settings.LIQUIDATION_API_BASE_URL
+        settings.LIQUIDATION_API_BASE_URL = ""
+        
+        try:
+            result = await liquidation_service.fetch_historical_liquidations("HYPERUSDT")
+            assert result == []  # Empty list when API not configured
+        finally:
+            settings.LIQUIDATION_API_BASE_URL = original_url
+    
+    def test_convert_api_to_ws_format(self):
+        """Test API response format conversion"""
+        api_data = {
+            "symbol": "HYPERUSDT",
+            "side": "buy",
+            "order_filled_accumulated_quantity": "500",
+            "average_price": "0.3000",
+            "order_trade_time": 1609459200000
+        }
+        
+        result = liquidation_service._convert_api_to_ws_format(api_data, "HYPERUSDT")
+        
+        assert result["symbol"] == "HYPERUSDT"
+        assert result["side"] == "BUY"  # Uppercase
+        assert result["quantity"] == "500"
+        assert float(result["priceUsdt"]) == 150.0  # 500 * 0.3
+        assert result["priceUsdtFormatted"] == "150"
+        assert result["avgPrice"] == "0.3000"
+        assert "displayTime" in result
+        assert result["timestamp"] == 1609459200000
+        assert result["baseAsset"] == ""  # No symbol info provided
+    
+    def test_convert_api_to_ws_format_with_symbol_info(self):
+        """Test API format conversion with symbol info"""
+        api_data = {
+            "symbol": "BTCUSDT",
+            "side": "sell",
+            "order_filled_accumulated_quantity": "0.5",
+            "average_price": "45000",
+            "order_trade_time": 1609459200000
+        }
+        
+        symbol_info = {
+            'symbol': 'BTCUSDT',
+            'baseAsset': 'BTC',
+            'pricePrecision': 1,
+            'amountPrecision': 3
+        }
+        
+        result = liquidation_service._convert_api_to_ws_format(api_data, "BTCUSDT", symbol_info)
+        
+        assert result["side"] == "SELL"
+        assert float(result["priceUsdt"]) == 22500.0  # 0.5 * 45000
+        assert result["priceUsdtFormatted"] == "22,500"  # With comma
+        assert result["baseAsset"] == "BTC"
+    
+    @pytest.mark.asyncio
+    async def test_http_session_creation(self):
+        """Test HTTP session is created only once"""
+        # Reset the session
+        liquidation_service._http_session = None
+        
+        session1 = await liquidation_service._get_http_session()
+        session2 = await liquidation_service._get_http_session()
+        
+        assert session1 is session2  # Same instance
+        assert isinstance(session1, aiohttp.ClientSession)
+        
+        # Clean up
+        await session1.close()
+        liquidation_service._http_session = None
+    
+    @pytest.mark.asyncio
+    async def test_disconnect_all_closes_http_session(self):
+        """Test that disconnect_all closes the HTTP session"""
+        # Create a mock session
+        mock_session = AsyncMock(spec=aiohttp.ClientSession)
+        liquidation_service._http_session = mock_session
+        
+        await liquidation_service.disconnect_all()
+        
+        mock_session.close.assert_called_once()
+        assert liquidation_service._http_session is None

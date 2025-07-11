@@ -44,6 +44,9 @@ class Settings:
     BINANCE_API_BASE_URL: str = os.getenv(
         "BINANCE_API_BASE_URL", "https://fapi.binance.com")
 
+    # Liquidation API Configuration
+    LIQUIDATION_API_BASE_URL: Optional[str] = os.getenv("LIQUIDATION_API_BASE_URL", "")
+
     # Firebase Configuration
     FIREBASE_CONFIG_JSON: Optional[str] = os.getenv("FIREBASE_CONFIG_JSON")
 
@@ -114,6 +117,12 @@ class Settings:
         if not self.BINANCE_SECRET_KEY:
             logging.warning(
                 "BINANCE_SECRET_KEY not found in environment variables")
+        
+        # Log liquidation API configuration
+        if self.LIQUIDATION_API_BASE_URL:
+            logging.info(f"Liquidation API configured: {self.LIQUIDATION_API_BASE_URL}")
+        else:
+            logging.warning("LIQUIDATION_API_BASE_URL not set - historical liquidations disabled")
 
     def _configure_logging(self):
         """Configure logging based on environment settings."""

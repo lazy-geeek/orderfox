@@ -240,6 +240,7 @@ Optional settings:
 - `MAX_ORDERBOOK_LIMIT`: Max order book depth (default: 50)
 - `DEBUG`: Enable debug logging (true/false)
 - `CORS_ORIGINS`: Allowed CORS origins
+- `LIQUIDATION_API_BASE_URL`: External API for historical liquidation data
 
 ## Architecture Highlights
 
@@ -295,6 +296,7 @@ Optional settings:
 ### Liquidation Data Stream System
 - **Binance Futures Integration**: Direct WebSocket connection to Binance @forceOrder stream for real-time liquidation data
 - **Backend Processing**: Liquidation service handles WebSocket connections, data formatting, and symbol conversion
+- **Historical Data Integration**: Fetches last 50 liquidations from external API on WebSocket connection
 - **Display Components**: LiquidationDisplay component shows Amount (USDT), Quantity, and Time in a 3-column layout
 - **Color Coding**: Amount column color-coded - green for buy liquidations, red for sell liquidations
 - **Dynamic Headers**: Quantity header updates dynamically to show base asset (e.g., "Quantity (BTC)" for BTCUSDT)
@@ -302,10 +304,26 @@ Optional settings:
   - Amount (USDT) rounded to whole numbers with comma thousand separators
   - Quantity formatted using `formatting_service` based on symbol's `amountPrecision`
   - Backend provides `baseAsset` field for dynamic header updates
+- **Data Ordering**: Liquidations sorted with newest first using deque with appendleft for real-time data
 - **Thin Client Architecture**: Backend provides formatted data with `quantityFormatted`, `priceUsdtFormatted`, and `displayTime`
 - **WebSocket Management**: Integrated with existing WebSocket service patterns and connection lifecycle
 - **Layout Integration**: Positioned right of trades display, below chart in responsive grid layout
 - **Error Handling**: Graceful fallback and reconnection logic for Binance connection issues
+- **API Integration**: Uses `fetch_historical_liquidations()` with configurable LIQUIDATION_API_BASE_URL
+
+### Liquidation Orders API Architecture
+- **External API Integration**: Fetches historical liquidation data from external API service
+- **HTTP Client**: Uses aiohttp with 15-second timeout for reliable API calls
+- **Data Conversion**: `_convert_api_to_ws_format()` ensures API data matches WebSocket format
+- **Field Mapping**: Uses `order_filled_accumulated_quantity` field for actual liquidated amounts
+- **Caching Strategy**: Historical data fetched once per symbol and stored in deque cache
+- **Error Resilience**: Returns empty list on API failure, allowing WebSocket-only operation
+- **Environment Configuration**: API URL configured via LIQUIDATION_API_BASE_URL environment variable
+- **Integration Points**: 
+  - `liquidation_service.fetch_historical_liquidations()` - API data fetching
+  - `liquidations_ws.py` - Fetches historical data on WebSocket connection
+  - Deque cache maintains last 50 liquidations per symbol
+- **Data Flow**: API → Convert to WS format → Sort by timestamp → Store in cache → Send to frontend
 
 ### Exchange Service Patterns
 - **CCXT Standard**: Regular CCXT exchange uses synchronous methods (`exchange.fetch_trades()`, `exchange.fetch_ohlcv()`)

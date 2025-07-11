@@ -8,11 +8,13 @@ since CCXT Pro doesn't support liquidation order streams.
 import asyncio
 import json
 import websockets
+import aiohttp
 from typing import Optional, Dict, List, Callable, Any
 from datetime import datetime
 import logging
 from decimal import Decimal
 from app.services.formatting_service import formatting_service
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class LiquidationService:
         self.running_streams: Dict[str, bool] = {}
         self.retry_delays = [1, 2, 5, 10, 30]  # Exponential backoff
         self.symbol_info_cache: Dict[str, Optional[Dict]] = {}  # Store symbol info per symbol
+        self._http_session: Optional[aiohttp.ClientSession] = None
         
     async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any], symbol_info: Optional[Dict] = None):
         """
@@ -205,6 +208,100 @@ class LiquidationService:
                     callback(data)
             except Exception as e:
                 logger.error(f"Error in liquidation callback: {e}")
+    
+    async def _get_http_session(self) -> aiohttp.ClientSession:
+        """Get or create HTTP session for API calls"""
+        if not self._http_session:
+            self._http_session = aiohttp.ClientSession()
+        return self._http_session
+    
+    async def fetch_historical_liquidations(self, symbol: str, limit: int = 50) -> List[Dict]:
+        """
+        Fetch historical liquidations from external API
+        
+        Args:
+            symbol: Trading symbol (e.g., 'BTCUSDT')
+            limit: Maximum number of liquidations to fetch
+            
+        Returns:
+            List of formatted liquidation data dictionaries
+        """
+        if not settings.LIQUIDATION_API_BASE_URL:
+            logger.warning("LIQUIDATION_API_BASE_URL not configured, returning empty list")
+            return []
+        
+        try:
+            session = await self._get_http_session()
+            url = f"{settings.LIQUIDATION_API_BASE_URL}/liquidation-orders"
+            params = {"symbol": symbol.upper(), "limit": limit}
+            
+            async with session.get(url, params=params, timeout=15) as response:
+                if response.status != 200:
+                    logger.warning(f"Liquidation API returned status {response.status} for {symbol}")
+                    return []
+                
+                data = await response.json()
+                
+                # Get symbol info for formatting
+                symbol_info = self.symbol_info_cache.get(symbol)
+                
+                # Convert API format to our WebSocket format
+                return [self._convert_api_to_ws_format(item, symbol, symbol_info) for item in data]
+                
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout fetching historical liquidations for {symbol}")
+            return []
+        except Exception as e:
+            logger.error(f"Failed to fetch historical liquidations for {symbol}: {e}")
+            return []
+    
+    def _convert_api_to_ws_format(self, api_data: Dict, display_symbol: str, symbol_info: Optional[Dict] = None) -> Dict:
+        """
+        Convert API response format to match WebSocket format
+        
+        Args:
+            api_data: Liquidation data from API
+            display_symbol: Symbol for display
+            symbol_info: Optional symbol information for formatting
+            
+        Returns:
+            Formatted liquidation data matching WebSocket format
+        """
+        # Calculate USDT value using filled quantity
+        quantity = Decimal(api_data.get("order_filled_accumulated_quantity", "0"))
+        avg_price = Decimal(api_data.get("average_price", "0"))
+        amount_usdt = quantity * avg_price
+        
+        # Convert timestamp
+        timestamp = api_data.get("order_trade_time", 0)
+        dt = datetime.fromtimestamp(timestamp / 1000)
+        display_time = dt.strftime('%H:%M:%S')
+        
+        # Format quantity
+        if symbol_info:
+            quantity_formatted = formatting_service.format_amount(float(quantity), symbol_info)
+        else:
+            # Fallback formatting
+            if quantity >= 1:
+                quantity_formatted = f"{quantity:.3f}"
+            else:
+                quantity_formatted = f"{quantity:.6f}"
+        
+        # Format price to whole USDT with thousand separators
+        price_formatted = f"{int(round(float(amount_usdt))):,}"
+        
+        return {
+            "symbol": display_symbol,
+            "side": api_data.get("side", "").upper(),  # API returns lowercase
+            "quantity": str(quantity),
+            "quantityFormatted": quantity_formatted,
+            "priceUsdt": str(amount_usdt),
+            "priceUsdtFormatted": price_formatted,
+            "timestamp": timestamp,
+            "displayTime": display_time,
+            "avgPrice": str(avg_price),
+            "baseAsset": symbol_info.get('baseAsset', '') if symbol_info else ''
+        }
                 
     async def disconnect_stream(self, symbol: str):
         """
@@ -241,6 +338,11 @@ class LiquidationService:
         symbols = list(self.active_connections.keys())
         for symbol in symbols:
             await self.disconnect_stream(symbol)
+        
+        # Close HTTP session if it exists
+        if self._http_session:
+            await self._http_session.close()
+            self._http_session = None
 
 # Singleton instance
 liquidation_service = LiquidationService()
