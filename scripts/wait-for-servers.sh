@@ -4,13 +4,9 @@
 # Returns immediately once both servers are responding
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+# Source common configuration and functions
+source "$SCRIPT_DIR/common.sh"
 
 echo -e "${YELLOW}Waiting for OrderFox servers to be ready...${NC}"
 
@@ -19,19 +15,17 @@ MAX_WAIT=30
 WAIT_INTERVAL=1
 ELAPSED=0
 
-# Function to check if backend is ready
+# Wrapper functions for compatibility
 check_backend() {
-    curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health | grep -q "200"
+    check_backend_health
 }
 
-# Function to check if frontend is ready
 check_frontend() {
-    curl -s -o /dev/null http://localhost:3000 2>/dev/null
-    return $?
+    check_frontend_health
 }
 
 # Wait for backend
-echo -n "Waiting for backend (port 8000)..."
+echo -n "Waiting for backend (port $BACKEND_PORT)..."
 while ! check_backend && [ $ELAPSED -lt $MAX_WAIT ]; do
     echo -n "."
     sleep $WAIT_INTERVAL
@@ -50,7 +44,7 @@ fi
 ELAPSED=0
 
 # Wait for frontend
-echo -n "Waiting for frontend (port 3000)..."
+echo -n "Waiting for frontend (port $FRONTEND_PORT)..."
 while ! check_frontend && [ $ELAPSED -lt $MAX_WAIT ]; do
     echo -n "."
     sleep $WAIT_INTERVAL
@@ -67,5 +61,5 @@ fi
 
 echo ""
 echo -e "${GREEN}✓ All servers are ready!${NC}"
-echo "Backend: http://localhost:8000"
-echo "Frontend: http://localhost:3000"
+echo "Backend: $BACKEND_URL"
+echo "Frontend: $FRONTEND_URL"

@@ -19,11 +19,28 @@ const getEnvVar = (name, defaultValue) => {
 // In development, use relative URLs to leverage Vite's proxy configuration
 // This avoids CORS issues when connecting from Windows host to dev container
 const isDevelopment = import.meta.env.MODE === 'development';
+
+// Production URLs should be provided via environment variables
+// If not provided in production, throw an error to prevent misconfiguration
+const getProductionUrl = (varName, devDefault) => {
+  if (isDevelopment) {
+    return devDefault;
+  }
+  
+  const value = import.meta.env[varName];
+  if (!value || value === '') {
+    console.error(`${varName} must be set in production environment`);
+    // Return a placeholder URL to prevent app crash, but log the error
+    return `${varName}_NOT_SET`;
+  }
+  return value;
+};
+
 export const API_BASE_URL = getEnvVar('VITE_APP_API_BASE_URL', 
-  isDevelopment ? '/api/v1' : 'http://localhost:8000/api/v1'
+  getProductionUrl('VITE_APP_API_BASE_URL', '/api/v1')
 );
 export const WS_BASE_URL = getEnvVar('VITE_APP_WS_BASE_URL', 
-  isDevelopment ? 'ws://localhost:3000/api/v1' : 'ws://localhost:8000/api/v1'
+  getProductionUrl('VITE_APP_WS_BASE_URL', 'ws://localhost:3000/api/v1')
 );
 
 // Log current configuration (useful for debugging)

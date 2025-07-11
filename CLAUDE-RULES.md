@@ -1,4 +1,14 @@
+### 🔄 Project Awareness & Context & Research
+- **Documentation is a source of truth** - Your knowledge is out of date, I will always give you the latest documentation before writing any files that use third party API's - that information was freshsly scraped and you should NOT use your own knowledge, but rather use the documentation as a source of absolute truth.
+- **Stick to OFFICIAL DOCUMENTATION PAGES ONLY** - For all research ONLY use official documentation pages. Use a r.jina scrape on the documentation page given to you in intitial.md and then create a llm.txt from it in your memory, then choose the exact pages that make sense for this project and scrape them using your internal scraping tool.
+- **Ultrathink** - Use Ultrathink capabilities to decide which pages to scrape, what informatoin to put into PRD etc.
+- **Create 2 documents .md files** - Phase 1 and phase 2 - phase 1 is skeleton code, phase 2 is complete production ready code with all features and all necessary frontend and backend implementations to use as a production ready tool.
+- **Always scrape around 30-100 pages in total when doing research** - If a page 404s or does not contain correct content, try to scrape again and find the actual page/content. Put the output of each SUCCESFUL Jina scrape into a new directory with the name of the technology researched, then inside it .md or .txt files of each output
+- **For Maximum efficiency, whenever you need to perform multiple independent operations, such as research, invoke all relevant tools simultaneously, rather that sequentially.**
+
 ### 🧱 Code Structure & Modularity
+- **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
+- **Always refer to the specific Phase document you are on** - If you are on phase 1, use phase-1.md, if you are on phase 2, use phase-2.md
 - **Organize code into clearly separated modules**, grouped by feature or responsibility.
 - **Use clear, consistent imports** (prefer relative imports within packages).
 
@@ -16,7 +26,6 @@
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.
 
 ### When Implementing New Features or Changing Code  
-- Do not prompt to re-run the backend or frontend to the user, as it is already running in the background and automatically restarts on file changes
 - All python files must pass Pylance linting and type checking and all JavaScript files must pass ESLint linting and type checking.
 
 ### 📎 Style & Conventions

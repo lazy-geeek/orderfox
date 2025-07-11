@@ -24,6 +24,7 @@ export function createMainLayout() {
   h1.textContent = 'OrderFox';
 
   const headerControls = document.createElement('div');
+  headerControls.className = 'header-controls';
   headerControls.style.display = 'flex';
   headerControls.style.justifyContent = 'space-between';
   headerControls.style.alignItems = 'center';
@@ -51,13 +52,17 @@ export function createMainLayout() {
   // Main Content
   const mainContent = document.createElement('div');
   mainContent.style.display = 'flex';
+  mainContent.style.flexDirection = 'column';
   mainContent.style.flex = '1';
   mainContent.style.gap = '1rem';
   mainContent.style.padding = '1rem';
   mainContent.style.backgroundColor = 'var(--bg-primary)';
+  mainContent.style.overflow = 'auto';
 
+  // Chart Section - Full Width
   const chartSection = document.createElement('main');
-  chartSection.style.flex = '2';
+  chartSection.className = 'chart-section';
+  chartSection.style.width = '100%';
   chartSection.style.display = 'flex';
   chartSection.style.flexDirection = 'column';
   chartSection.style.backgroundColor = 'var(--bg-primary)';
@@ -67,11 +72,13 @@ export function createMainLayout() {
   candlestickChartPlaceholder.textContent = 'CandlestickChart';
   chartSection.appendChild(candlestickChartPlaceholder);
 
-  const rightSidebar = document.createElement('aside');
-  rightSidebar.style.flex = '1';
-  rightSidebar.style.display = 'flex';
-  rightSidebar.style.flexDirection = 'column';
-  rightSidebar.style.gap = '1rem';
+  // Bottom Section - OrderBook, Trades, and Liquidations Side by Side
+  const bottomSection = document.createElement('div');
+  bottomSection.className = 'bottom-section';
+  bottomSection.style.display = 'grid';
+  bottomSection.style.gridTemplateColumns = '1fr 1fr 1fr';
+  bottomSection.style.gap = '1rem';
+  bottomSection.style.width = '100%';
 
   const orderBookPlaceholder = document.createElement('div');
   orderBookPlaceholder.id = 'order-book-placeholder';
@@ -81,11 +88,16 @@ export function createMainLayout() {
   lastTradesPlaceholder.id = 'last-trades-container';
   lastTradesPlaceholder.textContent = 'LastTradesDisplay';
 
-  rightSidebar.appendChild(orderBookPlaceholder);
-  rightSidebar.appendChild(lastTradesPlaceholder);
+  const liquidationPlaceholder = document.createElement('div');
+  liquidationPlaceholder.id = 'liquidation-container';
+  liquidationPlaceholder.textContent = 'LiquidationDisplay';
+
+  bottomSection.appendChild(orderBookPlaceholder);
+  bottomSection.appendChild(lastTradesPlaceholder);
+  bottomSection.appendChild(liquidationPlaceholder);
 
   mainContent.appendChild(chartSection);
-  mainContent.appendChild(rightSidebar);
+  mainContent.appendChild(bottomSection);
 
   layout.appendChild(header);
   layout.appendChild(mainContent);

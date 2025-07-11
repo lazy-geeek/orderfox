@@ -19,6 +19,10 @@ const state = {
   tradesLoading: false,
   tradesError: null,
   tradesWsConnected: false,
+  currentLiquidations: [],
+  liquidationsLoading: false,
+  liquidationsError: null,
+  liquidationsWsConnected: false,
   selectedRounding: null,
   availableRoundingOptions: [], // Provided by backend
   displayDepth: 10,
@@ -66,10 +70,12 @@ function setSelectedSymbol(symbol) {
     state.currentCandles = [];
     state.currentTicker = null;
     state.currentTrades = [];
+    state.currentLiquidations = [];
     state.candlesWsConnected = false;
     state.orderBookWsConnected = false;
     state.tickerWsConnected = false;
     state.tradesWsConnected = false;
+    state.liquidationsWsConnected = false;
     
     // Set rounding options from symbol data
     const selectedSymbolData = state.symbolsList.find(s => s.id === symbol);
@@ -86,10 +92,12 @@ function setSelectedSymbol(symbol) {
   notify('currentCandles');
   notify('currentTicker');
   notify('currentTrades');
+  notify('currentLiquidations');
   notify('candlesWsConnected');
   notify('orderBookWsConnected');
   notify('tickerWsConnected');
   notify('tradesWsConnected');
+  notify('liquidationsWsConnected');
   notify('selectedRounding');
   notify('availableRoundingOptions');
 }
@@ -200,17 +208,59 @@ function clearTrades() {
   notify('tradesLoading');
 }
 
+function updateLiquidationsFromWebSocket(payload) {
+  // Direct assignment - backend provides validated data
+  if (state.selectedSymbol && payload.symbol === state.selectedSymbol) {
+    state.currentLiquidations = payload.liquidations || payload.data || [];
+    state.liquidationsLoading = false;
+    
+    notify('currentLiquidations');
+    notify('liquidationsLoading');
+  }
+}
+
+function setLiquidationsWsConnected(connected) {
+  state.liquidationsWsConnected = connected;
+  notify('liquidationsWsConnected');
+}
+
+function setLiquidationsLoading(loading) {
+  state.liquidationsLoading = loading;
+  notify('liquidationsLoading');
+}
+
+function setLiquidationsError(error) {
+  state.liquidationsError = error;
+  notify('liquidationsError');
+}
+
+function clearLiquidationsError() {
+  state.liquidationsError = null;
+  notify('liquidationsError');
+}
+
+function clearLiquidations() {
+  state.currentLiquidations = [];
+  state.liquidationsWsConnected = false;
+  state.liquidationsLoading = true; // Indicate transition state
+  notify('currentLiquidations');
+  notify('liquidationsWsConnected');
+  notify('liquidationsLoading');
+}
+
 function clearError() {
   state.candlesError = null;
   state.orderBookError = null;
   state.symbolsError = null;
   state.tickerError = null;
   state.tradesError = null;
+  state.liquidationsError = null;
   notify('candlesError');
   notify('orderBookError');
   notify('symbolsError');
   notify('tickerError');
   notify('tradesError');
+  notify('liquidationsError');
 }
 
 function setSelectedRounding(rounding) {
@@ -444,6 +494,12 @@ export {
   setTradesError,
   clearTradesError,
   clearTrades,
+  updateLiquidationsFromWebSocket,
+  setLiquidationsWsConnected,
+  setLiquidationsLoading,
+  setLiquidationsError,
+  clearLiquidationsError,
+  clearLiquidations,
   clearError,
   setSelectedRounding,
   setAvailableRoundingOptions,

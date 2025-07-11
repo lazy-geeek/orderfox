@@ -29,7 +29,7 @@ function createOrderBookDisplay() {
     </div>
     <div class="display-content">
       <div class="asks-section">
-        <div class="section-header asks-header">
+        <div class="section-header three-columns asks-header">
           <span class="price-header">Price</span>
           <span class="amount-header">Amount</span>
           <span class="total-header">Total</span>
@@ -37,7 +37,7 @@ function createOrderBookDisplay() {
         <div class="asks-list"></div>
       </div>
       <div class="bids-section">
-        <div class="section-header bids-header">
+        <div class="section-header three-columns bids-header">
           <span class="price-header">Price</span>
           <span class="amount-header">Amount</span>
           <span class="total-header">Total</span>
@@ -127,12 +127,12 @@ function updateOrderBookDisplay(container, data) {
       // Display asks exactly as received from backend
       orderBook.asks.forEach((ask) => {
         const row = document.createElement('div');
-        row.className = 'order-level ask-level';
+        row.className = 'display-row order-level ask-level';
         
         row.innerHTML = `
-          <span class="price ask-price">${ask.price_formatted}</span>
-          <span class="amount">${ask.amount_formatted}</span>
-          <span class="total">${ask.cumulative_formatted}</span>
+          <span class="display-price ask-price">${ask.price_formatted}</span>
+          <span class="display-amount">${ask.amount_formatted}</span>
+          <span class="display-total">${ask.cumulative_formatted}</span>
         `;
         asksList.appendChild(row);
       });
@@ -140,12 +140,12 @@ function updateOrderBookDisplay(container, data) {
       // Display bids exactly as received from backend
       orderBook.bids.forEach((bid) => {
         const row = document.createElement('div');
-        row.className = 'order-level bid-level';
+        row.className = 'display-row order-level bid-level';
         
         row.innerHTML = `
-          <span class="price bid-price">${bid.price_formatted}</span>
-          <span class="amount">${bid.amount_formatted}</span>
-          <span class="total">${bid.cumulative_formatted}</span>
+          <span class="display-price bid-price">${bid.price_formatted}</span>
+          <span class="display-amount">${bid.amount_formatted}</span>
+          <span class="display-total">${bid.cumulative_formatted}</span>
         `;
         bidsList.appendChild(row);
       });

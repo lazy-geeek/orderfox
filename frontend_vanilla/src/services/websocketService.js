@@ -126,6 +126,8 @@ export const connectWebSocketStream = async (
         setTickerWsConnected(true);
       } else if (streamType === 'trades') {
         setTradesWsConnected(true);
+      } else if (streamType === 'liquidations') {
+        // Liquidations connected - handled by component
       }
     };
 
@@ -146,6 +148,11 @@ export const connectWebSocketStream = async (
           updateTickerFromWebSocket(data);
         } else if (data.type === 'trades_update') {
           updateTradesFromWebSocket(data);
+        } else if (data.type === 'liquidations' || data.type === 'liquidation') {
+          // Handle liquidation data
+          if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
+            window.updateLiquidationDisplay(data);
+          }
         } else if (data.type === 'param_update_ack') {
           // Parameter update acknowledged
         } else if (data.type === 'params_updated') {
@@ -195,6 +202,11 @@ export const connectWebSocketStream = async (
           setTickerWsConnected(false);
         } else if (streamType === 'trades') {
           setTradesWsConnected(false);
+        } else if (streamType === 'liquidations') {
+          // Liquidations disconnected - handled by component
+          if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
+            window.updateLiquidationDisplay({ type: 'error', message: 'Connection error' });
+          }
         }
       }
     };
@@ -212,6 +224,11 @@ export const connectWebSocketStream = async (
           setTickerWsConnected(false);
         } else if (streamType === 'trades') {
           setTradesWsConnected(false);
+        } else if (streamType === 'liquidations') {
+          // Liquidations disconnected - handled by component
+          if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
+            window.updateLiquidationDisplay({ type: 'error', message: 'Connection closed' });
+          }
         }
         delete activeWebSockets[streamKey];
 
