@@ -22,7 +22,7 @@ class LiquidationService:
     """Service for connecting to Binance liquidation streams"""
     
     def __init__(self):
-        self.base_url = "wss://fstream.binance.com"
+        self.base_url = settings.BINANCE_WS_BASE_URL
         self.active_connections: Dict[str, asyncio.Task] = {}
         self.data_callbacks: Dict[str, List[Callable]] = {}
         self.running_streams: Dict[str, bool] = {}

@@ -102,6 +102,35 @@ npm run dev:status
 - Check `logs/backend.log` and `logs/frontend.log` for debugging
 - If ports are blocked, use `npm run dev:stop` first
 
+## Environment Configuration
+
+### Environment Variables
+- **`.env` file**: Store local environment variables (git-ignored)
+- **`.env.example`**: Template showing required variables (committed to repo)
+- **No hardcoded URLs**: All URLs must be configurable via environment
+- **Script loading**: Scripts automatically load `.env` if present
+- **Override support**: `BACKEND_PORT=8001 ./scripts/check-servers.sh`
+
+### Common Script Architecture
+- **`scripts/common.sh`**: Centralized configuration for all scripts
+- **Shared functionality**: Environment loading, port checks, health checks
+- **DRY principle**: Eliminates ~90 lines of duplicate code across scripts
+- **Consistent behavior**: All scripts use same configuration logic
+
+### Required Environment Variables
+```bash
+# Backend Configuration
+BACKEND_PORT=8000
+BACKEND_URL=http://localhost:8000
+BINANCE_WS_BASE_URL=wss://fstream.binance.com
+
+# Frontend Configuration  
+FRONTEND_PORT=3000
+FRONTEND_URL=http://localhost:3000
+VITE_APP_API_BASE_URL=http://localhost:8000/api/v1  # Production URL
+VITE_APP_WS_BASE_URL=ws://localhost:8000/api/v1    # Production WebSocket
+```
+
 ## Root-Based Command Reference
 
 Quick reference for optimized development workflow:
@@ -143,27 +172,39 @@ orderfox/
 │   │   │   └── connection_manager.py # WebSocket connection management
 │   │   ├── services/            # Business logic
 │   │   │   ├── trade_service.py # Trade data processing and formatting
-│   │   │   └── orderbook_aggregation_service.py # Order book processing
+│   │   │   ├── orderbook_aggregation_service.py # Order book processing
+│   │   │   └── liquidation_service.py # Liquidation stream processing
 │   │   ├── models/              # Data models
 │   │   └── core/                # Config, logging
+│       └── config.py            # Settings with env variable loading
 │   └── tests/                   # Pytest test suite
 │       └── services/
 │           └── test_trade_service.py # Trade service unit tests
-└── frontend_vanilla/
-    ├── src/
-    │   ├── components/          # UI components
-    │   │   ├── LastTradesDisplay.js # Real-time trades display component
-    │   │   └── OrderBookDisplay.js  # Order book display component
-    │   ├── services/            # API, WebSocket & centralized managers
-    │   │   ├── websocketManager.js  # Centralized WebSocket connection logic
-    │   │   └── websocketService.js  # Low-level WebSocket operations
-    │   └── store/               # State management
-    ├── tests/                   # Vitest test suite
-    │   ├── components/          # Component unit tests
-    │   │   └── LastTradesDisplay.test.js # Last trades component tests
-    │   ├── integration/         # Integration tests
-    │   └── setup.js             # Test configuration
-    └── main.js                  # App entry point
+├── frontend_vanilla/
+│   ├── src/
+│   │   ├── components/          # UI components
+│   │   │   ├── LastTradesDisplay.js # Real-time trades display component
+│   │   │   ├── OrderBookDisplay.js  # Order book display component
+│   │   │   └── LiquidationDisplay.js # Liquidation orders display
+│   │   ├── services/            # API, WebSocket & centralized managers
+│   │   │   ├── websocketManager.js  # Centralized WebSocket connection logic
+│   │   │   └── websocketService.js  # Low-level WebSocket operations
+│   │   ├── config/              # Configuration
+│   │   │   └── env.js           # Environment variable management
+│   │   └── store/               # State management
+│   ├── tests/                   # Vitest test suite
+│   │   ├── components/          # Component unit tests
+│   │   │   └── LastTradesDisplay.test.js # Last trades component tests
+│   │   ├── integration/         # Integration tests
+│   │   └── setup.js             # Test configuration
+│   └── main.js                  # App entry point
+└── scripts/
+    ├── common.sh                # Shared configuration and functions
+    ├── check-servers.sh         # Server status checking
+    ├── start-servers-bg.sh      # Background server startup
+    ├── start-servers-interactive.sh # Interactive server startup
+    ├── wait-for-servers.sh      # Wait for servers to be ready
+    └── stop-servers.sh          # Stop all servers
 ```
 
 ## Key Commands
@@ -541,6 +582,9 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **Use Absolute Paths**: Always use `/home/bail/github/orderfox/` prefix for directory navigation
 - **Debugging**: Check logs in `logs/` directory, use browser DevTools for WebSocket debugging
 - **Caching**: Symbol info cached for 5 minutes
+- **Environment Variables**: Never hardcode URLs - use environment variables
+- **Script Architecture**: All scripts source `common.sh` for shared functionality
+- **Configuration Override**: Pass env vars before script: `BACKEND_PORT=8001 ./scripts/check-servers.sh`
 
 ## Error Handling
 
