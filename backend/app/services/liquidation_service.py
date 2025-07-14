@@ -252,8 +252,8 @@ class LiquidationService:
             # Build parameters
             params = {
                 "symbol": symbol.upper(),
-                "timeframe": timeframe,
-                "limit": 1000  # Get more data for aggregation
+                "timeframe": timeframe
+                # Note: liqui_api doesn't support limit parameter
             }
             
             if start_time:
@@ -314,49 +314,71 @@ class LiquidationService:
         # Group liquidations by time bucket
         buckets = defaultdict(lambda: {"buy_volume": Decimal("0"), "sell_volume": Decimal("0"), "count": 0})
         
+        # Process liquidation data from liqui_api
+        # Format: {"timestamp": ms, "side": "buy/sell", "cumulated_usd_size": float}
         for liq in liquidations:
-            # Get timestamp from either format
-            timestamp = liq.get("order_trade_time") or liq.get("timestamp", 0)
-            if not timestamp:
+            # Get timestamp (already the bucket start time)
+            bucket_time = liq.get("timestamp", 0)
+            if not bucket_time:
                 continue
                 
-            # Calculate bucket start time
-            bucket_time = (timestamp // timeframe_ms) * timeframe_ms
-            
-            # Get volume (quantity * price)
-            quantity = Decimal(str(liq.get("order_filled_accumulated_quantity", "0") or liq.get("quantity", "0")))
-            avg_price = Decimal(str(liq.get("average_price", "0") or liq.get("avgPrice", "0")))
-            volume = quantity * avg_price
+            side = liq.get("side", "").upper()
+            volume = Decimal(str(liq.get("cumulated_usd_size", "0")))
             
             # Add to appropriate side
-            side = liq.get("side", "").upper()
             if side == "BUY":
                 buckets[bucket_time]["buy_volume"] += volume
+                buckets[bucket_time]["count"] += 1
             elif side == "SELL":
                 buckets[bucket_time]["sell_volume"] += volume
-            
-            buckets[bucket_time]["count"] += 1
+                buckets[bucket_time]["count"] += 1
         
         # Convert to list format
         result = []
         symbol_info = self.symbol_info_cache.get(symbol)
         
-        for bucket_time, data in sorted(buckets.items()):
-            buy_volume = float(data["buy_volume"])
-            sell_volume = float(data["sell_volume"])
-            total_volume = buy_volume + sell_volume
+        # Determine the time range to fill
+        if buckets:
+            # Get min and max bucket times
+            bucket_times = list(buckets.keys())
+            min_bucket_time = min(bucket_times)
+            max_bucket_time = max(bucket_times)
             
-            result.append({
-                "time": int(bucket_time / 1000),  # Convert to seconds for chart
-                "buy_volume": str(buy_volume),
-                "sell_volume": str(sell_volume),
-                "total_volume": str(total_volume),
-                "buy_volume_formatted": formatting_service.format_total(buy_volume, symbol_info),
-                "sell_volume_formatted": formatting_service.format_total(sell_volume, symbol_info),
-                "total_volume_formatted": formatting_service.format_total(total_volume, symbol_info),
-                "count": data["count"],
-                "timestamp_ms": bucket_time
-            })
+            # Generate all time buckets in the range
+            current_bucket = min_bucket_time
+            while current_bucket <= max_bucket_time:
+                if current_bucket in buckets:
+                    # We have data for this bucket
+                    data = buckets[current_bucket]
+                    buy_volume = float(data["buy_volume"])
+                    sell_volume = float(data["sell_volume"])
+                    total_volume = buy_volume + sell_volume
+                    delta_volume = buy_volume - sell_volume
+                    count = data["count"]
+                else:
+                    # No data for this bucket - fill with zeros
+                    buy_volume = 0.0
+                    sell_volume = 0.0
+                    total_volume = 0.0
+                    delta_volume = 0.0
+                    count = 0
+                
+                result.append({
+                    "time": int(current_bucket / 1000),  # Convert to seconds for chart
+                    "buy_volume": str(buy_volume),
+                    "sell_volume": str(sell_volume),
+                    "total_volume": str(total_volume),
+                    "delta_volume": str(delta_volume),
+                    "buy_volume_formatted": formatting_service.format_total(buy_volume, symbol_info),
+                    "sell_volume_formatted": formatting_service.format_total(sell_volume, symbol_info),
+                    "total_volume_formatted": formatting_service.format_total(total_volume, symbol_info),
+                    "delta_volume_formatted": formatting_service.format_total(abs(delta_volume), symbol_info),
+                    "count": count,
+                    "timestamp_ms": current_bucket
+                })
+                
+                # Move to next bucket
+                current_bucket += timeframe_ms
         
         return result
     
@@ -633,14 +655,20 @@ class LiquidationService:
                 sell_volume = float(data["sell_volume"])
                 total_volume = buy_volume + sell_volume
                 
+                # Calculate delta (positive = more shorts liquidated, negative = more longs liquidated)
+                delta_volume = buy_volume - sell_volume
+                
+                # Include all buckets (even with zero delta) for continuous time series
                 volume_updates.append({
                     "time": int(bucket_time / 1000),
                     "buy_volume": str(buy_volume),
                     "sell_volume": str(sell_volume),
                     "total_volume": str(total_volume),
+                    "delta_volume": str(delta_volume),
                     "buy_volume_formatted": formatting_service.format_total(buy_volume, symbol_info),
                     "sell_volume_formatted": formatting_service.format_total(sell_volume, symbol_info),
                     "total_volume_formatted": formatting_service.format_total(total_volume, symbol_info),
+                    "delta_volume_formatted": formatting_service.format_total(abs(delta_volume), symbol_info),
                     "count": data["count"],
                     "timestamp_ms": bucket_time
                 })

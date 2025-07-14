@@ -138,6 +138,9 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **Data Aggregation**: `aggregate_liquidations_for_timeframe()` method groups liquidations by time buckets
 - **Timeframe Support**: 1m, 5m, 15m, 30m, 1h, 4h, 1d timeframes for volume aggregation
 - **Volume Calculation**: Separates buy volume (shorts liquidated) and sell volume (longs liquidated)
+- **Delta Volume**: Backend calculates `delta_volume = buy_volume - sell_volume` for histogram display
+- **Time Range Synchronization**: Uses exact same time range as candle data via cache coordination
+- **Backend Coordination**: Liquidation WebSocket waits for candle time range to be cached before fetching data
 - **Historical Data**: `fetch_historical_liquidations_by_timeframe()` with time range parameters
 - **Real-time Aggregation**: Maintains aggregation buffers for live volume updates
 - **Data Models**: `LiquidationVolume` and `LiquidationVolumeResponse` Pydantic models
@@ -150,6 +153,19 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **Dual Time Fields**: Chart data includes both `timestamp` (ms) and `time` (seconds) for TradingView compatibility
 - **Dynamic Price Precision**: Automatically adjusts decimal places based on symbol precision
 - **Synchronous CCXT Usage**: Uses standard CCXT methods without await for chart data fetching
+- **Time Range Caching**: Stores actual candle time ranges in `time_range_cache` for coordination with other services
+- **Cache Key Format**: `{exchange_symbol}:{timeframe}` (e.g., "BTC/USDT:USDT:1m")
+- **Time Range Data**: Includes `start_ms`, `end_ms`, `start`, and `end` fields for flexibility
+
+### Time Range Synchronization System
+- **Purpose**: Ensures liquidation volume data uses exact same time range as displayed candles
+- **Implementation**: 
+  - `ChartDataService` caches time range when fetching candles
+  - Liquidation WebSocket polls cache for up to 10 seconds (100ms intervals)
+  - Uses cached range for liquidation volume API call
+  - Falls back to 24-hour range if cache unavailable
+- **Backend Coordination**: All timing logic handled server-side, frontend just connects WebSockets
+- **Benefits**: Perfect alignment between candles and liquidation volume at all zoom levels
 
 ## WebSocket Protocol
 

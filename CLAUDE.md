@@ -230,6 +230,12 @@ See backend/CLAUDE.md and frontend_vanilla/CLAUDE.md for component-specific envi
 - **Script Architecture**: All scripts source `common.sh` for shared functionality
 - **Configuration Override**: Pass env vars before script: `BACKEND_PORT=8001 ./scripts/check-servers.sh`
 
+### Architecture Principles
+- **Thin Client Architecture**: All calculations and business logic in backend, frontend only displays
+- **Backend Coordination**: Backend handles all timing, sequencing, and synchronization
+- **No Frontend Calculations**: Time ranges, data aggregation, and formatting all happen server-side
+- **WebSocket Connections**: Frontend can connect all WebSockets simultaneously, backend handles sequencing
+
 ### VS Code Dev Container
 
 ```bash

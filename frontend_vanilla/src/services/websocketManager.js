@@ -208,16 +208,14 @@ export class WebSocketManager {
    */
   static async fetchLiquidationVolumeData(symbol, timeframe) {
     try {
-      const volumeData = await liquidationVolumeService.fetchLiquidationVolume(symbol, timeframe);
+      // The backend will now handle time range calculation based on actual candle data
+      // We just need to connect the WebSocket, which will send the properly aligned data
+      console.log(`Liquidation volume will be fetched via WebSocket for ${symbol}/${timeframe}`);
       
-      if (volumeData && volumeData.length > 0) {
-        // Call the global update function if it exists
-        if (typeof window !== 'undefined' && window.updateLiquidationVolume) {
-          window.updateLiquidationVolume({ data: volumeData });
-        }
-      }
+      // The liquidation WebSocket with timeframe parameter will handle fetching
+      // historical volume data that matches the candle time range
     } catch (error) {
-      console.warn('Failed to fetch initial liquidation volume data:', error);
+      console.warn('Failed to initialize liquidation volume:', error);
     }
   }
 }

@@ -1,5 +1,11 @@
 import { createChart } from 'lightweight-charts';
 
+// Convert UTC timestamp to local timezone for chart display
+function timeToLocal(originalTime) {
+  const d = new Date(originalTime * 1000);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()) / 1000;
+}
+
 const TIMEFRAMES = [
   { value: '1m', label: '1m' },
   { value: '5m', label: '5m' },
@@ -132,15 +138,12 @@ function createLiquidationVolumeSeries() {
       type: 'volume',
     },
     priceScaleId: '', // Empty string makes it an overlay
-    // We'll set colors per bar dynamically
-  });
-  
-  // Position at bottom 30% of chart
-  series.priceScale().applyOptions({
     scaleMargins: {
       top: 0.7,    // Start 70% from top
       bottom: 0,   // Extend to bottom
     },
+    lastValueVisible: false, // Don't show last value label
+    priceLineVisible: false, // Don't show horizontal price line
   });
   
   return series;
@@ -356,8 +359,13 @@ function setupVolumeTooltip(container) {
     // Format tooltip content
     const buyVolume = volumeData.buy_volume_formatted || volumeData.buy_volume;
     const sellVolume = volumeData.sell_volume_formatted || volumeData.sell_volume;
-    const totalVolume = volumeData.total_volume_formatted || volumeData.total_volume;
+    const deltaVolume = volumeData.delta_volume_formatted || volumeData.delta_volume;
+    const deltaValue = parseFloat(volumeData.delta_volume || 0);
     const timestamp = new Date(volumeData.timestamp_ms || volumeData.time * 1000).toLocaleTimeString();
+    
+    // Determine dominant side for tooltip
+    const dominantSide = deltaValue > 0 ? 'Shorts' : 'Longs';
+    const deltaClass = deltaValue > 0 ? 'buy' : 'sell';
     
     tooltipElement.innerHTML = `
       <div class="tooltip-header">Liquidation Volume</div>
@@ -366,16 +374,16 @@ function setupVolumeTooltip(container) {
         <span class="tooltip-value">${timestamp}</span>
       </div>
       <div class="tooltip-row">
-        <span class="tooltip-label">Buy (Shorts):</span>
+        <span class="tooltip-label">Shorts Liquidated:</span>
         <span class="tooltip-value buy">${buyVolume}</span>
       </div>
       <div class="tooltip-row">
-        <span class="tooltip-label">Sell (Longs):</span>
+        <span class="tooltip-label">Longs Liquidated:</span>
         <span class="tooltip-value sell">${sellVolume}</span>
       </div>
       <div class="tooltip-row">
-        <span class="tooltip-label">Total:</span>
-        <span class="tooltip-value">${totalVolume}</span>
+        <span class="tooltip-label">Net (${dominantSide}):</span>
+        <span class="tooltip-value ${deltaClass}">${deltaVolume}</span>
       </div>
     `;
     
@@ -442,8 +450,9 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 
   // Backend provides data ready for Lightweight Charts
   // Backend sends: { time: seconds, timestamp: milliseconds, open, high, low, close }
+  // Convert UTC timestamps to local time for chart display
   const formattedData = currentCandles.map(candle => ({
-    time: candle.time, // Backend provides time in seconds for TradingView
+    time: timeToLocal(candle.time), // Convert UTC to local time
     open: candle.open,
     high: candle.high,
     low: candle.low,
@@ -513,7 +522,8 @@ function updateLatestCandle(candleData) {
   }
 
   // Backend provides time field in seconds for TradingView
-  const chartTime = candleData.time; // Backend sends time in seconds
+  // Convert to local time to match chart's timezone
+  const chartTime = timeToLocal(candleData.time); // Convert UTC to local time
   
   // Get current chart data to check ordering
   let lastChartTime = null;
@@ -581,7 +591,9 @@ function resetZoomState() {
 }
 
 function updateLiquidationVolume(volumeData) {
+  console.log('updateLiquidationVolume called, volumeSeries:', !!volumeSeries, 'visible:', volumeSeriesVisible);
   if (!volumeSeries || !volumeSeriesVisible) {
+    console.warn('Volume series not ready or not visible');
     return;
   }
   
@@ -594,22 +606,34 @@ function updateLiquidationVolume(volumeData) {
   // Store volume data for tooltips
   currentVolumeData = volumeData;
   
-  // Process volume data into histogram format
-  const histogramData = volumeData.map(item => {
-    // Determine bar color based on dominant side
-    const buyVolume = parseFloat(item.buy_volume || 0);
-    const sellVolume = parseFloat(item.sell_volume || 0);
-    const totalVolume = parseFloat(item.total_volume || 0);
-    
-    // Green if buy > sell (shorts liquidated), red if sell > buy (longs liquidated)
-    const color = buyVolume > sellVolume ? '#0ECB81' : '#F6465D';
-    
-    return {
-      time: item.time, // Already in seconds from backend
-      value: totalVolume,
-      color: color,
-    };
-  });
+  // Debug: Log sample of volume data
+  console.log('Updating liquidation volume with', volumeData.length, 'data points');
+  if (volumeData.length > 0) {
+    console.log('Sample data:', volumeData[0], '...', volumeData[volumeData.length - 1]);
+  }
+  
+  // Process volume data into histogram format using delta
+  const histogramData = volumeData
+    .filter(item => {
+      // Filter out items with zero delta (no bars to show)
+      const deltaVolume = parseFloat(item.delta_volume || 0);
+      return deltaVolume !== 0;
+    })
+    .map(item => {
+      // Use delta volume from backend
+      const deltaVolume = parseFloat(item.delta_volume || 0);
+      
+      // Green if delta > 0 (more shorts liquidated), red if delta < 0 (more longs liquidated)
+      const color = deltaVolume > 0 ? '#0ECB81' : '#F6465D';
+      
+      return {
+        time: timeToLocal(item.time), // Convert UTC to local time to match candles
+        value: Math.abs(deltaVolume), // Use absolute value for bar height
+        color: color,
+      };
+    });
+  
+  console.log('Filtered histogram data points with non-zero values:', histogramData.length);
   
   // Update series data
   if (!volumeSeries) {
@@ -617,6 +641,8 @@ function updateLiquidationVolume(volumeData) {
     return;
   }
   volumeSeries.setData(histogramData);
+  
+  // Don't call fitContent here as it affects the main chart zoom
 }
 
 function toggleLiquidationVolume() {

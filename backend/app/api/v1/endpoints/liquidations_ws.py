@@ -146,29 +146,59 @@ async def liquidation_stream(
             await liquidation_service.register_volume_callback(display_symbol, timeframe, volume_callback)
             
             # Send historical volume data
-            try:
-                # Get last 24 hours of volume data
-                end_time = int(datetime.now().timestamp() * 1000)
-                start_time = end_time - (24 * 60 * 60 * 1000)
-                
-                historical_volume = await liquidation_service.fetch_historical_liquidations_by_timeframe(
-                    display_symbol, timeframe, start_time, end_time
-                )
-                
-                if historical_volume:
-                    volume_update = LiquidationVolumeUpdate(
-                        symbol=display_symbol,
-                        timeframe=timeframe,
-                        data=historical_volume,
-                        timestamp=datetime.utcnow().isoformat()
+            # Create a task to send volume data once candle time range is available
+            async def send_volume_when_ready():
+                try:
+                    from app.services.chart_data_service import chart_data_service
+                    
+                    # Convert display symbol to exchange format for cache lookup
+                    exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(display_symbol)
+                    cache_key = f"{exchange_symbol}:{timeframe}"
+                    
+                    # Wait for candle time range to be cached (with timeout)
+                    max_wait = 10  # seconds
+                    wait_interval = 0.1  # 100ms
+                    waited = 0
+                    
+                    while waited < max_wait:
+                        time_range = chart_data_service.time_range_cache.get(cache_key)
+                        if time_range:
+                            break
+                        await asyncio.sleep(wait_interval)
+                        waited += wait_interval
+                    
+                    if time_range:
+                        # Use the exact same time range as the candles
+                        start_time = time_range['start_ms']
+                        end_time = time_range['end_ms']
+                        logger.info(f"Using cached candle time range for {display_symbol}/{timeframe}: {start_time} to {end_time}")
+                    else:
+                        # Fallback to last 24 hours if no cached range after waiting
+                        logger.warning(f"No cached time range for {cache_key} after {max_wait}s, using default 24h range")
+                        end_time = int(datetime.now().timestamp() * 1000)
+                        start_time = end_time - (24 * 60 * 60 * 1000)
+                    
+                    historical_volume = await liquidation_service.fetch_historical_liquidations_by_timeframe(
+                        display_symbol, timeframe, start_time, end_time
                     )
-                    await websocket.send_json(volume_update.dict())
-                    logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
-            except Exception as e:
-                logger.error(f"Error fetching historical volume data: {e}")
+                
+                    if historical_volume:
+                        volume_update = LiquidationVolumeUpdate(
+                            symbol=display_symbol,
+                            timeframe=timeframe,
+                            data=historical_volume,
+                            timestamp=datetime.utcnow().isoformat()
+                        )
+                        await websocket.send_json(volume_update.dict())
+                        logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
+                except Exception as e:
+                    logger.error(f"Error fetching historical volume data: {e}")
+            
+            # Add the volume task to run concurrently
+            volume_task = asyncio.create_task(send_volume_when_ready())
+            tasks.append(volume_task)
         
         # Create tasks for handling different data streams
-        tasks = []
         
         # Task for liquidation data
         async def handle_liquidations():

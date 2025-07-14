@@ -55,6 +55,8 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **Backend Trust**: Frontend trusts backend data completely - no client-side validation required
 - **Direct Assignment**: State update functions simplified to direct assignment (`state.currentCandles = payload.data`)
 - **No Data Processing**: All formatting, sorting, and calculations done by backend
+- **No Time Calculations**: All time ranges and date calculations happen in backend
+- **Backend Sequencing**: Backend handles coordination between data sources (e.g., candles and liquidation volume)
 
 ### CSS Architecture & Component Styling
 - **Shared Base Classes**: Use `.orderfox-display-base` for all display components

@@ -23,6 +23,8 @@ class ChartDataService:
     def __init__(self):
         """Initialize the chart data service."""
         self.exchange_service = exchange_service
+        # Cache for storing time ranges of candle data by symbol:timeframe
+        self.time_range_cache = {}
 
     def calculate_optimal_candle_count(self, container_width: int) -> int:
         """
@@ -123,13 +125,29 @@ class ChartDataService:
             from app.services.symbol_service import symbol_service
             symbol_info = symbol_service.get_symbol_info(symbol)
             
+            # Get the actual time range from the data
+            time_range = None
+            if formatted_data:
+                time_range = {
+                    'start_ms': formatted_data[0]['timestamp'],
+                    'end_ms': formatted_data[-1]['timestamp'],
+                    'start': formatted_data[0]['time'],
+                    'end': formatted_data[-1]['time']
+                }
+                
+                # Store in cache for coordination with liquidation service
+                cache_key = f"{symbol}:{timeframe}"
+                self.time_range_cache[cache_key] = time_range
+                logger.info(f"Cached time range for {cache_key}: {time_range['start_ms']} to {time_range['end_ms']}")
+            
             # Prepare the response with symbol data including priceFormat
             response = {
                 'type': 'historical_candles',
                 'symbol': symbol,
                 'timeframe': timeframe,
                 'data': formatted_data,
-                'count': len(formatted_data)
+                'count': len(formatted_data),
+                'time_range': time_range
             }
             
             # Add symbol data if available

@@ -14,9 +14,11 @@ class LiquidationVolume(BaseModel):
     buy_volume: str = Field(..., description="Total buy liquidation volume (shorts liquidated)")
     sell_volume: str = Field(..., description="Total sell liquidation volume (longs liquidated)")
     total_volume: str = Field(..., description="Total liquidation volume")
+    delta_volume: str = Field(..., description="Delta volume (buy - sell), positive = more shorts liquidated")
     buy_volume_formatted: str = Field(..., description="Formatted buy volume for display")
     sell_volume_formatted: str = Field(..., description="Formatted sell volume for display")
     total_volume_formatted: str = Field(..., description="Formatted total volume for display")
+    delta_volume_formatted: str = Field(..., description="Formatted delta volume for display")
     count: int = Field(..., description="Number of liquidations in this bucket")
     timestamp_ms: int = Field(..., description="Timestamp in milliseconds")
     
