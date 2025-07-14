@@ -590,8 +590,8 @@ function resetZoomState() {
   chartInitialized = false;
 }
 
-function updateLiquidationVolume(volumeData) {
-  console.log('updateLiquidationVolume called, volumeSeries:', !!volumeSeries, 'visible:', volumeSeriesVisible);
+function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
+  console.log('updateLiquidationVolume called, volumeSeries:', !!volumeSeries, 'visible:', volumeSeriesVisible, 'isRealTimeUpdate:', isRealTimeUpdate);
   if (!volumeSeries || !volumeSeriesVisible) {
     console.warn('Volume series not ready or not visible');
     return;
@@ -603,44 +603,80 @@ function updateLiquidationVolume(volumeData) {
     return;
   }
   
-  // Store volume data for tooltips
-  currentVolumeData = volumeData;
-  
   // Debug: Log sample of volume data
   console.log('Updating liquidation volume with', volumeData.length, 'data points');
   if (volumeData.length > 0) {
     console.log('Sample data:', volumeData[0], '...', volumeData[volumeData.length - 1]);
   }
   
-  // Process volume data into histogram format using delta
-  const histogramData = volumeData
-    .filter(item => {
-      // Filter out items with zero delta (no bars to show)
-      const deltaVolume = parseFloat(item.delta_volume || 0);
-      return deltaVolume !== 0;
-    })
-    .map(item => {
-      // Use delta volume from backend
-      const deltaVolume = parseFloat(item.delta_volume || 0);
-      
-      // Green if delta > 0 (more shorts liquidated), red if delta < 0 (more longs liquidated)
+  if (isRealTimeUpdate && volumeData.length === 1) {
+    // Real-time update - use update() method like candlesticks
+    const item = volumeData[0];
+    const deltaVolume = parseFloat(item.delta_volume || 0);
+    
+    if (deltaVolume !== 0) {
       const color = deltaVolume > 0 ? '#0ECB81' : '#F6465D';
-      
-      return {
-        time: timeToLocal(item.time), // Convert UTC to local time to match candles
-        value: Math.abs(deltaVolume), // Use absolute value for bar height
+      const histogramBar = {
+        time: timeToLocal(item.time),
+        value: Math.abs(deltaVolume),
         color: color,
       };
-    });
-  
-  console.log('Filtered histogram data points with non-zero values:', histogramData.length);
-  
-  // Update series data
-  if (!volumeSeries) {
-    console.warn('Volume series not initialized - cannot update liquidation volume');
-    return;
+      
+      try {
+        volumeSeries.update(histogramBar);
+        console.log('Updated liquidation volume bar:', histogramBar);
+        
+        // Update currentVolumeData for tooltips
+        // Find and update existing entry or add new one
+        const existingIndex = currentVolumeData.findIndex(d => d.time === item.time);
+        if (existingIndex >= 0) {
+          currentVolumeData[existingIndex] = item;
+        } else {
+          // Insert in correct position to maintain time order
+          currentVolumeData.push(item);
+          currentVolumeData.sort((a, b) => a.time - b.time);
+        }
+      } catch (error) {
+        console.error('Error updating liquidation volume:', error);
+        // Fall back to setData if update fails
+        updateLiquidationVolume(volumeData, false);
+      }
+    }
+  } else {
+    // Initial load or full update - use setData()
+    // Store volume data for tooltips
+    currentVolumeData = volumeData;
+    
+    // Process volume data into histogram format using delta
+    const histogramData = volumeData
+      .filter(item => {
+        // Filter out items with zero delta (no bars to show)
+        const deltaVolume = parseFloat(item.delta_volume || 0);
+        return deltaVolume !== 0;
+      })
+      .map(item => {
+        // Use delta volume from backend
+        const deltaVolume = parseFloat(item.delta_volume || 0);
+        
+        // Green if delta > 0 (more shorts liquidated), red if delta < 0 (more longs liquidated)
+        const color = deltaVolume > 0 ? '#0ECB81' : '#F6465D';
+        
+        return {
+          time: timeToLocal(item.time), // Convert UTC to local time to match candles
+          value: Math.abs(deltaVolume), // Use absolute value for bar height
+          color: color,
+        };
+      });
+    
+    console.log('Filtered histogram data points with non-zero values:', histogramData.length);
+    
+    // Update series data
+    if (!volumeSeries) {
+      console.warn('Volume series not initialized - cannot update liquidation volume');
+      return;
+    }
+    volumeSeries.setData(histogramData);
   }
-  volumeSeries.setData(histogramData);
   
   // Don't call fitContent here as it affects the main chart zoom
 }

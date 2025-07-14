@@ -254,6 +254,51 @@ VITE_APP_WS_BASE_URL=ws://localhost:8000/api/v1    # Production WebSocket
 - **Dynamic Price Precision**: Charts automatically adjust decimal places based on symbol precision
 - **Performance Optimization**: Price precision updates only on symbol changes, not during real-time data updates
 
+## Real-time Data Update Patterns
+
+### TradingView Lightweight Charts Update Strategy
+When working with TradingView Lightweight Charts series (candlesticks, histograms, etc.), it's crucial to use the correct update method:
+
+1. **Initial/Historical Data**: Use `setData()` 
+   - Replaces all existing data
+   - Used when loading historical data or switching symbols/timeframes
+   - Example: `candlestickSeries.setData(formattedData)`
+
+2. **Real-time Updates**: Use `update()` 
+   - Preserves existing data and adds/updates specific data points
+   - Much more performant than `setData()` for live updates
+   - Example: `candlestickSeries.update(formattedCandle)`
+
+### Implementation Pattern
+```javascript
+function updateChartSeries(data, isRealTimeUpdate = false) {
+  if (isRealTimeUpdate && data.length === 1) {
+    // Real-time update - use update() to preserve existing data
+    series.update(data[0]);
+  } else {
+    // Initial load or full update - use setData()
+    series.setData(data);
+  }
+}
+```
+
+### Detecting Real-time Updates
+In the WebSocket message handler or global update function:
+```javascript
+window.updateChartData = (data) => {
+  // Check if this is a real-time update (single data point and not marked as initial)
+  const isRealTimeUpdate = data.data.length === 1 && !data.initial;
+  updateChartSeries(data.data, isRealTimeUpdate);
+};
+```
+
+### Example: Liquidation Volume Implementation
+The liquidation volume histogram follows this pattern:
+- Historical volume data arrives as an array → uses `setData()`
+- Individual liquidation updates arrive as single items → uses `update()`
+- This prevents historical data from disappearing when new liquidations occur
+- The same pattern applies to candlestick updates and any other chart series
+
 ## Vite Configuration
 
 Key Vite settings:

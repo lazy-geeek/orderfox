@@ -86,7 +86,9 @@ window.resetChartData = resetChartData;
 // Set up global function for liquidation volume updates
 window.updateLiquidationVolume = (data) => {
   if (data && data.data && Array.isArray(data.data)) {
-    updateLiquidationVolume(data.data);
+    // Check if this is a real-time update (single data point) or historical data
+    const isRealTimeUpdate = data.data.length === 1 && !data.initial;
+    updateLiquidationVolume(data.data, isRealTimeUpdate);
   }
 };
 
