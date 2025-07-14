@@ -372,7 +372,7 @@ class TestLiquidationService:
         mock_session.get.assert_called_once_with(
             f"{settings.LIQUIDATION_API_BASE_URL}/liquidation-orders",
             params={"symbol": "HYPERUSDT", "limit": 50},
-            timeout=15
+            timeout=aiohttp.ClientTimeout(total=15)
         )
     
     @pytest.mark.asyncio
@@ -500,18 +500,14 @@ class TestLiquidationService:
         # Mock API response that will be aggregated
         mock_response = [
             {
-                "symbol": "BTCUSDT",
+                "timestamp": 1609459200000,
                 "side": "sell",
-                "order_filled_accumulated_quantity": "1.5",
-                "average_price": "45000",
-                "order_trade_time": 1609459200000
+                "cumulated_usd_size": 67500.0  # 1.5 * 45000
             },
             {
-                "symbol": "BTCUSDT",
+                "timestamp": 1609459260000,
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.8",
-                "average_price": "44000",
-                "order_trade_time": 1609459260000
+                "cumulated_usd_size": 35200.0  # 0.8 * 44000
             }
         ]
         
@@ -530,48 +526,34 @@ class TestLiquidationService:
         
         # Mock aggregate method to test that data flows correctly
         with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
-            with patch.object(liquidation_service, '_convert_api_to_ws_format') as mock_convert:
-                # Set up mock to return properly formatted data
-                mock_convert.side_effect = [
-                    {
-                        "timestamp": 1609459200000,
-                        "side": "SELL",
-                        "priceUsdt": "67500"  # 1.5 * 45000
-                    },
-                    {
-                        "timestamp": 1609459260000,
-                        "side": "BUY", 
-                        "priceUsdt": "35200"  # 0.8 * 44000
-                    }
-                ]
-                
-                result = await liquidation_service.fetch_historical_liquidations_by_timeframe(
-                    "BTCUSDT", "1m", start_time=1609459200000, end_time=1609459500000
-                )
+            result = await liquidation_service.fetch_historical_liquidations_by_timeframe(
+                "BTCUSDT", "1m", start_time=1609459200000, end_time=1609459500000
+            )
         
         # Result should be aggregated data
         assert len(result) == 2  # Two 1-minute buckets
         assert result[0]["time"] == 1609459200  # First minute
-        assert result[0]["sell_volume"] == "67500"
-        assert result[0]["buy_volume"] == "0"
-        assert result[0]["total_volume"] == "67500"
+        assert result[0]["sell_volume"] == "67500.0"
+        assert result[0]["buy_volume"] == "0.0"
+        assert result[0]["total_volume"] == "67500.0"
+        assert result[0]["delta_volume"] == "-67500.0"
         
         assert result[1]["time"] == 1609459260  # Second minute
-        assert result[1]["buy_volume"] == "35200"
-        assert result[1]["sell_volume"] == "0"
-        assert result[1]["total_volume"] == "35200"
+        assert result[1]["buy_volume"] == "35200.0"
+        assert result[1]["sell_volume"] == "0.0"
+        assert result[1]["total_volume"] == "35200.0"
+        assert result[1]["delta_volume"] == "35200.0"
         
         # Verify the API was called with correct parameters
         mock_session.get.assert_called_once_with(
-            f"{settings.LIQUIDATION_API_BASE_URL}/api/liquidations",
+            f"{settings.LIQUIDATION_API_BASE_URL}/liquidations",
             params={
                 "symbol": "BTCUSDT",
                 "timeframe": "1m",
-                "limit": 1000,
-                "start_time": 1609459200000,
-                "end_time": 1609459500000
+                "start_timestamp": "1609459200000",
+                "end_timestamp": "1609459500000"
             },
-            timeout=aiohttp.ClientTimeout(total=30)
+            timeout=aiohttp.ClientTimeout(total=120)
         )
     
     @pytest.mark.asyncio
@@ -599,36 +581,33 @@ class TestLiquidationService:
         
         mock_session.get.assert_called_once()
         call_args = mock_session.get.call_args[1]
-        assert call_args['params']['start_time'] == expected_start
-        assert call_args['params']['end_time'] == expected_end
+        # For default time range, start_time and end_time are not passed
+        assert 'start_timestamp' not in call_args['params']
+        assert 'end_timestamp' not in call_args['params']
     
     @pytest.mark.asyncio
     async def test_aggregate_liquidations_for_timeframe_1m(self):
         """Test aggregation of liquidations for 1-minute timeframe"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,  # 2021-01-01 00:00:00
+                "timestamp": 1609459200000,  # 2021-01-01 00:00:00
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.1",
-                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+                "cumulated_usd_size": 1000.0  # Total: 1000
             },
             {
-                "order_trade_time": 1609459210000,  # 2021-01-01 00:00:10
+                "timestamp": 1609459210000,  # 2021-01-01 00:00:10
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.05",
-                "average_price": "10000"  # Total: 0.05 * 10000 = 500
+                "cumulated_usd_size": 500.0  # Total: 500
             },
             {
-                "order_trade_time": 1609459250000,  # 2021-01-01 00:00:50
+                "timestamp": 1609459250000,  # 2021-01-01 00:00:50
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.03",
-                "average_price": "10000"  # Total: 0.03 * 10000 = 300
+                "cumulated_usd_size": 300.0  # Total: 300
             },
             {
-                "order_trade_time": 1609459260000,  # 2021-01-01 00:01:00 (next minute)
+                "timestamp": 1609459260000,  # 2021-01-01 00:01:00 (next minute)
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.08",
-                "average_price": "10000"  # Total: 0.08 * 10000 = 800
+                "cumulated_usd_size": 800.0  # Total: 800
             }
         ]
         
@@ -643,6 +622,7 @@ class TestLiquidationService:
         assert result[0]["buy_volume"] == "1300.0"  # 1000 + 300
         assert result[0]["sell_volume"] == "500.0"
         assert result[0]["total_volume"] == "1800.0"
+        assert result[0]["delta_volume"] == "800.0"  # 1300 - 500
         assert result[0]["count"] == 3
         
         # Second minute bucket
@@ -650,6 +630,7 @@ class TestLiquidationService:
         assert result[1]["buy_volume"] == "0.0"
         assert result[1]["sell_volume"] == "800.0"
         assert result[1]["total_volume"] == "800.0"
+        assert result[1]["delta_volume"] == "-800.0"  # 0 - 800
         assert result[1]["count"] == 1
     
     @pytest.mark.asyncio
@@ -657,28 +638,24 @@ class TestLiquidationService:
         """Test aggregation of liquidations for 5-minute timeframe"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,  # 00:00
+                "timestamp": 1609459200000,  # 00:00
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.1",
-                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+                "cumulated_usd_size": 1000.0  # Total: 1000
             },
             {
-                "order_trade_time": 1609459260000,  # 00:01
+                "timestamp": 1609459260000,  # 00:01
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.05",
-                "average_price": "10000"  # Total: 0.05 * 10000 = 500
+                "cumulated_usd_size": 500.0  # Total: 500
             },
             {
-                "order_trade_time": 1609459440000,  # 00:04
+                "timestamp": 1609459440000,  # 00:04
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.07",
-                "average_price": "10000"  # Total: 0.07 * 10000 = 700
+                "cumulated_usd_size": 700.0  # Total: 700
             },
             {
-                "order_trade_time": 1609459500000,  # 00:05 (next 5-minute bucket)
+                "timestamp": 1609459500000,  # 00:05 (next 5-minute bucket)
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.09",
-                "average_price": "10000"  # Total: 0.09 * 10000 = 900
+                "cumulated_usd_size": 900.0  # Total: 900
             }
         ]
         
@@ -693,6 +670,7 @@ class TestLiquidationService:
         assert result[0]["buy_volume"] == "1700.0"  # 1000 + 700
         assert result[0]["sell_volume"] == "500.0"
         assert result[0]["total_volume"] == "2200.0"
+        assert result[0]["delta_volume"] == "1200.0"  # 1700 - 500
         assert result[0]["count"] == 3
         
         # Second 5-minute bucket
@@ -700,6 +678,7 @@ class TestLiquidationService:
         assert result[1]["buy_volume"] == "0.0"
         assert result[1]["sell_volume"] == "900.0"
         assert result[1]["total_volume"] == "900.0"
+        assert result[1]["delta_volume"] == "-900.0"  # 0 - 900
         assert result[1]["count"] == 1
     
     @pytest.mark.asyncio
@@ -707,28 +686,24 @@ class TestLiquidationService:
         """Test aggregation of liquidations for 1-hour timeframe"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,  # 00:00
+                "timestamp": 1609459200000,  # 00:00
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.1",
-                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+                "cumulated_usd_size": 1000.0  # Total: 1000
             },
             {
-                "order_trade_time": 1609460400000,  # 00:20
+                "timestamp": 1609460400000,  # 00:20
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.2",
-                "average_price": "10000"  # Total: 0.2 * 10000 = 2000
+                "cumulated_usd_size": 2000.0  # Total: 2000
             },
             {
-                "order_trade_time": 1609462000000,  # 00:46:40
+                "timestamp": 1609462000000,  # 00:46:40
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.15",
-                "average_price": "10000"  # Total: 0.15 * 10000 = 1500
+                "cumulated_usd_size": 1500.0  # Total: 1500
             },
             {
-                "order_trade_time": 1609462800000,  # 01:00 (next hour)
+                "timestamp": 1609462800000,  # 01:00 (next hour)
                 "side": "sell",
-                "order_filled_accumulated_quantity": "0.3",
-                "average_price": "10000"  # Total: 0.3 * 10000 = 3000
+                "cumulated_usd_size": 3000.0  # Total: 3000
             }
         ]
         
@@ -743,6 +718,7 @@ class TestLiquidationService:
         assert result[0]["buy_volume"] == "2500.0"  # 1000 + 1500
         assert result[0]["sell_volume"] == "2000.0"
         assert result[0]["total_volume"] == "4500.0"
+        assert result[0]["delta_volume"] == "500.0"  # 2500 - 2000
         assert result[0]["count"] == 3
         
         # Second hour
@@ -750,6 +726,7 @@ class TestLiquidationService:
         assert result[1]["buy_volume"] == "0.0"
         assert result[1]["sell_volume"] == "3000.0"
         assert result[1]["total_volume"] == "3000.0"
+        assert result[1]["delta_volume"] == "-3000.0"  # 0 - 3000
         assert result[1]["count"] == 1
     
     @pytest.mark.asyncio
@@ -766,10 +743,9 @@ class TestLiquidationService:
         """Test aggregation with single liquidation"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,
+                "timestamp": 1609459200000,
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.1",
-                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+                "cumulated_usd_size": 1000.0  # Total: 1000
             }
         ]
         
@@ -781,6 +757,7 @@ class TestLiquidationService:
         assert result[0]["buy_volume"] == "1000.0"
         assert result[0]["sell_volume"] == "0.0"
         assert result[0]["total_volume"] == "1000.0"
+        assert result[0]["delta_volume"] == "1000.0"
         assert result[0]["count"] == 1
     
     @pytest.mark.asyncio
@@ -788,16 +765,14 @@ class TestLiquidationService:
         """Test that aggregated data includes formatted values"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,
+                "timestamp": 1609459200000,
                 "side": "buy",
-                "order_filled_accumulated_quantity": "1.234567",
-                "average_price": "10000"  # Total: 1.234567 * 10000 = 12345.67
+                "cumulated_usd_size": 12345.67  # Total: 12345.67
             },
             {
-                "order_trade_time": 1609459210000,
+                "timestamp": 1609459210000,
                 "side": "sell",
-                "order_filled_accumulated_quantity": "9.876543",
-                "average_price": "10000"  # Total: 9.876543 * 10000 = 98765.43
+                "cumulated_usd_size": 98765.43  # Total: 98765.43
             }
         ]
         
@@ -806,19 +781,23 @@ class TestLiquidationService:
         )
         
         assert len(result) == 1
-        assert result[0]["buy_volume_formatted"] == "12,345.67"
-        assert result[0]["sell_volume_formatted"] == "98,765.43"
-        assert result[0]["total_volume_formatted"] == "111,111.10"
+        assert result[0]["buy_volume"] == "12345.67"
+        assert result[0]["sell_volume"] == "98765.43"
+        assert result[0]["total_volume"] == "111111.09999999999"
+        assert result[0]["delta_volume"] == "-86419.76"
+        # Formatted values are included
+        assert "buy_volume_formatted" in result[0]
+        assert "sell_volume_formatted" in result[0]
+        assert "total_volume_formatted" in result[0]
     
     @pytest.mark.asyncio
     async def test_aggregate_liquidations_invalid_timeframe(self):
         """Test aggregation with invalid timeframe defaults to 1m"""
         liquidations = [
             {
-                "order_trade_time": 1609459200000,
+                "timestamp": 1609459200000,
                 "side": "buy",
-                "order_filled_accumulated_quantity": "0.1",
-                "average_price": "10000"
+                "cumulated_usd_size": 1000.0
             }
         ]
         

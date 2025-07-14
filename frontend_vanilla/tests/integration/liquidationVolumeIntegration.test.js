@@ -75,9 +75,7 @@ vi.mock('lightweight-charts', () => ({
 describe('Liquidation Volume Integration Tests', () => {
   let dom;
   let liquidationVolumeService;
-  let websocketService;
   let store;
-  let chartComponent;
   
   beforeEach(async () => {
     // Set up DOM
@@ -101,15 +99,22 @@ describe('Liquidation Volume Integration Tests', () => {
       const liquidationModule = await import('../../src/services/liquidationVolumeService.js');
       const storeModule = await import('../../src/store/store.js');
       
-      liquidationVolumeService = liquidationModule.liquidationVolumeService;
-      store = storeModule.store;
+      liquidationVolumeService = liquidationModule.default;
+      store = storeModule;
     } catch (error) {
       console.error('Import error:', error);
     }
     
     // Clear any existing state
     liquidationVolumeService.clearCache();
-    store.reset();
+    // Reset store state manually
+    store.setState({
+      selectedSymbol: 'BTCUSDT',
+      selectedTimeframe: '1m',
+      liquidationVolume: [],
+      liquidationVolumeLoading: false,
+      liquidationVolumeError: null
+    });
   });
   
   afterEach(() => {
@@ -124,23 +129,27 @@ describe('Liquidation Volume Integration Tests', () => {
       const mockVolumeData = [
         {
           time: 1640995200,
-          buy_volume: "15000.0",
-          sell_volume: "25000.0",
-          total_volume: "40000.0",
-          buy_volume_formatted: "15,000.00",
-          sell_volume_formatted: "25,000.00",
-          total_volume_formatted: "40,000.00",
+          buy_volume: '15000.0',
+          sell_volume: '25000.0',
+          total_volume: '40000.0',
+          delta_volume: '-10000.0',
+          buy_volume_formatted: '15,000.00',
+          sell_volume_formatted: '25,000.00',
+          total_volume_formatted: '40,000.00',
+          delta_volume_formatted: '10,000.00',
           count: 50,
           timestamp_ms: 1640995200000
         },
         {
           time: 1640995260,
-          buy_volume: "8000.0",
-          sell_volume: "12000.0",
-          total_volume: "20000.0",
-          buy_volume_formatted: "8,000.00",
-          sell_volume_formatted: "12,000.00",
-          total_volume_formatted: "20,000.00",
+          buy_volume: '8000.0',
+          sell_volume: '12000.0',
+          total_volume: '20000.0',
+          delta_volume: '-4000.0',
+          buy_volume_formatted: '8,000.00',
+          sell_volume_formatted: '12,000.00',
+          total_volume_formatted: '20,000.00',
+          delta_volume_formatted: '4,000.00',
           count: 30,
           timestamp_ms: 1640995260000
         }
@@ -161,8 +170,7 @@ describe('Liquidation Volume Integration Tests', () => {
       
       expect(result).toEqual(mockVolumeData);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/liquidation-volume/BTCUSDT/1m'),
-        expect.any(Object)
+        '/api/v1/liquidation-volume/BTCUSDT/1m'
       );
       
       // Step 2: Update store with volume data
@@ -219,12 +227,12 @@ describe('Liquidation Volume Integration Tests', () => {
         timeframe: '1m',
         data: [{
           time: 1640995320,
-          buy_volume: "5000.0",
-          sell_volume: "3000.0",
-          total_volume: "8000.0",
-          buy_volume_formatted: "5,000.00",
-          sell_volume_formatted: "3,000.00",
-          total_volume_formatted: "8,000.00",
+          buy_volume: '5000.0',
+          sell_volume: '3000.0',
+          total_volume: '8000.0',
+          buy_volume_formatted: '5,000.00',
+          sell_volume_formatted: '3,000.00',
+          total_volume_formatted: '8,000.00',
           count: 15,
           timestamp_ms: 1640995320000
         }],
@@ -253,23 +261,23 @@ describe('Liquidation Volume Integration Tests', () => {
     it('should coordinate symbol and timeframe changes', async () => {
       const mockDataBTC1m = [{
         time: 1640995200,
-        buy_volume: "10000.0",
-        sell_volume: "15000.0",
-        total_volume: "25000.0"
+        buy_volume: '10000.0',
+        sell_volume: '15000.0',
+        total_volume: '25000.0'
       }];
       
       const mockDataBTC5m = [{
         time: 1640995200,
-        buy_volume: "50000.0",
-        sell_volume: "75000.0",
-        total_volume: "125000.0"
+        buy_volume: '50000.0',
+        sell_volume: '75000.0',
+        total_volume: '125000.0'
       }];
       
       const mockDataETH1m = [{
         time: 1640995200,
-        buy_volume: "5000.0",
-        sell_volume: "7000.0",
-        total_volume: "12000.0"
+        buy_volume: '5000.0',
+        sell_volume: '7000.0',
+        total_volume: '12000.0'
       }];
       
       // Test symbol change
@@ -367,9 +375,9 @@ describe('Liquidation Volume Integration Tests', () => {
     it('should efficiently cache and reuse data', async () => {
       const mockData = [{
         time: 1640995200,
-        buy_volume: "1000.0",
-        sell_volume: "2000.0",
-        total_volume: "3000.0"
+        buy_volume: '1000.0',
+        sell_volume: '2000.0',
+        total_volume: '3000.0'
       }];
       
       global.fetch.mockResolvedValue({

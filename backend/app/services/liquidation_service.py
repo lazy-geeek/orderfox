@@ -257,9 +257,9 @@ class LiquidationService:
             }
             
             if start_time:
-                params["start_timestamp"] = start_time
+                params["start_timestamp"] = str(start_time)
             if end_time:
-                params["end_timestamp"] = end_time
+                params["end_timestamp"] = str(end_time)
             
             logger.info(f"Fetching liquidations from {url} with params: {params}")
             
@@ -317,10 +317,13 @@ class LiquidationService:
         # Process liquidation data from liqui_api
         # Format: {"timestamp": ms, "side": "buy/sell", "cumulated_usd_size": float}
         for liq in liquidations:
-            # Get timestamp (already the bucket start time)
-            bucket_time = liq.get("timestamp", 0)
-            if not bucket_time:
+            # Get timestamp and calculate bucket start time
+            timestamp = liq.get("timestamp", 0)
+            if not timestamp:
                 continue
+            
+            # Calculate bucket start time
+            bucket_time = (timestamp // timeframe_ms) * timeframe_ms
                 
             side = liq.get("side", "").upper()
             volume = Decimal(str(liq.get("cumulated_usd_size", "0")))

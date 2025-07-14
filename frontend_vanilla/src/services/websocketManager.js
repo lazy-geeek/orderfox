@@ -23,7 +23,6 @@ import {
   updateOrderBookParameters,
 } from './websocketService.js';
 
-import liquidationVolumeService from './liquidationVolumeService.js';
 
 /**
  * Get chart container width for backend calculation.
