@@ -113,6 +113,11 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **Data Ordering**: Liquidations sorted with newest first using deque with appendleft for real-time data
 - **Thin Client Architecture**: Backend provides formatted data with `quantityFormatted`, `priceUsdtFormatted`, and `displayTime`
 - **API Integration**: Uses `fetch_historical_liquidations()` with configurable LIQUIDATION_API_BASE_URL
+- **Fan-out Architecture**: Single Binance connection per symbol shared between multiple frontend subscribers (table + chart)
+- **Connection Reference Counting**: `disconnect_stream(symbol, callback)` removes specific callbacks, only closes Binance connection when no subscribers remain
+- **Deduplication System**: Prevents duplicate liquidation entries using `timestamp + amount + side` as unique keys
+- **Global Cache Management**: `historical_loaded` flag ensures historical data fetched only once per symbol across all connections
+- **Connection Sharing Logging**: Backend logs show "Adding callback to existing stream" when multiple components subscribe to same symbol
 
 ### Liquidation Orders API Architecture
 - **External API Integration**: Fetches historical liquidation data from external API service
@@ -127,11 +132,40 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
   - `liquidations_ws.py` - Fetches historical data on WebSocket connection
   - Deque cache maintains last 50 liquidations per symbol
 
+### Liquidation Volume Aggregation System
+- **REST API Endpoint**: `/api/v1/liquidation-volume/{symbol}/{timeframe}` for historical volume data
+- **WebSocket Integration**: Timeframe parameter support for liquidation streams
+- **Data Aggregation**: `aggregate_liquidations_for_timeframe()` method groups liquidations by time buckets
+- **Timeframe Support**: 1m, 5m, 15m, 30m, 1h, 4h, 1d timeframes for volume aggregation
+- **Volume Calculation**: Separates buy volume (shorts liquidated) and sell volume (longs liquidated)
+- **Delta Volume**: Backend calculates `delta_volume = buy_volume - sell_volume` for histogram display
+- **Time Range Synchronization**: Uses exact same time range as candle data via cache coordination
+- **Backend Coordination**: Liquidation WebSocket waits for candle time range to be cached before fetching data
+- **Historical Data**: `fetch_historical_liquidations_by_timeframe()` with time range parameters
+- **Real-time Aggregation**: Maintains aggregation buffers for live volume updates
+- **Data Models**: `LiquidationVolume` and `LiquidationVolumeResponse` Pydantic models
+- **WebSocket Messages**: Sends `liquidation_volume` type messages with aggregated data
+- **Chart Integration**: Provides formatted volume data for TradingView histogram overlays
+- **Performance**: Efficient time bucket calculations with proper caching
+
 ### Chart Data Service
 - **Container-Width Optimization**: Calculates optimal candle count based on container width: `min(max((containerWidth/6)*3, 200), 1000)`
 - **Dual Time Fields**: Chart data includes both `timestamp` (ms) and `time` (seconds) for TradingView compatibility
 - **Dynamic Price Precision**: Automatically adjusts decimal places based on symbol precision
 - **Synchronous CCXT Usage**: Uses standard CCXT methods without await for chart data fetching
+- **Time Range Caching**: Stores actual candle time ranges in `time_range_cache` for coordination with other services
+- **Cache Key Format**: `{exchange_symbol}:{timeframe}` (e.g., "BTC/USDT:USDT:1m")
+- **Time Range Data**: Includes `start_ms`, `end_ms`, `start`, and `end` fields for flexibility
+
+### Time Range Synchronization System
+- **Purpose**: Ensures liquidation volume data uses exact same time range as displayed candles
+- **Implementation**: 
+  - `ChartDataService` caches time range when fetching candles
+  - Liquidation WebSocket polls cache for up to 10 seconds (100ms intervals)
+  - Uses cached range for liquidation volume API call
+  - Falls back to 24-hour range if cache unavailable
+- **Backend Coordination**: All timing logic handled server-side, frontend just connects WebSockets
+- **Benefits**: Perfect alignment between candles and liquidation volume at all zoom levels
 
 ## WebSocket Protocol
 
@@ -155,6 +189,11 @@ ws://localhost:8000/api/v1/ws/candles/BTCUSDT?timeframe=1m&container_width=800
 Connect to liquidations stream:
 ```
 ws://localhost:8000/api/v1/ws/liquidations/BTCUSDT
+```
+
+Connect to liquidations stream with volume aggregation:
+```
+ws://localhost:8000/api/v1/ws/liquidations/BTCUSDT?timeframe=1m
 ```
 
 ### Dynamic Parameter Updates
@@ -222,6 +261,8 @@ Update parameters without reconnecting (order book only):
 - **Logging**: Structured logs with request timing and correlation IDs
 - **Health Check**: GET /health endpoint for monitoring
 - **Exchange Errors**: Proper handling of exchange API errors with fallbacks
+- **Connection Lifecycle**: Proper handling of "Cannot call 'send' once a close message has been sent" errors during frontend disconnection
+- **Race Condition Prevention**: Backend waits for proper WebSocket cleanup before processing new connections
 
 ## Environment Variables
 

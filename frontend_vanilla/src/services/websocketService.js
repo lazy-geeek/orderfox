@@ -34,20 +34,44 @@ export const connectWebSocketStream = async (
   
   const cleanWsBaseUrl = WS_BASE_URL.replace(/\/$/, '');
   
+  // Convert relative URL to proper WebSocket URL
+  const getWebSocketUrl = (path) => {
+    if (path.startsWith('ws://') || path.startsWith('wss://')) {
+      return path; // Already a proper WebSocket URL
+    }
+    
+    // Convert relative path to WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    return `${protocol}//${host}${path}`;
+  };
+  
   let wsUrl;
-  if (timeframe) {
-    wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
-    if (streamType === 'candles' && limit) {
-      wsUrl += `?limit=${limit}`;
-    }
+  if (streamType === 'candles' && timeframe) {
+    // Candles use timeframe in path
+    const basePath = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
+    const fullPath = limit ? `${basePath}?limit=${limit}` : basePath;
+    wsUrl = getWebSocketUrl(fullPath);
   } else {
-    wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
+    // Other streams use symbol only in path
+    const basePath = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
+    
+    // Add query parameters
+    const params = new URLSearchParams();
+    
     if (streamType === 'orderbook' && limit) {
-      wsUrl += `?limit=${limit}`;
+      params.append('limit', limit);
       if (rounding) {
-        wsUrl += `&rounding=${rounding}`;
+        params.append('rounding', rounding);
       }
+    } else if (streamType === 'liquidations' && timeframe) {
+      // Support timeframe parameter for liquidations
+      params.append('timeframe', timeframe);
     }
+    
+    const queryString = params.toString();
+    const fullPath = queryString ? `${basePath}?${queryString}` : basePath;
+    wsUrl = getWebSocketUrl(fullPath);
   }
 
   if (connectionInProgress[streamKey]) {
@@ -57,9 +81,15 @@ export const connectWebSocketStream = async (
   if (activeWebSockets[streamKey]) {
     const currentState = activeWebSockets[streamKey].readyState;
     if (currentState === WebSocket.OPEN) {
+      console.log(`WebSocket ${streamKey} already open, skipping connection`);
       return;
     } else if (currentState === WebSocket.CONNECTING) {
+      console.log(`WebSocket ${streamKey} still connecting, skipping connection`);
       return;
+    } else if (currentState === WebSocket.CLOSING || currentState === WebSocket.CLOSED) {
+      console.log(`WebSocket ${streamKey} is ${currentState === WebSocket.CLOSING ? 'closing' : 'closed'}, cleaning up and creating new connection`);
+      // Clean up the old connection
+      delete activeWebSockets[streamKey];
     }
   }
 
@@ -139,6 +169,7 @@ export const connectWebSocketStream = async (
         const data = JSON.parse(event.data);
         
         if (data.type === 'historical_candles') {
+          console.log('Received historical candles:', data.count, 'candles for', data.symbol);
           updateCandlesFromHistoricalData(data);
         } else if (data.type === 'candle_update') {
           updateCandlesFromWebSocket(data);
@@ -153,6 +184,15 @@ export const connectWebSocketStream = async (
           if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
             window.updateLiquidationDisplay(data);
           }
+        } else if (data.type === 'liquidation_volume') {
+          // Handle liquidation volume updates
+          console.log('Received liquidation volume:', data.data?.length, 'records for', data.symbol);
+          if (typeof window !== 'undefined' && window.updateLiquidationVolume) {
+            window.updateLiquidationVolume(data);
+          }
+        } else if (data.type === 'heartbeat') {
+          // Handle heartbeat messages (keep connection alive)
+          // No action needed - just acknowledge receipt
         } else if (data.type === 'param_update_ack') {
           // Parameter update acknowledged
         } else if (data.type === 'params_updated') {
@@ -312,11 +352,32 @@ export const disconnectWebSocketStream = (
 };
 
 export const disconnectAllWebSockets = () => {
+  const connectionsToClose = [];
+  
   for (const key in activeWebSockets) {
     if (Object.prototype.hasOwnProperty.call(activeWebSockets, key)) {
-      activeWebSockets[key].close(1000, 'Client initiated close (all)');
+      const ws = activeWebSockets[key];
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        // Set event handlers to null to prevent error callbacks during shutdown
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        
+        try {
+          ws.close(1000, 'Client initiated close (all)');
+          connectionsToClose.push(key);
+        } catch (error) {
+          // Ignore errors during cleanup - connection might already be closing
+          console.warn(`Error closing WebSocket ${key}:`, error.message);
+        }
+      }
       delete activeWebSockets[key];
     }
+  }
+  
+  if (connectionsToClose.length > 0) {
+    console.log(`Disconnected ${connectionsToClose.length} WebSocket connections:`, connectionsToClose);
   }
   
   Object.keys(connectionAttempts).forEach(key => delete connectionAttempts[key]);

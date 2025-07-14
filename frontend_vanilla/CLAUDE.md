@@ -55,6 +55,8 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **Backend Trust**: Frontend trusts backend data completely - no client-side validation required
 - **Direct Assignment**: State update functions simplified to direct assignment (`state.currentCandles = payload.data`)
 - **No Data Processing**: All formatting, sorting, and calculations done by backend
+- **No Time Calculations**: All time ranges and date calculations happen in backend
+- **Backend Sequencing**: Backend handles coordination between data sources (e.g., candles and liquidation volume)
 
 ### CSS Architecture & Component Styling
 - **Shared Base Classes**: Use `.orderfox-display-base` for all display components
@@ -78,6 +80,12 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **State Integration**: Seamless integration with state management and UI reset patterns
 - **Auto-reconnection**: Built-in reconnection logic with exponential backoff
 - **Message Handling**: `websocketService.js` handles low-level WebSocket operations
+- **Liquidation Volume Integration**: Automatic fetching of historical volume data on symbol/timeframe changes
+- **Connection Lifecycle Management**: Proper event handler nullification during shutdown prevents race conditions
+- **Async Symbol Switching**: 500ms delay allows backend processing to complete before creating new connections
+- **Graceful Disconnection**: Try-catch blocks handle WebSocket close errors during cleanup
+- **State Validation**: Connection state checking before attempting to close or create connections
+- **WebSocket URL Construction**: Automatic conversion of relative URLs to proper WebSocket URLs with protocol handling
 
 ### State Management
 - **Subscribe/Notify Pattern**: Custom lightweight state management
@@ -134,6 +142,21 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 - **Real-time Updates**: Use `series.update()` for single candle updates
 - **Auto-fitting**: Only on initial load or symbol/timeframe changes
 - **Price Precision**: Automatically adjusts based on symbol (backend-provided)
+- **Chart Initialization Tracking**: `chartInitialized` flag prevents premature liquidation volume updates before chart is ready
+- **Pending Data Buffering**: Volume data is buffered in `pendingVolumeData` until chart is properly initialized
+- **Graceful Error Handling**: Chart warnings only appear after initialization, not during initial loading
+
+### Liquidation Volume Chart Overlay
+- **Histogram Series**: TradingView histogram series as overlay (empty `priceScaleId`)
+- **Scale Positioning**: Bottom 30% of chart (top: 0.7, bottom: 0)
+- **Color Coding**: Green bars for buy-dominant periods, red for sell-dominant
+- **Bar Height**: Total liquidation volume (buy + sell combined)
+- **Timeframe Sync**: Automatically switches with chart timeframe
+- **Toggle Control**: UI button to show/hide liquidation volume overlay
+- **Service Integration**: `liquidationVolumeService.js` for API calls and caching
+- **Real-time Updates**: WebSocket messages update volume data in real-time
+- **Mobile Responsive**: Dynamic scale margins for different screen sizes
+- **Performance**: Efficient volume data aggregation for large datasets
 
 ### Order Book Display
 - **Four Columns**: Price, Size for both bids and asks
@@ -176,6 +199,10 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 2. Don't create direct WebSocket connections
 3. Handle connection status updates in UI
 4. Let WebSocketManager handle reconnection logic
+5. Always await `WebSocketManager.switchSymbol()` since it's async
+6. Use 500ms delay minimum when switching symbols to prevent race conditions
+7. Implement proper error handling for WebSocket close operations
+8. Check connection state before attempting to close or modify connections
 
 ### State Management Updates
 1. Keep state updates as direct assignments
@@ -226,6 +253,51 @@ VITE_APP_WS_BASE_URL=ws://localhost:8000/api/v1    # Production WebSocket
 - **Smart Auto-fitting**: Only calls `fitContent()` on initial load or symbol/timeframe changes
 - **Dynamic Price Precision**: Charts automatically adjust decimal places based on symbol precision
 - **Performance Optimization**: Price precision updates only on symbol changes, not during real-time data updates
+
+## Real-time Data Update Patterns
+
+### TradingView Lightweight Charts Update Strategy
+When working with TradingView Lightweight Charts series (candlesticks, histograms, etc.), it's crucial to use the correct update method:
+
+1. **Initial/Historical Data**: Use `setData()` 
+   - Replaces all existing data
+   - Used when loading historical data or switching symbols/timeframes
+   - Example: `candlestickSeries.setData(formattedData)`
+
+2. **Real-time Updates**: Use `update()` 
+   - Preserves existing data and adds/updates specific data points
+   - Much more performant than `setData()` for live updates
+   - Example: `candlestickSeries.update(formattedCandle)`
+
+### Implementation Pattern
+```javascript
+function updateChartSeries(data, isRealTimeUpdate = false) {
+  if (isRealTimeUpdate && data.length === 1) {
+    // Real-time update - use update() to preserve existing data
+    series.update(data[0]);
+  } else {
+    // Initial load or full update - use setData()
+    series.setData(data);
+  }
+}
+```
+
+### Detecting Real-time Updates
+In the WebSocket message handler or global update function:
+```javascript
+window.updateChartData = (data) => {
+  // Check if this is a real-time update (single data point and not marked as initial)
+  const isRealTimeUpdate = data.data.length === 1 && !data.initial;
+  updateChartSeries(data.data, isRealTimeUpdate);
+};
+```
+
+### Example: Liquidation Volume Implementation
+The liquidation volume histogram follows this pattern:
+- Historical volume data arrives as an array → uses `setData()`
+- Individual liquidation updates arrive as single items → uses `update()`
+- This prevents historical data from disappearing when new liquidations occur
+- The same pattern applies to candlestick updates and any other chart series
 
 ## Vite Configuration
 

@@ -3,7 +3,7 @@ import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
 import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
-import { createCandlestickChart, createTimeframeSelector, updateCandlestickChart, updateLatestCandle, resetZoomState, resetChartData } from './components/LightweightChart.js';
+import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButton, updateCandlestickChart, updateLatestCandle, updateLiquidationVolume, toggleLiquidationVolume, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
 import { LiquidationDisplay } from './components/LiquidationDisplay.js';
@@ -54,6 +54,8 @@ const candlestickChartContainer = document.createElement('div');
 candlestickChartPlaceholder.replaceWith(candlestickChartContainer);
 createCandlestickChart(candlestickChartContainer);
 
+// Volume toggle button will be created later with controls
+
 const orderBookDisplay = createOrderBookDisplay();
 orderBookPlaceholder.replaceWith(orderBookDisplay);
 
@@ -80,6 +82,20 @@ window.notify = notify;
 
 // CRITICAL: Expose resetChartData globally for timeframe switches
 window.resetChartData = resetChartData;
+
+// Set up global function for liquidation volume updates
+window.updateLiquidationVolume = (data) => {
+  if (data && data.data && Array.isArray(data.data)) {
+    // Check if this is a real-time update (single data point) or historical data
+    const isRealTimeUpdate = data.data.length === 1 && !data.initial;
+    updateLiquidationVolume(data.data, isRealTimeUpdate);
+  }
+};
+
+// Set up global function for liquidation volume toggle
+window.toggleLiquidationVolume = () => {
+  return toggleLiquidationVolume();
+};
 
 // Note: getOptimalCandleCount() function moved to WebSocketManager for centralization
 
@@ -151,14 +167,29 @@ subscribe((key) => {
 });
 
 // Event Listeners
-symbolSelector.addEventListener('change', (e) => {
-  WebSocketManager.switchSymbol(e.target.value);
+symbolSelector.addEventListener('change', async (e) => {
+  try {
+    await WebSocketManager.switchSymbol(e.target.value);
+  } catch (error) {
+    console.error('Error switching symbol:', error);
+  }
 });
 
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {
   WebSocketManager.switchTimeframe(newTimeframe);
 });
-candlestickChartContainer.prepend(timeframeSelector);
+
+const volumeToggleButton = createVolumeToggleButton();
+
+// Create a controls container for chart controls
+const chartControls = document.createElement('div');
+chartControls.style.display = 'flex';
+chartControls.style.gap = '1rem';
+chartControls.style.marginBottom = '0.5rem';
+chartControls.appendChild(timeframeSelector);
+chartControls.appendChild(volumeToggleButton);
+
+candlestickChartContainer.prepend(chartControls);
 
 orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
   const newDepth = Number(e.target.value);

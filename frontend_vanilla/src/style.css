@@ -652,6 +652,81 @@ code {
   border-color: var(--color-info);
 }
 
+/* Volume Toggle Button Styles */
+.volume-toggle-container {
+  display: flex;
+  align-items: center;
+}
+
+.volume-toggle-button {
+  padding: 6px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-toggle-button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.volume-toggle-button.active {
+  background: var(--color-buy);
+  color: var(--text-primary);
+  border-color: var(--color-buy);
+}
+
+/* Volume Tooltip Styles */
+.volume-tooltip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-medium);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.volume-tooltip .tooltip-header {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 4px;
+}
+
+.volume-tooltip .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.volume-tooltip .tooltip-label {
+  color: var(--text-secondary);
+}
+
+.volume-tooltip .tooltip-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.volume-tooltip .tooltip-value.buy {
+  color: var(--color-buy);
+}
+
+.volume-tooltip .tooltip-value.sell {
+  color: var(--color-sell);
+}
+
 /* Layout Overrides for Dark Mode */
 header {
   background-color: var(--bg-secondary) !important;

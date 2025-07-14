@@ -5,11 +5,12 @@ This module provides FastAPI WebSocket endpoints for real-time liquidation data
 streaming from Binance futures liquidation orders.
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.api.v1.endpoints.connection_manager import connection_manager as manager
 from app.services.symbol_service import symbol_service
 from app.services.liquidation_service import liquidation_service
-from typing import List, Dict
+from app.models.liquidation import LiquidationVolumeUpdate
+from typing import List, Dict, Optional
 import asyncio
 import logging
 from datetime import datetime
@@ -19,26 +20,59 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Store recent liquidations per symbol using deque for FIFO behavior
+# Global cache shared across all WebSocket connections for the same symbol
 liquidations_cache: Dict[str, deque] = {}
 MAX_LIQUIDATIONS = 50
+# Track if historical data has been loaded for each symbol
+historical_loaded: Dict[str, bool] = {}
 
 @router.websocket("/ws/liquidations/{display_symbol}")
-async def liquidation_stream(websocket: WebSocket, display_symbol: str):
-    """WebSocket endpoint for liquidation data streaming"""
+async def liquidation_stream(
+    websocket: WebSocket, 
+    display_symbol: str,
+    timeframe: Optional[str] = Query(None, description="Timeframe for volume aggregation (1m, 5m, 15m, 1h, 4h, 1d)")
+):
+    """
+    WebSocket endpoint for liquidation data streaming
+    
+    Args:
+        display_symbol: Trading symbol (e.g., BTCUSDT)
+        timeframe: Optional timeframe for volume aggregation
+    """
     
     await websocket.accept()
-    logger.info(f"Liquidations WebSocket connected for {display_symbol}")
+    logger.info(f"Liquidations WebSocket connected for {display_symbol} (timeframe: {timeframe})")
     
     liquidation_queue = asyncio.Queue()
+    volume_queue = asyncio.Queue() if timeframe else None
+    tasks = []  # Initialize tasks list
     
     async def liquidation_callback(data: Dict):
-        """Callback for liquidation data"""
-        await liquidation_queue.put(data)
-        
-        # Store in liquidations cache (prepend to keep newest first)
+        """Callback for liquidation data with deduplication"""
+        # Initialize cache if needed
         if display_symbol not in liquidations_cache:
             liquidations_cache[display_symbol] = deque(maxlen=MAX_LIQUIDATIONS)
+        
+        # Check for duplicates using timestamp + amount + side as unique key
+        new_key = f"{data.get('timestamp', 0)}_{data.get('priceUsdt', '')}_{data.get('side', '')}"
+        
+        # Check if this liquidation already exists in cache
+        for existing in liquidations_cache[display_symbol]:
+            existing_key = f"{existing.get('timestamp', 0)}_{existing.get('priceUsdt', '')}_{existing.get('side', '')}"
+            if existing_key == new_key:
+                # Duplicate found - skip adding to queue and cache
+                return
+        
+        # Add to queue for this WebSocket connection
+        await liquidation_queue.put(data)
+        
+        # Store in global cache (prepend to keep newest first)
         liquidations_cache[display_symbol].appendleft(data)
+    
+    async def volume_callback(volume_data: List[Dict]):
+        """Callback for aggregated volume data"""
+        if volume_queue:
+            await volume_queue.put(volume_data)
     
     try:
         # Validate symbol
@@ -57,12 +91,16 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         # Get symbol info for formatting
         symbol_info = symbol_service.get_symbol_info(display_symbol)
         
-        # Initialize cache with historical data (only once per symbol)
+        # Initialize cache and load historical data (only once per symbol globally)
         if display_symbol not in liquidations_cache:
             liquidations_cache[display_symbol] = deque(maxlen=MAX_LIQUIDATIONS)
+        
+        # Load historical data only once per symbol (shared across all WebSocket connections)
+        if display_symbol not in historical_loaded:
+            historical_loaded[display_symbol] = True
             
             # Fetch historical liquidations
-            logger.info(f"Fetching historical liquidations for {display_symbol}")
+            logger.info(f"Fetching historical liquidations for {display_symbol} (shared across all connections)")
             historical = await liquidation_service.fetch_historical_liquidations(
                 display_symbol, limit=MAX_LIQUIDATIONS
             )
@@ -75,6 +113,8 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
             
             if historical:
                 logger.info(f"Loaded {len(historical)} historical liquidations for {display_symbol}")
+        else:
+            logger.info(f"Using existing historical liquidations for {display_symbol}")
         
         # Send initial data with cached liquidations
         initial_data = {
@@ -89,29 +129,131 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         # Connect to liquidation stream with symbol info
         await liquidation_service.connect_to_liquidation_stream(display_symbol, liquidation_callback, symbol_info)
         
-        # Stream liquidation data
-        while True:
-            try:
-                # Wait for new liquidation with timeout
-                liquidation = await asyncio.wait_for(liquidation_queue.get(), timeout=30)
-                
-                # Send update
-                update = {
-                    "type": "liquidation",
-                    "symbol": display_symbol,
-                    "data": liquidation,
+        # If timeframe is specified, register for volume updates and send historical volume data
+        if timeframe:
+            # Validate timeframe
+            valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
+            if timeframe not in valid_timeframes:
+                error_msg = {
+                    "type": "error",
+                    "message": f"Invalid timeframe. Must be one of: {', '.join(valid_timeframes)}",
                     "timestamp": datetime.utcnow().isoformat()
                 }
-                await websocket.send_json(update)
+                await websocket.send_json(error_msg)
+                return
+            
+            # Register for volume updates
+            await liquidation_service.register_volume_callback(display_symbol, timeframe, volume_callback)
+            
+            # Send historical volume data
+            # Create a task to send volume data once candle time range is available
+            async def send_volume_when_ready():
+                try:
+                    from app.services.chart_data_service import chart_data_service
+                    
+                    # Convert display symbol to exchange format for cache lookup
+                    exchange_symbol = symbol_service.resolve_symbol_to_exchange_format(display_symbol)
+                    cache_key = f"{exchange_symbol}:{timeframe}"
+                    
+                    # Wait for candle time range to be cached (with timeout)
+                    max_wait = 10  # seconds
+                    wait_interval = 0.1  # 100ms
+                    waited = 0
+                    
+                    while waited < max_wait:
+                        time_range = chart_data_service.time_range_cache.get(cache_key)
+                        if time_range:
+                            break
+                        await asyncio.sleep(wait_interval)
+                        waited += wait_interval
+                    
+                    if time_range:
+                        # Use the exact same time range as the candles
+                        start_time = time_range['start_ms']
+                        end_time = time_range['end_ms']
+                        logger.info(f"Using cached candle time range for {display_symbol}/{timeframe}: {start_time} to {end_time}")
+                    else:
+                        # Fallback to last 24 hours if no cached range after waiting
+                        logger.warning(f"No cached time range for {cache_key} after {max_wait}s, using default 24h range")
+                        end_time = int(datetime.now().timestamp() * 1000)
+                        start_time = end_time - (24 * 60 * 60 * 1000)
+                    
+                    historical_volume = await liquidation_service.fetch_historical_liquidations_by_timeframe(
+                        display_symbol, timeframe, start_time, end_time
+                    )
                 
-            except asyncio.TimeoutError:
-                # Send heartbeat
-                heartbeat = {
-                    "type": "heartbeat",
-                    "symbol": display_symbol,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-                await websocket.send_json(heartbeat)
+                    if historical_volume:
+                        volume_update = LiquidationVolumeUpdate(
+                            symbol=display_symbol,
+                            timeframe=timeframe,
+                            data=historical_volume,
+                            timestamp=datetime.utcnow().isoformat()
+                        )
+                        await websocket.send_json(volume_update.dict())
+                        logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
+                except Exception as e:
+                    logger.error(f"Error fetching historical volume data: {e}")
+            
+            # Add the volume task to run concurrently
+            volume_task = asyncio.create_task(send_volume_when_ready())
+            tasks.append(volume_task)
+        
+        # Create tasks for handling different data streams
+        
+        # Task for liquidation data
+        async def handle_liquidations():
+            while True:
+                try:
+                    # Wait for new liquidation with timeout
+                    liquidation = await asyncio.wait_for(liquidation_queue.get(), timeout=30)
+                    
+                    # Send update
+                    update = {
+                        "type": "liquidation",
+                        "symbol": display_symbol,
+                        "data": liquidation,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    await websocket.send_json(update)
+                    
+                except asyncio.TimeoutError:
+                    # Send heartbeat
+                    heartbeat = {
+                        "type": "heartbeat",
+                        "symbol": display_symbol,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    await websocket.send_json(heartbeat)
+        
+        # Task for volume data (if timeframe specified)
+        async def handle_volume():
+            if not volume_queue:
+                return
+                
+            while True:
+                try:
+                    # Wait for volume update
+                    volume_data = await volume_queue.get()
+                    
+                    # Send volume update
+                    volume_update = LiquidationVolumeUpdate(
+                        symbol=display_symbol,
+                        timeframe=timeframe,
+                        data=volume_data,
+                        timestamp=datetime.utcnow().isoformat()
+                    )
+                    await websocket.send_json(volume_update.dict())
+                    
+                except Exception as e:
+                    logger.error(f"Error sending volume update: {e}")
+        
+        # Start tasks
+        tasks.append(asyncio.create_task(handle_liquidations()))
+        if timeframe:
+            tasks.append(asyncio.create_task(handle_volume()))
+        
+        # Run until disconnected
+        await asyncio.gather(*tasks)
                 
     except WebSocketDisconnect:
         logger.info(f"Liquidations WebSocket disconnected for {display_symbol}")
@@ -127,9 +269,19 @@ async def liquidation_stream(websocket: WebSocket, display_symbol: str):
         except:
             pass
     finally:
-        # Disconnect liquidation stream for this symbol
+        # Cancel tasks
+        for task in tasks:
+            task.cancel()
+        
+        # Disconnect liquidation stream for this callback only (reference counting)
         try:
-            await liquidation_service.disconnect_stream(display_symbol)
+            await liquidation_service.disconnect_stream(display_symbol, liquidation_callback)
         except Exception as e:
             logger.error(f"Error disconnecting liquidation stream: {e}")
-        pass
+        
+        # Unregister volume callback if timeframe was specified
+        if timeframe:
+            try:
+                await liquidation_service.unregister_volume_callback(display_symbol, timeframe, volume_callback)
+            except Exception as e:
+                logger.error(f"Error unregistering volume callback: {e}")

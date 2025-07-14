@@ -102,13 +102,13 @@ describe('LastTradesDisplay', () => {
       
       // Check buy trade (should have bid-price class for green color)
       const buyTrade = rows[0];
-      const buyPriceElement = buyTrade.querySelector('.price');
+      const buyPriceElement = buyTrade.querySelector('.display-price');
       expect(buyPriceElement.classList.contains('bid-price')).toBe(true);
       expect(buyPriceElement.textContent).toBe('108,905.1');
       
       // Check sell trade (should have ask-price class for red color)
       const sellTrade = rows[1];
-      const sellPriceElement = sellTrade.querySelector('.price');
+      const sellPriceElement = sellTrade.querySelector('.display-price');
       expect(sellPriceElement.classList.contains('ask-price')).toBe(true);
       expect(sellPriceElement.textContent).toBe('108,904.0');
     });
@@ -244,9 +244,9 @@ describe('LastTradesDisplay', () => {
       expect(rows).toHaveLength(1);
       
       const row = rows[0];
-      expect(row.querySelector('.price').textContent).toBe('50,000.00');
-      expect(row.querySelector('.amount').textContent).toBe('1.500');
-      expect(row.querySelector('.time').textContent).toBe('12:30:45');
+      expect(row.querySelector('.display-price').textContent).toBe('50,000.00');
+      expect(row.querySelector('.display-amount').textContent).toBe('1.500');
+      expect(row.querySelector('.display-time').textContent).toBe('12:30:45');
     });
 
     it('should handle empty trades array in updateLastTradesData', () => {
@@ -329,19 +329,19 @@ describe('LastTradesDisplay', () => {
       
       const rows = container.querySelectorAll('.trade-level');
       
-      // Buy trade should have bid-price class
+      // Buy trade should have bid-price class on price only
       const buyRow = rows[0];
-      expect(buyRow.querySelector('.price').classList.contains('bid-price')).toBe(true);
-      expect(buyRow.querySelector('.amount').classList.contains('bid-price')).toBe(true);
+      expect(buyRow.querySelector('.display-price').classList.contains('bid-price')).toBe(true);
+      expect(buyRow.querySelector('.display-amount').classList.contains('bid-price')).toBe(false);
       
-      // Sell trade should have ask-price class  
+      // Sell trade should have ask-price class on price only
       const sellRow = rows[1];
-      expect(sellRow.querySelector('.price').classList.contains('ask-price')).toBe(true);
-      expect(sellRow.querySelector('.amount').classList.contains('ask-price')).toBe(true);
+      expect(sellRow.querySelector('.display-price').classList.contains('ask-price')).toBe(true);
+      expect(sellRow.querySelector('.display-amount').classList.contains('ask-price')).toBe(false);
       
       // Time should not have color class
-      expect(buyRow.querySelector('.time').classList.contains('bid-price')).toBe(false);
-      expect(sellRow.querySelector('.time').classList.contains('ask-price')).toBe(false);
+      expect(buyRow.querySelector('.display-time').classList.contains('bid-price')).toBe(false);
+      expect(sellRow.querySelector('.display-time').classList.contains('ask-price')).toBe(false);
     });
   });
 
