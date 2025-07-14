@@ -54,9 +54,7 @@ const candlestickChartContainer = document.createElement('div');
 candlestickChartPlaceholder.replaceWith(candlestickChartContainer);
 createCandlestickChart(candlestickChartContainer);
 
-// Create and add volume toggle button to the chart container
-const volumeToggleButton = createVolumeToggleButton();
-candlestickChartContainer.appendChild(volumeToggleButton);
+// Volume toggle button will be created later with controls
 
 const orderBookDisplay = createOrderBookDisplay();
 orderBookPlaceholder.replaceWith(orderBookDisplay);
