@@ -127,6 +127,19 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
   - `liquidations_ws.py` - Fetches historical data on WebSocket connection
   - Deque cache maintains last 50 liquidations per symbol
 
+### Liquidation Volume Aggregation System
+- **REST API Endpoint**: `/api/v1/liquidation-volume/{symbol}/{timeframe}` for historical volume data
+- **WebSocket Integration**: Timeframe parameter support for liquidation streams
+- **Data Aggregation**: `aggregate_liquidations_for_timeframe()` method groups liquidations by time buckets
+- **Timeframe Support**: 1m, 5m, 15m, 30m, 1h, 4h, 1d timeframes for volume aggregation
+- **Volume Calculation**: Separates buy volume (shorts liquidated) and sell volume (longs liquidated)
+- **Historical Data**: `fetch_historical_liquidations_by_timeframe()` with time range parameters
+- **Real-time Aggregation**: Maintains aggregation buffers for live volume updates
+- **Data Models**: `LiquidationVolume` and `LiquidationVolumeResponse` Pydantic models
+- **WebSocket Messages**: Sends `liquidation_volume` type messages with aggregated data
+- **Chart Integration**: Provides formatted volume data for TradingView histogram overlays
+- **Performance**: Efficient time bucket calculations with proper caching
+
 ### Chart Data Service
 - **Container-Width Optimization**: Calculates optimal candle count based on container width: `min(max((containerWidth/6)*3, 200), 1000)`
 - **Dual Time Fields**: Chart data includes both `timestamp` (ms) and `time` (seconds) for TradingView compatibility
@@ -155,6 +168,11 @@ ws://localhost:8000/api/v1/ws/candles/BTCUSDT?timeframe=1m&container_width=800
 Connect to liquidations stream:
 ```
 ws://localhost:8000/api/v1/ws/liquidations/BTCUSDT
+```
+
+Connect to liquidations stream with volume aggregation:
+```
+ws://localhost:8000/api/v1/ws/liquidations/BTCUSDT?timeframe=1m
 ```
 
 ### Dynamic Parameter Updates

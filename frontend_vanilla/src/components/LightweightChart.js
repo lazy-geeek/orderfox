@@ -11,12 +11,16 @@ const TIMEFRAMES = [
 
 let chartInstance = null;
 let candlestickSeries = null;
+let volumeSeries = null;
 let lastChartData = null;
 let lastSymbol = null;
 let lastTimeframe = null;
 let resizeObserver = null;
 let currentTheme = 'dark';
 let userHasZoomed = false;
+let volumeSeriesVisible = true;
+let currentVolumeData = []; // Store volume data for tooltips
+let tooltipElement = null;
 
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
@@ -33,8 +37,19 @@ function createLightweightChart(container) {
   
   chartInstance = createChart(chartContainer, chartOptions);
   
-  // Add candlestick series
+  // Add candlestick series with adjusted margins
   candlestickSeries = chartInstance.addCandlestickSeries(getCandlestickOptions());
+  
+  // Adjust candlestick series to use top 60% of chart
+  candlestickSeries.priceScale().applyOptions({
+    scaleMargins: {
+      top: 0.1,    // 10% margin from top
+      bottom: 0.4, // 40% margin from bottom
+    },
+  });
+
+  // Create liquidation volume series as overlay
+  volumeSeries = createLiquidationVolumeSeries();
 
   // Setup responsive sizing with ResizeObserver
   setupResizeObserver(chartContainer);
@@ -43,6 +58,12 @@ function createLightweightChart(container) {
   chartInstance.timeScale().subscribeVisibleTimeRangeChange(() => {
     userHasZoomed = true;
   });
+  
+  // Setup tooltip
+  setupVolumeTooltip(chartContainer);
+  
+  // Optimize touch interactions for mobile
+  setupMobileTouchOptimizations(chartContainer);
 
   // Listen for theme changes
   window.addEventListener('themechange', (e) => {
@@ -100,6 +121,29 @@ function getCandlestickOptions() {
   };
 }
 
+function createLiquidationVolumeSeries() {
+  if (!chartInstance) return null;
+  
+  // Create histogram series as overlay
+  const series = chartInstance.addHistogramSeries({
+    priceFormat: {
+      type: 'volume',
+    },
+    priceScaleId: '', // Empty string makes it an overlay
+    // We'll set colors per bar dynamically
+  });
+  
+  // Position at bottom 30% of chart
+  series.priceScale().applyOptions({
+    scaleMargins: {
+      top: 0.7,    // Start 70% from top
+      bottom: 0,   // Extend to bottom
+    },
+  });
+  
+  return series;
+}
+
 function setupResizeObserver(container) {
   if (resizeObserver) {
     resizeObserver.disconnect();
@@ -109,9 +153,97 @@ function setupResizeObserver(container) {
     if (entries.length === 0 || !chartInstance) return;
     const { width, height } = entries[0].contentRect;
     chartInstance.resize(width, height);
+    
+    // Adjust chart margins for mobile screens
+    adjustChartMarginsForScreenSize(width);
   });
   
   resizeObserver.observe(container);
+}
+
+function adjustChartMarginsForScreenSize(width) {
+  if (!candlestickSeries || !volumeSeries) return;
+  
+  // Mobile breakpoints
+  const isMobile = width < 768;
+  const isSmallMobile = width < 480;
+  
+  if (isSmallMobile) {
+    // Very small screens - more space for volume
+    candlestickSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.05,
+        bottom: 0.5, // 50% for volume
+      },
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.65,  // Adjusted for overlay
+        bottom: 0,
+      },
+    });
+  } else if (isMobile) {
+    // Mobile screens - balanced view
+    candlestickSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.05,
+        bottom: 0.45, // 45% for volume
+      },
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.65,  // Adjusted for overlay
+        bottom: 0,
+      },
+    });
+  } else {
+    // Desktop - standard margins
+    candlestickSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.4, // 40% for volume
+      },
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.7,   // Standard overlay position
+        bottom: 0,
+      },
+    });
+  }
+}
+
+function setupMobileTouchOptimizations(container) {
+  // Detect if device supports touch
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  if (!isTouchDevice || !chartInstance) return;
+  
+  // Optimize chart for touch interactions
+  chartInstance.applyOptions({
+    handleScroll: {
+      vertTouchDrag: false, // Disable vertical drag to prevent conflicts with page scroll
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+    },
+    handleScale: {
+      axisPressedMouseMove: {
+        time: true,
+        price: false, // Disable price axis scaling on mobile
+      },
+      mouseWheel: true,
+      pinch: true, // Enable pinch zoom
+    },
+  });
+  
+  // Improve tooltip behavior on touch devices
+  if (tooltipElement) {
+    container.addEventListener('touchstart', () => {
+      // Hide tooltip on touch to prevent it from blocking interactions
+      tooltipElement.style.display = 'none';
+    });
+  }
 }
 
 function switchTheme(newTheme) {
@@ -121,6 +253,8 @@ function switchTheme(newTheme) {
   
   // CRITICAL: More efficient than ECharts - use applyOptions instead of disposal
   chartInstance.applyOptions(getChartOptions(newTheme));
+  
+  // Volume series colors are set per bar, no theme update needed
   
   // Candlestick colors remain the same for both themes
   // Re-render with last known data if available
@@ -158,6 +292,104 @@ function createTimeframeSelector(handleTimeframeChange) {
   }
 
   return timeframeContainer;
+}
+
+function createVolumeToggleButton() {
+  const toggleContainer = document.createElement('div');
+  toggleContainer.className = 'volume-toggle-container';
+  
+  const button = document.createElement('button');
+  button.className = 'volume-toggle-button active';
+  button.textContent = 'Liquidation Volume';
+  button.title = 'Toggle liquidation volume display';
+  
+  button.addEventListener('click', () => {
+    const isVisible = toggleLiquidationVolume();
+    if (isVisible) {
+      button.classList.add('active');
+    } else {
+      button.classList.remove('active');
+    }
+  });
+  
+  toggleContainer.appendChild(button);
+  return toggleContainer;
+}
+
+function setupVolumeTooltip(container) {
+  // Create tooltip element
+  tooltipElement = document.createElement('div');
+  tooltipElement.className = 'volume-tooltip';
+  tooltipElement.style.display = 'none';
+  tooltipElement.style.position = 'absolute';
+  tooltipElement.style.zIndex = '1000';
+  container.appendChild(tooltipElement);
+  
+  // Subscribe to crosshair move
+  chartInstance.subscribeCrosshairMove((param) => {
+    if (!volumeSeriesVisible || !currentVolumeData.length || !param.time) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Find volume data for the current time
+    const volumeData = currentVolumeData.find(d => d.time === param.time);
+    if (!volumeData) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Get coordinates
+    const coordinate = param.seriesPrices.get(volumeSeries);
+    if (!coordinate) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Format tooltip content
+    const buyVolume = volumeData.buy_volume_formatted || volumeData.buy_volume;
+    const sellVolume = volumeData.sell_volume_formatted || volumeData.sell_volume;
+    const totalVolume = volumeData.total_volume_formatted || volumeData.total_volume;
+    const timestamp = new Date(volumeData.timestamp_ms || volumeData.time * 1000).toLocaleTimeString();
+    
+    tooltipElement.innerHTML = `
+      <div class="tooltip-header">Liquidation Volume</div>
+      <div class="tooltip-row">
+        <span class="tooltip-label">Time:</span>
+        <span class="tooltip-value">${timestamp}</span>
+      </div>
+      <div class="tooltip-row">
+        <span class="tooltip-label">Buy (Shorts):</span>
+        <span class="tooltip-value buy">${buyVolume}</span>
+      </div>
+      <div class="tooltip-row">
+        <span class="tooltip-label">Sell (Longs):</span>
+        <span class="tooltip-value sell">${sellVolume}</span>
+      </div>
+      <div class="tooltip-row">
+        <span class="tooltip-label">Total:</span>
+        <span class="tooltip-value">${totalVolume}</span>
+      </div>
+    `;
+    
+    // Position tooltip
+    const y = param.point.y;
+    let x = param.point.x;
+    
+    // Adjust position to keep tooltip visible
+    const tooltipWidth = 200;
+    const containerWidth = container.clientWidth;
+    
+    if (x + tooltipWidth > containerWidth) {
+      x = x - tooltipWidth - 10;
+    } else {
+      x = x + 10;
+    }
+    
+    tooltipElement.style.left = x + 'px';
+    tooltipElement.style.top = y + 'px';
+    tooltipElement.style.display = 'block';
+  });
 }
 
 function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, symbolData = null) {
@@ -321,6 +553,49 @@ function resetZoomState() {
   userHasZoomed = false;
 }
 
+function updateLiquidationVolume(volumeData) {
+  if (!volumeSeries || !volumeSeriesVisible) {
+    return;
+  }
+  
+  // Store volume data for tooltips
+  currentVolumeData = volumeData;
+  
+  // Process volume data into histogram format
+  const histogramData = volumeData.map(item => {
+    // Determine bar color based on dominant side
+    const buyVolume = parseFloat(item.buy_volume || 0);
+    const sellVolume = parseFloat(item.sell_volume || 0);
+    const totalVolume = parseFloat(item.total_volume || 0);
+    
+    // Green if buy > sell (shorts liquidated), red if sell > buy (longs liquidated)
+    const color = buyVolume > sellVolume ? '#0ECB81' : '#F6465D';
+    
+    return {
+      time: item.time, // Already in seconds from backend
+      value: totalVolume,
+      color: color,
+    };
+  });
+  
+  // Update series data
+  volumeSeries.setData(histogramData);
+}
+
+function toggleLiquidationVolume() {
+  if (!volumeSeries) return;
+  
+  volumeSeriesVisible = !volumeSeriesVisible;
+  
+  if (volumeSeriesVisible) {
+    volumeSeries.applyOptions({ visible: true });
+  } else {
+    volumeSeries.applyOptions({ visible: false });
+  }
+  
+  return volumeSeriesVisible;
+}
+
 function resetChartData() {
   // CRITICAL: Completely reset chart data to prevent timestamp conflicts
   if (candlestickSeries) {
@@ -328,6 +603,15 @@ function resetChartData() {
     lastChartData = null;
     lastSymbol = null;
     lastTimeframe = null;
+  }
+  
+  if (volumeSeries) {
+    volumeSeries.setData([]); // Clear volume data
+    currentVolumeData = []; // Clear stored volume data
+  }
+  
+  if (tooltipElement) {
+    tooltipElement.style.display = 'none'; // Hide tooltip
   }
 }
 
@@ -341,18 +625,23 @@ function disposeLightweightChart() {
     chartInstance = null;
   }
   candlestickSeries = null;
+  volumeSeries = null;
   lastChartData = null;
   lastSymbol = null;
   lastTimeframe = null;
   userHasZoomed = false;
+  volumeSeriesVisible = true;
 }
 
 // Export functions for backward compatibility with existing code
 export { 
   createLightweightChart as createCandlestickChart, 
-  createTimeframeSelector, 
+  createTimeframeSelector,
+  createVolumeToggleButton,
   updateLightweightChart as updateCandlestickChart,
   updateLatestCandle,
+  updateLiquidationVolume,
+  toggleLiquidationVolume,
   resetZoomState,
   resetChartData,
   disposeLightweightChart

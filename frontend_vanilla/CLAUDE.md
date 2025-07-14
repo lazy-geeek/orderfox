@@ -78,6 +78,7 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **State Integration**: Seamless integration with state management and UI reset patterns
 - **Auto-reconnection**: Built-in reconnection logic with exponential backoff
 - **Message Handling**: `websocketService.js` handles low-level WebSocket operations
+- **Liquidation Volume Integration**: Automatic fetching of historical volume data on symbol/timeframe changes
 
 ### State Management
 - **Subscribe/Notify Pattern**: Custom lightweight state management
@@ -134,6 +135,18 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 - **Real-time Updates**: Use `series.update()` for single candle updates
 - **Auto-fitting**: Only on initial load or symbol/timeframe changes
 - **Price Precision**: Automatically adjusts based on symbol (backend-provided)
+
+### Liquidation Volume Chart Overlay
+- **Histogram Series**: TradingView histogram series as overlay (empty `priceScaleId`)
+- **Scale Positioning**: Bottom 30% of chart (top: 0.7, bottom: 0)
+- **Color Coding**: Green bars for buy-dominant periods, red for sell-dominant
+- **Bar Height**: Total liquidation volume (buy + sell combined)
+- **Timeframe Sync**: Automatically switches with chart timeframe
+- **Toggle Control**: UI button to show/hide liquidation volume overlay
+- **Service Integration**: `liquidationVolumeService.js` for API calls and caching
+- **Real-time Updates**: WebSocket messages update volume data in real-time
+- **Mobile Responsive**: Dynamic scale margins for different screen sizes
+- **Performance**: Efficient volume data aggregation for large datasets
 
 ### Order Book Display
 - **Four Columns**: Price, Size for both bids and asks

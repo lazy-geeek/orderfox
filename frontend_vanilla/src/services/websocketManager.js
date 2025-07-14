@@ -23,6 +23,8 @@ import {
   updateOrderBookParameters,
 } from './websocketService.js';
 
+import liquidationVolumeService from './liquidationVolumeService.js';
+
 /**
  * Get chart container width for backend calculation.
  * Backend will calculate optimal candle count based on this width.
@@ -87,7 +89,10 @@ export class WebSocketManager {
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(newSymbol, 'trades');
-    connectWebSocketStream(newSymbol, 'liquidations');
+    connectWebSocketStream(newSymbol, 'liquidations', state.selectedTimeframe);
+    
+    // Fetch liquidation volume data for new symbol
+    this.fetchLiquidationVolumeData(newSymbol, state.selectedTimeframe);
   }
 
   /**
@@ -129,15 +134,20 @@ export class WebSocketManager {
       window.resetChartData();
     }
     
-    // CRITICAL: Disconnect stream using the OLD timeframe, not the new one
+    // CRITICAL: Disconnect streams using the OLD timeframe, not the new one
     disconnectWebSocketStream('candles', state.selectedSymbol, oldTimeframe);
+    disconnectWebSocketStream('liquidations', state.selectedSymbol, oldTimeframe);
     
     // Small delay to ensure cleanup completes
     await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Connect new candles stream with container width for backend calculation
+    // Connect new streams with new timeframe
     const containerWidth = getContainerWidth();
     connectWebSocketStream(state.selectedSymbol, 'candles', newTimeframe, containerWidth);
+    connectWebSocketStream(state.selectedSymbol, 'liquidations', newTimeframe);
+    
+    // Fetch liquidation volume data for new timeframe
+    this.fetchLiquidationVolumeData(state.selectedSymbol, newTimeframe);
   }
 
   /**
@@ -159,7 +169,10 @@ export class WebSocketManager {
     connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(symbol, 'trades');
-    connectWebSocketStream(symbol, 'liquidations');
+    connectWebSocketStream(symbol, 'liquidations', state.selectedTimeframe);
+    
+    // Fetch initial liquidation volume data
+    this.fetchLiquidationVolumeData(symbol, state.selectedTimeframe);
   }
 
   /**
@@ -181,6 +194,27 @@ export class WebSocketManager {
    */
   static getContainerWidth() {
     return getContainerWidth();
+  }
+
+  /**
+   * Fetch and initialize liquidation volume data.
+   * 
+   * @param {string} symbol - Trading symbol
+   * @param {string} timeframe - Chart timeframe
+   */
+  static async fetchLiquidationVolumeData(symbol, timeframe) {
+    try {
+      const volumeData = await liquidationVolumeService.fetchLiquidationVolume(symbol, timeframe);
+      
+      if (volumeData && volumeData.length > 0) {
+        // Call the global update function if it exists
+        if (typeof window !== 'undefined' && window.updateLiquidationVolume) {
+          window.updateLiquidationVolume({ data: volumeData });
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch initial liquidation volume data:', error);
+    }
   }
 }
 

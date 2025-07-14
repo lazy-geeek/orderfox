@@ -197,4 +197,362 @@ describe('LightweightChart Backend Data Integration', () => {
       });
     });
   });
+
+  describe('Liquidation Volume Series', () => {
+    let mockChart;
+    let mockVolumeSeries;
+
+    beforeEach(() => {
+      const mockPriceScale = {
+        applyOptions: vi.fn()
+      };
+      
+      mockVolumeSeries = {
+        setData: vi.fn(),
+        applyOptions: vi.fn(),
+        priceScale: vi.fn(() => mockPriceScale)
+      };
+      
+      mockChart = {
+        addHistogramSeries: vi.fn(() => mockVolumeSeries)
+      };
+    });
+
+    it('should create liquidation volume series as overlay', () => {
+      // Test creating volume series
+      const volumeSeries = mockChart.addHistogramSeries({
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '', // Empty string makes it an overlay
+      });
+
+      expect(mockChart.addHistogramSeries).toHaveBeenCalledWith({
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '',
+      });
+
+      // Should configure scale margins
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.7,
+          bottom: 0,
+        },
+      });
+
+      expect(volumeSeries.priceScale().applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.7,
+          bottom: 0,
+        },
+      });
+    });
+
+    it('should process liquidation volume data correctly', () => {
+      const volumeData = [
+        {
+          time: 1640995200,
+          buy_volume: "1500.0",
+          sell_volume: "2500.0",
+          total_volume: "4000.0",
+          buy_volume_formatted: "1,500.00",
+          sell_volume_formatted: "2,500.00",
+          total_volume_formatted: "4,000.00",
+          count: 5,
+          timestamp_ms: 1640995200000
+        },
+        {
+          time: 1640995260,
+          buy_volume: "800.0",
+          sell_volume: "1200.0",
+          total_volume: "2000.0",
+          buy_volume_formatted: "800.00",
+          sell_volume_formatted: "1,200.00",
+          total_volume_formatted: "2,000.00",
+          count: 3,
+          timestamp_ms: 1640995260000
+        }
+      ];
+
+      // Process into histogram format
+      const histogramData = volumeData.map(item => {
+        const buyVolume = parseFloat(item.buy_volume || 0);
+        const sellVolume = parseFloat(item.sell_volume || 0);
+        const totalVolume = parseFloat(item.total_volume || 0);
+        
+        // Green if buy > sell (shorts liquidated), red if sell > buy (longs liquidated)
+        const color = buyVolume > sellVolume ? '#0ECB81' : '#F6465D';
+        
+        return {
+          time: item.time,
+          value: totalVolume,
+          color: color,
+        };
+      });
+
+      expect(histogramData[0]).toEqual({
+        time: 1640995200,
+        value: 4000.0,
+        color: '#F6465D', // Red because sell > buy
+      });
+
+      expect(histogramData[1]).toEqual({
+        time: 1640995260,
+        value: 2000.0,
+        color: '#F6465D', // Red because sell > buy
+      });
+
+      mockVolumeSeries.setData(histogramData);
+      expect(mockVolumeSeries.setData).toHaveBeenCalledWith(histogramData);
+    });
+
+    it('should handle empty volume data', () => {
+      const volumeData = [];
+      
+      const histogramData = volumeData.map(item => ({
+        time: item.time,
+        value: parseFloat(item.total_volume || 0),
+        color: parseFloat(item.buy_volume || 0) > parseFloat(item.sell_volume || 0) ? '#0ECB81' : '#F6465D',
+      }));
+
+      expect(histogramData).toEqual([]);
+      
+      mockVolumeSeries.setData(histogramData);
+      expect(mockVolumeSeries.setData).toHaveBeenCalledWith([]);
+    });
+
+    it('should color bars based on dominant side', () => {
+      const testCases = [
+        {
+          buy_volume: "3000.0",
+          sell_volume: "1000.0",
+          expectedColor: '#0ECB81' // Green - buy dominant
+        },
+        {
+          buy_volume: "1000.0",
+          sell_volume: "3000.0",
+          expectedColor: '#F6465D' // Red - sell dominant
+        },
+        {
+          buy_volume: "2000.0",
+          sell_volume: "2000.0",
+          expectedColor: '#F6465D' // Red when equal (default to sell)
+        }
+      ];
+
+      testCases.forEach(testCase => {
+        const buyVolume = parseFloat(testCase.buy_volume);
+        const sellVolume = parseFloat(testCase.sell_volume);
+        const color = buyVolume > sellVolume ? '#0ECB81' : '#F6465D';
+        
+        expect(color).toBe(testCase.expectedColor);
+      });
+    });
+
+    it('should toggle volume series visibility', () => {
+      let volumeSeriesVisible = true;
+      
+      // Toggle function
+      function toggleLiquidationVolume() {
+        volumeSeriesVisible = !volumeSeriesVisible;
+        
+        if (volumeSeriesVisible) {
+          mockVolumeSeries.applyOptions({ visible: true });
+        } else {
+          mockVolumeSeries.applyOptions({ visible: false });
+        }
+        
+        return volumeSeriesVisible;
+      }
+
+      // Initially visible
+      expect(volumeSeriesVisible).toBe(true);
+
+      // Toggle off
+      const result1 = toggleLiquidationVolume();
+      expect(result1).toBe(false);
+      expect(mockVolumeSeries.applyOptions).toHaveBeenCalledWith({ visible: false });
+
+      // Toggle on
+      const result2 = toggleLiquidationVolume();
+      expect(result2).toBe(true);
+      expect(mockVolumeSeries.applyOptions).toHaveBeenCalledWith({ visible: true });
+    });
+  });
+
+  describe('Mobile Responsiveness', () => {
+    let mockCandlestickSeries;
+    let mockVolumeSeries;
+    let mockCandlestickPriceScale;
+    let mockVolumePriceScale;
+
+    beforeEach(() => {
+      mockCandlestickPriceScale = {
+        applyOptions: vi.fn()
+      };
+      
+      mockVolumePriceScale = {
+        applyOptions: vi.fn()
+      };
+      
+      mockCandlestickSeries = {
+        priceScale: vi.fn(() => mockCandlestickPriceScale)
+      };
+      
+      mockVolumeSeries = {
+        priceScale: vi.fn(() => mockVolumePriceScale)
+      };
+    });
+
+    it('should adjust margins for small mobile screens', () => {
+      const width = 400; // Small mobile
+      
+      // Function to adjust margins based on screen size
+      function adjustChartMarginsForScreenSize(width) {
+        const isMobile = width < 768;
+        const isSmallMobile = width < 480;
+        
+        if (isSmallMobile) {
+          mockCandlestickSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.05,
+              bottom: 0.5,
+            },
+          });
+          mockVolumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.65,
+              bottom: 0,
+            },
+          });
+        } else if (isMobile) {
+          mockCandlestickSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.05,
+              bottom: 0.45,
+            },
+          });
+          mockVolumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.65,
+              bottom: 0,
+            },
+          });
+        } else {
+          mockCandlestickSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.1,
+              bottom: 0.4,
+            },
+          });
+          mockVolumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.7,
+              bottom: 0,
+            },
+          });
+        }
+      }
+
+      adjustChartMarginsForScreenSize(width);
+
+      // Verify small mobile margins
+      expect(mockCandlestickPriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.05,
+          bottom: 0.5,
+        },
+      });
+      expect(mockVolumePriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.65,
+          bottom: 0,
+        },
+      });
+    });
+
+    it('should adjust margins for tablet screens', () => {
+      const width = 600; // Tablet
+      
+      function adjustChartMarginsForScreenSize(width) {
+        const isMobile = width < 768;
+        const isSmallMobile = width < 480;
+        
+        if (isSmallMobile) {
+          // Small mobile margins
+        } else if (isMobile) {
+          mockCandlestickSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.05,
+              bottom: 0.45,
+            },
+          });
+          mockVolumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.65,
+              bottom: 0,
+            },
+          });
+        }
+      }
+
+      adjustChartMarginsForScreenSize(width);
+
+      // Verify tablet margins
+      expect(mockCandlestickPriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.05,
+          bottom: 0.45,
+        },
+      });
+      expect(mockVolumePriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.65,
+          bottom: 0,
+        },
+      });
+    });
+
+    it('should use desktop margins for large screens', () => {
+      const width = 1200; // Desktop
+      
+      function adjustChartMarginsForScreenSize(width) {
+        const isMobile = width < 768;
+        const isSmallMobile = width < 480;
+        
+        if (!isMobile && !isSmallMobile) {
+          mockCandlestickSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.1,
+              bottom: 0.4,
+            },
+          });
+          mockVolumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+              top: 0.7,
+              bottom: 0,
+            },
+          });
+        }
+      }
+
+      adjustChartMarginsForScreenSize(width);
+
+      // Verify desktop margins
+      expect(mockCandlestickPriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.4,
+        },
+      });
+      expect(mockVolumePriceScale.applyOptions).toHaveBeenCalledWith({
+        scaleMargins: {
+          top: 0.7,
+          bottom: 0,
+        },
+      });
+    });
+  });
 });

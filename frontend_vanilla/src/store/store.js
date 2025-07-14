@@ -23,6 +23,9 @@ const state = {
   liquidationsLoading: false,
   liquidationsError: null,
   liquidationsWsConnected: false,
+  liquidationVolume: [],
+  liquidationVolumeLoading: false,
+  liquidationVolumeError: null,
   selectedRounding: null,
   availableRoundingOptions: [], // Provided by backend
   displayDepth: 10,
@@ -71,6 +74,7 @@ function setSelectedSymbol(symbol) {
     state.currentTicker = null;
     state.currentTrades = [];
     state.currentLiquidations = [];
+    state.liquidationVolume = [];
     state.candlesWsConnected = false;
     state.orderBookWsConnected = false;
     state.tickerWsConnected = false;
@@ -217,6 +221,29 @@ function updateLiquidationsFromWebSocket(payload) {
     notify('currentLiquidations');
     notify('liquidationsLoading');
   }
+}
+
+function updateLiquidationVolume(volumeData) {
+  // Update liquidation volume data
+  state.liquidationVolume = volumeData || [];
+  state.liquidationVolumeLoading = false;
+  
+  notify('liquidationVolume');
+  notify('liquidationVolumeLoading');
+}
+
+function setLiquidationVolumeLoading(loading) {
+  state.liquidationVolumeLoading = loading;
+  notify('liquidationVolumeLoading');
+}
+
+function setLiquidationVolumeError(error) {
+  state.liquidationVolumeError = error;
+  notify('liquidationVolumeError');
+}
+
+function getLiquidationVolume() {
+  return state.liquidationVolume;
 }
 
 function setLiquidationsWsConnected(connected) {
@@ -500,6 +527,10 @@ export {
   setLiquidationsError,
   clearLiquidationsError,
   clearLiquidations,
+  updateLiquidationVolume,
+  setLiquidationVolumeLoading,
+  setLiquidationVolumeError,
+  getLiquidationVolume,
   clearError,
   setSelectedRounding,
   setAvailableRoundingOptions,

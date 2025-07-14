@@ -493,3 +493,339 @@ class TestLiquidationService:
         
         mock_session.close.assert_called_once()
         assert liquidation_service._http_session is None
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_by_timeframe_success(self):
+        """Test successful API call for historical liquidations with timeframe"""
+        # Mock API response that will be aggregated
+        mock_response = [
+            {
+                "symbol": "BTCUSDT",
+                "side": "sell",
+                "order_filled_accumulated_quantity": "1.5",
+                "average_price": "45000",
+                "order_trade_time": 1609459200000
+            },
+            {
+                "symbol": "BTCUSDT",
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.8",
+                "average_price": "44000",
+                "order_trade_time": 1609459260000
+            }
+        ]
+        
+        # Mock the HTTP session and response
+        mock_session = AsyncMock()
+        mock_response_obj = AsyncMock()
+        mock_response_obj.status = 200
+        mock_response_obj.json = AsyncMock(return_value=mock_response)
+        
+        # Create async context manager mock
+        from unittest.mock import MagicMock
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response_obj)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = MagicMock(return_value=mock_context_manager)
+        
+        # Mock aggregate method to test that data flows correctly
+        with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
+            with patch.object(liquidation_service, '_convert_api_to_ws_format') as mock_convert:
+                # Set up mock to return properly formatted data
+                mock_convert.side_effect = [
+                    {
+                        "timestamp": 1609459200000,
+                        "side": "SELL",
+                        "priceUsdt": "67500"  # 1.5 * 45000
+                    },
+                    {
+                        "timestamp": 1609459260000,
+                        "side": "BUY", 
+                        "priceUsdt": "35200"  # 0.8 * 44000
+                    }
+                ]
+                
+                result = await liquidation_service.fetch_historical_liquidations_by_timeframe(
+                    "BTCUSDT", "1m", start_time=1609459200000, end_time=1609459500000
+                )
+        
+        # Result should be aggregated data
+        assert len(result) == 2  # Two 1-minute buckets
+        assert result[0]["time"] == 1609459200  # First minute
+        assert result[0]["sell_volume"] == "67500"
+        assert result[0]["buy_volume"] == "0"
+        assert result[0]["total_volume"] == "67500"
+        
+        assert result[1]["time"] == 1609459260  # Second minute
+        assert result[1]["buy_volume"] == "35200"
+        assert result[1]["sell_volume"] == "0"
+        assert result[1]["total_volume"] == "35200"
+        
+        # Verify the API was called with correct parameters
+        mock_session.get.assert_called_once_with(
+            f"{settings.LIQUIDATION_API_BASE_URL}/api/liquidations",
+            params={
+                "symbol": "BTCUSDT",
+                "timeframe": "1m",
+                "limit": 1000,
+                "start_time": 1609459200000,
+                "end_time": 1609459500000
+            },
+            timeout=aiohttp.ClientTimeout(total=30)
+        )
+    
+    @pytest.mark.asyncio
+    async def test_fetch_historical_liquidations_by_timeframe_default_time_range(self):
+        """Test historical liquidations with default time range (24h)"""
+        # Mock empty response
+        mock_session = AsyncMock()
+        mock_response_obj = AsyncMock()
+        mock_response_obj.status = 200
+        mock_response_obj.json = AsyncMock(return_value=[])
+        
+        from unittest.mock import MagicMock
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response_obj)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = MagicMock(return_value=mock_context_manager)
+        
+        with patch('time.time', return_value=1609545600):  # Mock current time
+            with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
+                await liquidation_service.fetch_historical_liquidations_by_timeframe("BTCUSDT", "1h")
+        
+        # Verify default time range (24h ago to now)
+        expected_start = 1609545600000 - 24 * 60 * 60 * 1000  # 24h ago in ms
+        expected_end = 1609545600000  # now in ms
+        
+        mock_session.get.assert_called_once()
+        call_args = mock_session.get.call_args[1]
+        assert call_args['params']['start_time'] == expected_start
+        assert call_args['params']['end_time'] == expected_end
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_for_timeframe_1m(self):
+        """Test aggregation of liquidations for 1-minute timeframe"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,  # 2021-01-01 00:00:00
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.1",
+                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+            },
+            {
+                "order_trade_time": 1609459210000,  # 2021-01-01 00:00:10
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.05",
+                "average_price": "10000"  # Total: 0.05 * 10000 = 500
+            },
+            {
+                "order_trade_time": 1609459250000,  # 2021-01-01 00:00:50
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.03",
+                "average_price": "10000"  # Total: 0.03 * 10000 = 300
+            },
+            {
+                "order_trade_time": 1609459260000,  # 2021-01-01 00:01:00 (next minute)
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.08",
+                "average_price": "10000"  # Total: 0.08 * 10000 = 800
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT"
+        )
+        
+        assert len(result) == 2  # Two 1-minute buckets
+        
+        # First minute bucket
+        assert result[0]["time"] == 1609459200  # Unix timestamp in seconds
+        assert result[0]["buy_volume"] == "1300.0"  # 1000 + 300
+        assert result[0]["sell_volume"] == "500.0"
+        assert result[0]["total_volume"] == "1800.0"
+        assert result[0]["count"] == 3
+        
+        # Second minute bucket
+        assert result[1]["time"] == 1609459260  # Unix timestamp in seconds
+        assert result[1]["buy_volume"] == "0.0"
+        assert result[1]["sell_volume"] == "800.0"
+        assert result[1]["total_volume"] == "800.0"
+        assert result[1]["count"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_for_timeframe_5m(self):
+        """Test aggregation of liquidations for 5-minute timeframe"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,  # 00:00
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.1",
+                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+            },
+            {
+                "order_trade_time": 1609459260000,  # 00:01
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.05",
+                "average_price": "10000"  # Total: 0.05 * 10000 = 500
+            },
+            {
+                "order_trade_time": 1609459440000,  # 00:04
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.07",
+                "average_price": "10000"  # Total: 0.07 * 10000 = 700
+            },
+            {
+                "order_trade_time": 1609459500000,  # 00:05 (next 5-minute bucket)
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.09",
+                "average_price": "10000"  # Total: 0.09 * 10000 = 900
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "5m", "BTCUSDT"
+        )
+        
+        assert len(result) == 2  # Two 5-minute buckets
+        
+        # First 5-minute bucket
+        assert result[0]["time"] == 1609459200  # 00:00
+        assert result[0]["buy_volume"] == "1700.0"  # 1000 + 700
+        assert result[0]["sell_volume"] == "500.0"
+        assert result[0]["total_volume"] == "2200.0"
+        assert result[0]["count"] == 3
+        
+        # Second 5-minute bucket
+        assert result[1]["time"] == 1609459500  # 00:05
+        assert result[1]["buy_volume"] == "0.0"
+        assert result[1]["sell_volume"] == "900.0"
+        assert result[1]["total_volume"] == "900.0"
+        assert result[1]["count"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_for_timeframe_1h(self):
+        """Test aggregation of liquidations for 1-hour timeframe"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,  # 00:00
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.1",
+                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+            },
+            {
+                "order_trade_time": 1609460400000,  # 00:20
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.2",
+                "average_price": "10000"  # Total: 0.2 * 10000 = 2000
+            },
+            {
+                "order_trade_time": 1609462000000,  # 00:46:40
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.15",
+                "average_price": "10000"  # Total: 0.15 * 10000 = 1500
+            },
+            {
+                "order_trade_time": 1609462800000,  # 01:00 (next hour)
+                "side": "sell",
+                "order_filled_accumulated_quantity": "0.3",
+                "average_price": "10000"  # Total: 0.3 * 10000 = 3000
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1h", "BTCUSDT"
+        )
+        
+        assert len(result) == 2  # Two 1-hour buckets
+        
+        # First hour
+        assert result[0]["time"] == 1609459200  # 00:00
+        assert result[0]["buy_volume"] == "2500.0"  # 1000 + 1500
+        assert result[0]["sell_volume"] == "2000.0"
+        assert result[0]["total_volume"] == "4500.0"
+        assert result[0]["count"] == 3
+        
+        # Second hour
+        assert result[1]["time"] == 1609462800  # 01:00
+        assert result[1]["buy_volume"] == "0.0"
+        assert result[1]["sell_volume"] == "3000.0"
+        assert result[1]["total_volume"] == "3000.0"
+        assert result[1]["count"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_empty_data(self):
+        """Test aggregation with empty liquidation data"""
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            [], "1m", "BTCUSDT"
+        )
+        
+        assert result == []
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_single_item(self):
+        """Test aggregation with single liquidation"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.1",
+                "average_price": "10000"  # Total: 0.1 * 10000 = 1000
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT"
+        )
+        
+        assert len(result) == 1
+        assert result[0]["buy_volume"] == "1000.0"
+        assert result[0]["sell_volume"] == "0.0"
+        assert result[0]["total_volume"] == "1000.0"
+        assert result[0]["count"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_formatting(self):
+        """Test that aggregated data includes formatted values"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,
+                "side": "buy",
+                "order_filled_accumulated_quantity": "1.234567",
+                "average_price": "10000"  # Total: 1.234567 * 10000 = 12345.67
+            },
+            {
+                "order_trade_time": 1609459210000,
+                "side": "sell",
+                "order_filled_accumulated_quantity": "9.876543",
+                "average_price": "10000"  # Total: 9.876543 * 10000 = 98765.43
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT"
+        )
+        
+        assert len(result) == 1
+        assert result[0]["buy_volume_formatted"] == "12,345.67"
+        assert result[0]["sell_volume_formatted"] == "98,765.43"
+        assert result[0]["total_volume_formatted"] == "111,111.10"
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_invalid_timeframe(self):
+        """Test aggregation with invalid timeframe defaults to 1m"""
+        liquidations = [
+            {
+                "order_trade_time": 1609459200000,
+                "side": "buy",
+                "order_filled_accumulated_quantity": "0.1",
+                "average_price": "10000"
+            }
+        ]
+        
+        # Should not raise error, defaults to 1m
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "invalid", "BTCUSDT"
+        )
+        
+        assert len(result) == 1
+        assert result[0]["time"] == 1609459200  # Properly bucketed to minute

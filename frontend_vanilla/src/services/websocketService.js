@@ -35,18 +35,32 @@ export const connectWebSocketStream = async (
   const cleanWsBaseUrl = WS_BASE_URL.replace(/\/$/, '');
   
   let wsUrl;
-  if (timeframe) {
+  if (streamType === 'candles' && timeframe) {
+    // Candles use timeframe in path
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}/${timeframe}`;
-    if (streamType === 'candles' && limit) {
+    if (limit) {
       wsUrl += `?limit=${limit}`;
     }
   } else {
+    // Other streams use symbol only in path
     wsUrl = `${cleanWsBaseUrl}/ws/${streamType}/${symbol}`;
+    
+    // Add query parameters
+    const params = new URLSearchParams();
+    
     if (streamType === 'orderbook' && limit) {
-      wsUrl += `?limit=${limit}`;
+      params.append('limit', limit);
       if (rounding) {
-        wsUrl += `&rounding=${rounding}`;
+        params.append('rounding', rounding);
       }
+    } else if (streamType === 'liquidations' && timeframe) {
+      // Support timeframe parameter for liquidations
+      params.append('timeframe', timeframe);
+    }
+    
+    const queryString = params.toString();
+    if (queryString) {
+      wsUrl += `?${queryString}`;
     }
   }
 
@@ -152,6 +166,11 @@ export const connectWebSocketStream = async (
           // Handle liquidation data
           if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
             window.updateLiquidationDisplay(data);
+          }
+        } else if (data.type === 'liquidation_volume') {
+          // Handle liquidation volume updates
+          if (typeof window !== 'undefined' && window.updateLiquidationVolume) {
+            window.updateLiquidationVolume(data);
           }
         } else if (data.type === 'param_update_ack') {
           // Parameter update acknowledged
