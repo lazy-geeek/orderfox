@@ -165,8 +165,12 @@ subscribe((key) => {
 });
 
 // Event Listeners
-symbolSelector.addEventListener('change', (e) => {
-  WebSocketManager.switchSymbol(e.target.value);
+symbolSelector.addEventListener('change', async (e) => {
+  try {
+    await WebSocketManager.switchSymbol(e.target.value);
+  } catch (error) {
+    console.error('Error switching symbol:', error);
+  }
 });
 
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {

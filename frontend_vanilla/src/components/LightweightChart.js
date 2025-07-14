@@ -21,6 +21,8 @@ let userHasZoomed = false;
 let volumeSeriesVisible = true;
 let currentVolumeData = []; // Store volume data for tooltips
 let tooltipElement = null;
+let chartInitialized = false; // Track if chart has received initial data
+let pendingVolumeData = null; // Buffer volume data until chart is ready
 
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
@@ -339,7 +341,12 @@ function setupVolumeTooltip(container) {
       return;
     }
     
-    // Get coordinates
+    // Get coordinates - ensure volumeSeries exists
+    if (!volumeSeries || !param.seriesPrices) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
     const coordinate = param.seriesPrices.get(volumeSeries);
     if (!coordinate) {
       tooltipElement.style.display = 'none';
@@ -424,7 +431,10 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 
   // Check if we have valid candle data
   if (!currentCandles || currentCandles.length === 0) {
-    console.warn(`No candle data available for ${symbol} ${timeframe}`);
+    // Only warn if chart was previously initialized - avoid warnings on initial load
+    if (chartInitialized) {
+      console.warn(`No candle data available for ${symbol} ${timeframe}`);
+    }
     // Clear the chart but don't break
     candlestickSeries.setData([]);
     return;
@@ -447,6 +457,17 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
   // CRITICAL: Use setData to completely replace chart data
   // This clears any previous data and prevents timestamp ordering conflicts
   candlestickSeries.setData(formattedData);
+
+  // Mark chart as initialized after first successful data load
+  if (!chartInitialized) {
+    chartInitialized = true;
+    
+    // Process any pending volume data
+    if (pendingVolumeData) {
+      updateLiquidationVolume(pendingVolumeData);
+      pendingVolumeData = null;
+    }
+  }
 
   // Update chart title - we'll add this as a visual indicator
   updateChartTitle(symbol, timeframe);
@@ -528,6 +549,10 @@ function updateLatestCandle(candleData) {
   };
 
   try {
+    if (!candlestickSeries) {
+      console.error('Candlestick series not initialized');
+      return;
+    }
     candlestickSeries.update(formattedCandle);
   } catch (error) {
     // CRITICAL: Catch and log TradingView chart errors without crashing
@@ -551,10 +576,18 @@ function updateLatestCandle(candleData) {
 function resetZoomState() {
   // Reset zoom tracking when symbol or timeframe changes
   userHasZoomed = false;
+  // Reset chart initialization state for new symbol/timeframe
+  chartInitialized = false;
 }
 
 function updateLiquidationVolume(volumeData) {
   if (!volumeSeries || !volumeSeriesVisible) {
+    return;
+  }
+  
+  // If chart hasn't been initialized yet, buffer the volume data
+  if (!chartInitialized) {
+    pendingVolumeData = volumeData;
     return;
   }
   
@@ -579,11 +612,18 @@ function updateLiquidationVolume(volumeData) {
   });
   
   // Update series data
+  if (!volumeSeries) {
+    console.warn('Volume series not initialized - cannot update liquidation volume');
+    return;
+  }
   volumeSeries.setData(histogramData);
 }
 
 function toggleLiquidationVolume() {
-  if (!volumeSeries) return;
+  if (!volumeSeries) {
+    console.warn('Volume series not initialized');
+    return false;
+  }
   
   volumeSeriesVisible = !volumeSeriesVisible;
   
@@ -613,6 +653,10 @@ function resetChartData() {
   if (tooltipElement) {
     tooltipElement.style.display = 'none'; // Hide tooltip
   }
+  
+  // Reset initialization state
+  chartInitialized = false;
+  pendingVolumeData = null;
 }
 
 function disposeLightweightChart() {
@@ -631,6 +675,8 @@ function disposeLightweightChart() {
   lastTimeframe = null;
   userHasZoomed = false;
   volumeSeriesVisible = true;
+  chartInitialized = false;
+  pendingVolumeData = null;
 }
 
 // Export functions for backward compatibility with existing code

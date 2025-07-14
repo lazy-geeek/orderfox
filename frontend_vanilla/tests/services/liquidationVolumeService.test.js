@@ -5,9 +5,7 @@ global.fetch = vi.fn();
 
 // Mock config
 vi.mock('../../src/config/env.js', () => ({
-  API_CONFIG: {
-    API_BASE_URL: 'http://localhost:8000/api/v1'
-  }
+  API_BASE_URL: 'http://localhost:8000/api/v1'
 }));
 
 describe('LiquidationVolumeService', () => {

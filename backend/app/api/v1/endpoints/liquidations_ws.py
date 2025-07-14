@@ -20,8 +20,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Store recent liquidations per symbol using deque for FIFO behavior
+# Global cache shared across all WebSocket connections for the same symbol
 liquidations_cache: Dict[str, deque] = {}
 MAX_LIQUIDATIONS = 50
+# Track if historical data has been loaded for each symbol
+historical_loaded: Dict[str, bool] = {}
 
 @router.websocket("/ws/liquidations/{display_symbol}")
 async def liquidation_stream(
@@ -45,12 +48,25 @@ async def liquidation_stream(
     tasks = []  # Initialize tasks list
     
     async def liquidation_callback(data: Dict):
-        """Callback for liquidation data"""
-        await liquidation_queue.put(data)
-        
-        # Store in liquidations cache (prepend to keep newest first)
+        """Callback for liquidation data with deduplication"""
+        # Initialize cache if needed
         if display_symbol not in liquidations_cache:
             liquidations_cache[display_symbol] = deque(maxlen=MAX_LIQUIDATIONS)
+        
+        # Check for duplicates using timestamp + amount + side as unique key
+        new_key = f"{data.get('timestamp', 0)}_{data.get('priceUsdt', '')}_{data.get('side', '')}"
+        
+        # Check if this liquidation already exists in cache
+        for existing in liquidations_cache[display_symbol]:
+            existing_key = f"{existing.get('timestamp', 0)}_{existing.get('priceUsdt', '')}_{existing.get('side', '')}"
+            if existing_key == new_key:
+                # Duplicate found - skip adding to queue and cache
+                return
+        
+        # Add to queue for this WebSocket connection
+        await liquidation_queue.put(data)
+        
+        # Store in global cache (prepend to keep newest first)
         liquidations_cache[display_symbol].appendleft(data)
     
     async def volume_callback(volume_data: List[Dict]):
@@ -75,12 +91,16 @@ async def liquidation_stream(
         # Get symbol info for formatting
         symbol_info = symbol_service.get_symbol_info(display_symbol)
         
-        # Initialize cache with historical data (only once per symbol)
+        # Initialize cache and load historical data (only once per symbol globally)
         if display_symbol not in liquidations_cache:
             liquidations_cache[display_symbol] = deque(maxlen=MAX_LIQUIDATIONS)
+        
+        # Load historical data only once per symbol (shared across all WebSocket connections)
+        if display_symbol not in historical_loaded:
+            historical_loaded[display_symbol] = True
             
             # Fetch historical liquidations
-            logger.info(f"Fetching historical liquidations for {display_symbol}")
+            logger.info(f"Fetching historical liquidations for {display_symbol} (shared across all connections)")
             historical = await liquidation_service.fetch_historical_liquidations(
                 display_symbol, limit=MAX_LIQUIDATIONS
             )
@@ -93,6 +113,8 @@ async def liquidation_stream(
             
             if historical:
                 logger.info(f"Loaded {len(historical)} historical liquidations for {display_symbol}")
+        else:
+            logger.info(f"Using existing historical liquidations for {display_symbol}")
         
         # Send initial data with cached liquidations
         initial_data = {
@@ -221,9 +243,9 @@ async def liquidation_stream(
         for task in tasks:
             task.cancel()
         
-        # Disconnect liquidation stream for this symbol
+        # Disconnect liquidation stream for this callback only (reference counting)
         try:
-            await liquidation_service.disconnect_stream(display_symbol)
+            await liquidation_service.disconnect_stream(display_symbol, liquidation_callback)
         except Exception as e:
             logger.error(f"Error disconnecting liquidation stream: {e}")
         

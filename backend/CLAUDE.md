@@ -113,6 +113,11 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **Data Ordering**: Liquidations sorted with newest first using deque with appendleft for real-time data
 - **Thin Client Architecture**: Backend provides formatted data with `quantityFormatted`, `priceUsdtFormatted`, and `displayTime`
 - **API Integration**: Uses `fetch_historical_liquidations()` with configurable LIQUIDATION_API_BASE_URL
+- **Fan-out Architecture**: Single Binance connection per symbol shared between multiple frontend subscribers (table + chart)
+- **Connection Reference Counting**: `disconnect_stream(symbol, callback)` removes specific callbacks, only closes Binance connection when no subscribers remain
+- **Deduplication System**: Prevents duplicate liquidation entries using `timestamp + amount + side` as unique keys
+- **Global Cache Management**: `historical_loaded` flag ensures historical data fetched only once per symbol across all connections
+- **Connection Sharing Logging**: Backend logs show "Adding callback to existing stream" when multiple components subscribe to same symbol
 
 ### Liquidation Orders API Architecture
 - **External API Integration**: Fetches historical liquidation data from external API service
@@ -240,6 +245,8 @@ Update parameters without reconnecting (order book only):
 - **Logging**: Structured logs with request timing and correlation IDs
 - **Health Check**: GET /health endpoint for monitoring
 - **Exchange Errors**: Proper handling of exchange API errors with fallbacks
+- **Connection Lifecycle**: Proper handling of "Cannot call 'send' once a close message has been sent" errors during frontend disconnection
+- **Race Condition Prevention**: Backend waits for proper WebSocket cleanup before processing new connections
 
 ## Environment Variables
 

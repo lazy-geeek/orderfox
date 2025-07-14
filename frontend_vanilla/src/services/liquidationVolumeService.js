@@ -1,4 +1,4 @@
-import { API_CONFIG } from '../config/env.js';
+import { API_BASE_URL } from '../config/env.js';
 
 class LiquidationVolumeService {
   constructor() {
@@ -25,7 +25,7 @@ class LiquidationVolumeService {
     }
     
     try {
-      const baseUrl = API_CONFIG.API_BASE_URL;
+      const baseUrl = API_BASE_URL;
       
       // Build URL
       let url = `${baseUrl}/liquidation-volume/${symbol}/${timeframe}`;

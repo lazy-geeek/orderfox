@@ -42,6 +42,7 @@ class LiquidationService:
     async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any], symbol_info: Optional[Dict] = None):
         """
         Connect to Binance liquidation stream for a specific symbol
+        Uses fan-out pattern - single Binance connection, multiple frontend subscribers
         
         Args:
             symbol: Trading symbol (e.g., 'BTCUSDT')
@@ -57,15 +58,17 @@ class LiquidationService:
             self.data_callbacks[symbol] = []
         self.data_callbacks[symbol].append(callback)
         
-        # Store symbol info
-        self.symbol_info_cache[symbol] = symbol_info
+        # Store symbol info (update if provided)
+        if symbol_info:
+            self.symbol_info_cache[symbol] = symbol_info
         
-        # If already connected, just add callback
+        # If already connected, just add callback - connection sharing
         if symbol in self.active_connections:
-            logger.info(f"Already connected to {symbol} liquidation stream")
+            logger.info(f"Adding callback to existing {symbol} liquidation stream ({len(self.data_callbacks[symbol])} total subscribers)")
             return
             
-        # Start new connection
+        # Start new connection - this will be shared by all subscribers
+        logger.info(f"Starting new Binance liquidation stream for {symbol}")
         self.running_streams[symbol] = True
         task = asyncio.create_task(self._maintain_connection(symbol, stream_url))
         self.active_connections[symbol] = task
@@ -244,7 +247,7 @@ class LiquidationService:
         
         try:
             session = await self._get_http_session()
-            url = f"{settings.LIQUIDATION_API_BASE_URL}/api/liquidations"
+            url = f"{settings.LIQUIDATION_API_BASE_URL}/liquidations"
             
             # Build parameters
             params = {
@@ -254,13 +257,13 @@ class LiquidationService:
             }
             
             if start_time:
-                params["start_time"] = start_time
+                params["start_timestamp"] = start_time
             if end_time:
-                params["end_time"] = end_time
+                params["end_timestamp"] = end_time
             
             logger.info(f"Fetching liquidations from {url} with params: {params}")
             
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=120)) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     logger.error(f"Liquidation API error {response.status}: {error_text}")
@@ -476,14 +479,30 @@ class LiquidationService:
             "baseAsset": symbol_info.get('baseAsset', '') if symbol_info else ''
         }
                 
-    async def disconnect_stream(self, symbol: str):
+    async def disconnect_stream(self, symbol: str, callback: Optional[Callable] = None):
         """
-        Disconnect from liquidation stream
+        Disconnect from liquidation stream with reference counting
+        Only closes Binance connection when no more subscribers
         
         Args:
             symbol: Trading symbol to disconnect
+            callback: Specific callback to remove (if None, removes all)
         """
-        logger.info(f"Disconnecting liquidation stream for {symbol}")
+        if callback:
+            # Remove specific callback
+            if symbol in self.data_callbacks and callback in self.data_callbacks[symbol]:
+                self.data_callbacks[symbol].remove(callback)
+                logger.info(f"Removed callback from {symbol} liquidation stream ({len(self.data_callbacks[symbol])} remaining subscribers)")
+                
+                # If still have subscribers, don't close connection
+                if self.data_callbacks[symbol]:
+                    return
+            else:
+                # Callback not found or symbol not in callbacks
+                return
+        
+        # Remove all callbacks or no more callbacks remaining
+        logger.info(f"Disconnecting Binance liquidation stream for {symbol}")
         
         # Stop the stream
         self.running_streams[symbol] = False
@@ -647,11 +666,12 @@ class LiquidationService:
             self.liquidation_buffers[symbol][timeframe] = []
     
     async def unregister_volume_callback(self, symbol: str, timeframe: str, callback: Callable):
-        """Unregister volume callback"""
+        """Unregister volume callback with reference counting"""
         if (symbol in self.buffer_callbacks and 
             timeframe in self.buffer_callbacks[symbol]):
             try:
                 self.buffer_callbacks[symbol][timeframe].remove(callback)
+                logger.info(f"Removed volume callback for {symbol}/{timeframe} ({len(self.buffer_callbacks[symbol][timeframe])} remaining)")
                 
                 # Clean up if no more callbacks
                 if not self.buffer_callbacks[symbol][timeframe]:
@@ -677,6 +697,7 @@ class LiquidationService:
                     del self.buffer_callbacks[symbol]
                     
             except ValueError:
+                logger.warning(f"Callback not found for {symbol}/{timeframe}")
                 pass
     
     async def _notify_volume_callbacks(self, symbol: str, timeframe: str, volume_data: List[Dict]):

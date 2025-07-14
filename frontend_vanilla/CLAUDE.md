@@ -79,6 +79,11 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **Auto-reconnection**: Built-in reconnection logic with exponential backoff
 - **Message Handling**: `websocketService.js` handles low-level WebSocket operations
 - **Liquidation Volume Integration**: Automatic fetching of historical volume data on symbol/timeframe changes
+- **Connection Lifecycle Management**: Proper event handler nullification during shutdown prevents race conditions
+- **Async Symbol Switching**: 500ms delay allows backend processing to complete before creating new connections
+- **Graceful Disconnection**: Try-catch blocks handle WebSocket close errors during cleanup
+- **State Validation**: Connection state checking before attempting to close or create connections
+- **WebSocket URL Construction**: Automatic conversion of relative URLs to proper WebSocket URLs with protocol handling
 
 ### State Management
 - **Subscribe/Notify Pattern**: Custom lightweight state management
@@ -135,6 +140,9 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 - **Real-time Updates**: Use `series.update()` for single candle updates
 - **Auto-fitting**: Only on initial load or symbol/timeframe changes
 - **Price Precision**: Automatically adjusts based on symbol (backend-provided)
+- **Chart Initialization Tracking**: `chartInitialized` flag prevents premature liquidation volume updates before chart is ready
+- **Pending Data Buffering**: Volume data is buffered in `pendingVolumeData` until chart is properly initialized
+- **Graceful Error Handling**: Chart warnings only appear after initialization, not during initial loading
 
 ### Liquidation Volume Chart Overlay
 - **Histogram Series**: TradingView histogram series as overlay (empty `priceScaleId`)
@@ -189,6 +197,10 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 2. Don't create direct WebSocket connections
 3. Handle connection status updates in UI
 4. Let WebSocketManager handle reconnection logic
+5. Always await `WebSocketManager.switchSymbol()` since it's async
+6. Use 500ms delay minimum when switching symbols to prevent race conditions
+7. Implement proper error handling for WebSocket close operations
+8. Check connection state before attempting to close or modify connections
 
 ### State Management Updates
 1. Keep state updates as direct assignments

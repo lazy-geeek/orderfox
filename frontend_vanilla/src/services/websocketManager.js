@@ -84,6 +84,10 @@ export class WebSocketManager {
     // Disconnect all existing streams
     disconnectAllWebSockets();
     
+    // Wait for connections to fully close to prevent race conditions
+    // Backend processing can take up to 6+ seconds (seen in logs)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // Connect new WebSocket streams with container width for backend calculation
     const containerWidth = getContainerWidth();
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
