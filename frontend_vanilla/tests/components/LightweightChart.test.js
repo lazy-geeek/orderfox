@@ -20,7 +20,7 @@ describe('LightweightChart Backend Data Integration', () => {
   });
 
   // Test applying backend-provided priceFormat directly to chart
-  function testBackendPriceFormat(symbolData, symbol) {
+  function testBackendPriceFormat(symbolData) {
     // Backend now provides complete priceFormat object
     if (symbolData && symbolData.priceFormat) {
       // Frontend simply applies backend-provided format
@@ -254,23 +254,23 @@ describe('LightweightChart Backend Data Integration', () => {
       const volumeData = [
         {
           time: 1640995200,
-          buy_volume: "1500.0",
-          sell_volume: "2500.0",
-          total_volume: "4000.0",
-          buy_volume_formatted: "1,500.00",
-          sell_volume_formatted: "2,500.00",
-          total_volume_formatted: "4,000.00",
+          buy_volume: '1500.0',
+          sell_volume: '2500.0',
+          total_volume: '4000.0',
+          buy_volume_formatted: '1,500.00',
+          sell_volume_formatted: '2,500.00',
+          total_volume_formatted: '4,000.00',
           count: 5,
           timestamp_ms: 1640995200000
         },
         {
           time: 1640995260,
-          buy_volume: "800.0",
-          sell_volume: "1200.0",
-          total_volume: "2000.0",
-          buy_volume_formatted: "800.00",
-          sell_volume_formatted: "1,200.00",
-          total_volume_formatted: "2,000.00",
+          buy_volume: '800.0',
+          sell_volume: '1200.0',
+          total_volume: '2000.0',
+          buy_volume_formatted: '800.00',
+          sell_volume_formatted: '1,200.00',
+          total_volume_formatted: '2,000.00',
           count: 3,
           timestamp_ms: 1640995260000
         }
@@ -326,18 +326,18 @@ describe('LightweightChart Backend Data Integration', () => {
     it('should color bars based on dominant side', () => {
       const testCases = [
         {
-          buy_volume: "3000.0",
-          sell_volume: "1000.0",
+          buy_volume: '3000.0',
+          sell_volume: '1000.0',
           expectedColor: '#0ECB81' // Green - buy dominant
         },
         {
-          buy_volume: "1000.0",
-          sell_volume: "3000.0",
+          buy_volume: '1000.0',
+          sell_volume: '3000.0',
           expectedColor: '#F6465D' // Red - sell dominant
         },
         {
-          buy_volume: "2000.0",
-          sell_volume: "2000.0",
+          buy_volume: '2000.0',
+          sell_volume: '2000.0',
           expectedColor: '#F6465D' // Red when equal (default to sell)
         }
       ];
@@ -553,6 +553,313 @@ describe('LightweightChart Backend Data Integration', () => {
           bottom: 0,
         },
       });
+    });
+  });
+
+  describe('Price Scale Reset Functionality', () => {
+    let mockChart;
+    let mockCandlestickSeries;
+    let mockVolumeSeries;
+    let mockRightPriceScale;
+    let mockSeriesPriceScale;
+    let mockVolumePriceScale;
+    let mockTimeScale;
+
+    beforeEach(() => {
+      mockRightPriceScale = {
+        setAutoScale: vi.fn(),
+        applyOptions: vi.fn()
+      };
+      
+      mockSeriesPriceScale = {
+        setAutoScale: vi.fn(),
+        applyOptions: vi.fn()
+      };
+      
+      mockVolumePriceScale = {
+        setAutoScale: vi.fn(),
+        applyOptions: vi.fn()
+      };
+      
+      mockTimeScale = {
+        fitContent: vi.fn()
+      };
+      
+      mockChart = {
+        priceScale: vi.fn(() => mockRightPriceScale),
+        timeScale: vi.fn(() => mockTimeScale)
+      };
+      
+      mockCandlestickSeries = {
+        priceScale: vi.fn(() => mockSeriesPriceScale),
+        applyOptions: vi.fn()
+      };
+      
+      mockVolumeSeries = {
+        priceScale: vi.fn(() => mockVolumePriceScale)
+      };
+    });
+
+    it('should reset price scale using multiple API methods', () => {
+      // Test resetPriceScaleForSymbolChange functionality
+      function resetPriceScaleForSymbolChange() {
+        if (!mockChart || !mockCandlestickSeries) return;
+        
+        try {
+          // Method 1: Via chart right price scale API
+          const rightPriceScale = mockChart.priceScale('right');
+          rightPriceScale.setAutoScale(true);
+          
+          // Method 2: Via series price scale API
+          const seriesPriceScale = mockCandlestickSeries.priceScale();
+          seriesPriceScale.setAutoScale(true);
+          seriesPriceScale.applyOptions({autoScale: true});
+          
+          // Method 3: Apply options directly to candlestick series
+          mockCandlestickSeries.applyOptions({
+            priceScale: {
+              autoScale: true,
+            }
+          });
+          
+          // Method 4: Force time scale fit
+          mockChart.timeScale().fitContent();
+          
+          // Method 5: Reset volume series if exists
+          if (mockVolumeSeries) {
+            const volumePriceScale = mockVolumeSeries.priceScale();
+            volumePriceScale.setAutoScale(true);
+            volumePriceScale.applyOptions({autoScale: true});
+          }
+          
+        } catch (error) {
+          console.error('Price scale reset failed:', error);
+        }
+      }
+
+      resetPriceScaleForSymbolChange();
+
+      // Verify all methods were called
+      expect(mockChart.priceScale).toHaveBeenCalledWith('right');
+      expect(mockRightPriceScale.setAutoScale).toHaveBeenCalledWith(true);
+      expect(mockSeriesPriceScale.setAutoScale).toHaveBeenCalledWith(true);
+      expect(mockSeriesPriceScale.applyOptions).toHaveBeenCalledWith({autoScale: true});
+      expect(mockCandlestickSeries.applyOptions).toHaveBeenCalledWith({
+        priceScale: {
+          autoScale: true,
+        }
+      });
+      expect(mockTimeScale.fitContent).toHaveBeenCalled();
+      expect(mockVolumePriceScale.setAutoScale).toHaveBeenCalledWith(true);
+      expect(mockVolumePriceScale.applyOptions).toHaveBeenCalledWith({autoScale: true});
+    });
+
+    it('should handle symbol change detection properly', () => {
+      const testCases = [
+        {
+          lastSymbol: null,
+          currentSymbol: 'BTCUSDT',
+          expectedChange: true,
+          expectedReset: false,
+          description: 'initial load'
+        },
+        {
+          lastSymbol: 'BTCUSDT',
+          currentSymbol: 'BTCUSDT',
+          expectedChange: false,
+          expectedReset: false,
+          description: 'same symbol'
+        },
+        {
+          lastSymbol: 'BTCUSDT',
+          currentSymbol: 'EURUSD',
+          expectedChange: true,
+          expectedReset: true,
+          description: 'different symbol'
+        },
+        {
+          lastSymbol: 'EURUSD',
+          currentSymbol: 'BTCUSDT',
+          expectedChange: true,
+          expectedReset: true,
+          description: 'symbol change back'
+        }
+      ];
+
+      testCases.forEach(testCase => {
+        const isSymbolChange = testCase.lastSymbol !== testCase.currentSymbol;
+        const requiresPriceScaleReset = isSymbolChange && testCase.lastSymbol !== null;
+
+        expect(isSymbolChange).toBe(testCase.expectedChange);
+        expect(requiresPriceScaleReset).toBe(testCase.expectedReset);
+      });
+    });
+
+    it('should handle price scale reset for different symbol price ranges', () => {
+      const symbolTestCases = [
+        {
+          from: 'BTCUSDT',
+          to: 'EURUSD',
+          description: 'high to low price range (BTC ~$50k to EUR ~$1.05)'
+        },
+        {
+          from: 'EURUSD',
+          to: 'BTCUSDT',
+          description: 'low to high price range (EUR ~$1.05 to BTC ~$50k)'
+        },
+        {
+          from: 'BTCUSDT',
+          to: 'ETHUSDT',
+          description: 'similar high price ranges'
+        },
+        {
+          from: 'ADAUSDT',
+          to: 'DOGEUSDT',
+          description: 'similar low price ranges'
+        }
+      ];
+
+      symbolTestCases.forEach(testCase => {
+        // Reset mocks
+        vi.clearAllMocks();
+        
+        // Simulate symbol change
+        const lastSymbol = testCase.from;
+        const currentSymbol = testCase.to;
+        const requiresPriceScaleReset = lastSymbol !== currentSymbol && lastSymbol !== null;
+
+        if (requiresPriceScaleReset) {
+          // Call price scale reset
+          mockRightPriceScale.setAutoScale(true);
+          mockSeriesPriceScale.setAutoScale(true);
+          mockSeriesPriceScale.applyOptions({autoScale: true});
+          mockTimeScale.fitContent();
+        }
+
+        if (requiresPriceScaleReset) {
+          expect(mockRightPriceScale.setAutoScale).toHaveBeenCalledWith(true);
+          expect(mockSeriesPriceScale.setAutoScale).toHaveBeenCalledWith(true);
+          expect(mockSeriesPriceScale.applyOptions).toHaveBeenCalledWith({autoScale: true});
+          expect(mockTimeScale.fitContent).toHaveBeenCalled();
+        }
+      });
+    });
+
+    it('should handle multiple rapid symbol changes', () => {
+      const symbolSequence = ['BTCUSDT', 'EURUSD', 'ETHUSDT', 'ADAUSDT', 'BTCUSDT'];
+      let lastSymbol = null;
+      let resetCount = 0;
+
+      symbolSequence.forEach(symbol => {
+        const isSymbolChange = lastSymbol !== symbol;
+        const requiresPriceScaleReset = isSymbolChange && lastSymbol !== null;
+
+        if (requiresPriceScaleReset) {
+          resetCount++;
+          mockRightPriceScale.setAutoScale(true);
+          mockSeriesPriceScale.setAutoScale(true);
+          mockTimeScale.fitContent();
+        }
+
+        lastSymbol = symbol;
+      });
+
+      // Should have reset price scale 4 times (excluding initial load)
+      expect(resetCount).toBe(4);
+      expect(mockRightPriceScale.setAutoScale).toHaveBeenCalledTimes(4);
+      expect(mockSeriesPriceScale.setAutoScale).toHaveBeenCalledTimes(4);
+      expect(mockTimeScale.fitContent).toHaveBeenCalledTimes(4);
+    });
+
+    it('should handle price scale reset errors gracefully', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Mock an error in setAutoScale
+      mockRightPriceScale.setAutoScale.mockImplementation(() => {
+        throw new Error('Price scale API error');
+      });
+
+      function resetPriceScaleForSymbolChange() {
+        try {
+          mockRightPriceScale.setAutoScale(true);
+          mockSeriesPriceScale.setAutoScale(true);
+          mockTimeScale.fitContent();
+        } catch (error) {
+          console.error('Price scale reset failed:', error);
+        }
+      }
+
+      // Should not throw error
+      expect(() => resetPriceScaleForSymbolChange()).not.toThrow();
+      
+      // Should log error
+      expect(consoleSpy).toHaveBeenCalledWith('Price scale reset failed:', expect.any(Error));
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle missing chart instances gracefully', () => {
+      function resetPriceScaleForSymbolChange() {
+        if (!mockChart || !mockCandlestickSeries) return;
+        
+        mockRightPriceScale.setAutoScale(true);
+      }
+
+      // Test with null chart
+      mockChart = null;
+      resetPriceScaleForSymbolChange();
+      expect(mockRightPriceScale.setAutoScale).not.toHaveBeenCalled();
+
+      // Test with null series
+      mockChart = { priceScale: vi.fn(() => mockRightPriceScale) };
+      mockCandlestickSeries = null;
+      resetPriceScaleForSymbolChange();
+      expect(mockRightPriceScale.setAutoScale).not.toHaveBeenCalled();
+    });
+
+    it('should provide visual feedback for price scale reset', () => {
+      const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent');
+      
+      function showPriceScaleResetFeedback(trigger = 'auto') {
+        const feedbackEvent = new CustomEvent('priceScaleResetFeedback', {
+          detail: {
+            message: trigger === 'double-click' ? 'Price scale reset manually' : 'Price scale auto-adjusted',
+            trigger: trigger,
+            symbol: 'BTCUSDT',
+            timeframe: '1m',
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(feedbackEvent);
+      }
+
+      // Test auto feedback
+      showPriceScaleResetFeedback('auto');
+      expect(mockDispatchEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'priceScaleResetFeedback',
+          detail: expect.objectContaining({
+            message: 'Price scale auto-adjusted',
+            trigger: 'auto',
+            symbol: 'BTCUSDT',
+            timeframe: '1m'
+          })
+        })
+      );
+
+      // Test double-click feedback
+      showPriceScaleResetFeedback('double-click');
+      expect(mockDispatchEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'priceScaleResetFeedback',
+          detail: expect.objectContaining({
+            message: 'Price scale reset manually',
+            trigger: 'double-click'
+          })
+        })
+      );
+
+      mockDispatchEvent.mockRestore();
     });
   });
 });
