@@ -86,6 +86,8 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
 - **Graceful Disconnection**: Try-catch blocks handle WebSocket close errors during cleanup
 - **State Validation**: Connection state checking before attempting to close or create connections
 - **WebSocket URL Construction**: Automatic conversion of relative URLs to proper WebSocket URLs with protocol handling
+- **CONNECTING State Handling**: WebSockets in CONNECTING state are removed but not forcefully closed to prevent "closed before established" errors
+- **State-Aware Disconnection**: Only OPEN WebSockets are closed with proper close codes; CONNECTING sockets fail naturally
 
 ### State Management
 - **Subscribe/Notify Pattern**: Custom lightweight state management
@@ -203,6 +205,8 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 6. Use 500ms delay minimum when switching symbols to prevent race conditions
 7. Implement proper error handling for WebSocket close operations
 8. Check connection state before attempting to close or modify connections
+9. Never force-close WebSockets in CONNECTING state - remove them from tracking and let them fail naturally
+10. Clear event handlers before any close operation to prevent race condition callbacks
 
 ### State Management Updates
 1. Keep state updates as direct assignments

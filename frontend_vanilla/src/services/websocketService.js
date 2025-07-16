@@ -335,12 +335,23 @@ export const disconnectWebSocketStream = (
   const streamKey = timeframe ? `${streamType}-${symbol}-${timeframe}` : `${streamType}-${symbol}`;
   if (activeWebSockets[streamKey]) {
     const ws = activeWebSockets[streamKey];
+    
+    // Clear event handlers first to prevent callbacks during cleanup
     ws.onopen = null;
     ws.onmessage = null;
     ws.onerror = null;
     ws.onclose = null;
     
-    ws.close(1000, 'Client initiated close');
+    // Only close if WebSocket is OPEN or CLOSING
+    // If CONNECTING, we let it fail naturally to avoid the "closed before established" error
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1000, 'Client initiated close');
+    } else if (ws.readyState === WebSocket.CONNECTING) {
+      // For CONNECTING state, we can't close it cleanly
+      // Just remove it from active connections and let it fail naturally
+      console.log(`WebSocket ${streamKey} still connecting, removing from active connections`);
+    }
+    
     delete activeWebSockets[streamKey];
   }
   
@@ -353,17 +364,20 @@ export const disconnectWebSocketStream = (
 
 export const disconnectAllWebSockets = () => {
   const connectionsToClose = [];
+  const connectingConnections = [];
   
   for (const key in activeWebSockets) {
     if (Object.prototype.hasOwnProperty.call(activeWebSockets, key)) {
       const ws = activeWebSockets[key];
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        // Set event handlers to null to prevent error callbacks during shutdown
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onclose = null;
-        
+      
+      // Clear event handlers first to prevent callbacks during cleanup
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        // Only close OPEN connections
         try {
           ws.close(1000, 'Client initiated close (all)');
           connectionsToClose.push(key);
@@ -371,15 +385,25 @@ export const disconnectAllWebSockets = () => {
           // Ignore errors during cleanup - connection might already be closing
           console.warn(`Error closing WebSocket ${key}:`, error.message);
         }
+      } else if (ws.readyState === WebSocket.CONNECTING) {
+        // For CONNECTING state, just track and remove from active connections
+        // Let them fail naturally to avoid "closed before established" error
+        connectingConnections.push(key);
       }
+      
       delete activeWebSockets[key];
     }
   }
   
   if (connectionsToClose.length > 0) {
-    console.log(`Disconnected ${connectionsToClose.length} WebSocket connections:`, connectionsToClose);
+    console.log(`Closed ${connectionsToClose.length} WebSocket connections:`, connectionsToClose);
   }
   
+  if (connectingConnections.length > 0) {
+    console.log(`Removed ${connectingConnections.length} connecting WebSocket connections:`, connectingConnections);
+  }
+  
+  // Clear all tracking maps
   Object.keys(connectionAttempts).forEach(key => delete connectionAttempts[key]);
   Object.keys(lastConnectionAttempt).forEach(key => delete lastConnectionAttempt[key]);
   Object.keys(connectionInProgress).forEach(key => delete connectionInProgress[key]);
