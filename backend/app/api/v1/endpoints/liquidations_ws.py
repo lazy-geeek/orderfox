@@ -102,7 +102,7 @@ async def liquidation_stream(
             # Fetch historical liquidations
             logger.info(f"Fetching historical liquidations for {display_symbol} (shared across all connections)")
             historical = await liquidation_service.fetch_historical_liquidations(
-                display_symbol, limit=MAX_LIQUIDATIONS
+                display_symbol, limit=MAX_LIQUIDATIONS, symbol_info=symbol_info
             )
             
             # Add to cache (newest first - sort by timestamp descending)

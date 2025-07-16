@@ -416,13 +416,14 @@ class LiquidationService:
             self._http_session = aiohttp.ClientSession()
         return self._http_session
     
-    async def fetch_historical_liquidations(self, symbol: str, limit: int = 50) -> List[Dict]:
+    async def fetch_historical_liquidations(self, symbol: str, limit: int = 50, symbol_info: Optional[Dict] = None) -> List[Dict]:
         """
         Fetch historical liquidations from external API
         
         Args:
             symbol: Trading symbol (e.g., 'BTCUSDT')
             limit: Maximum number of liquidations to fetch
+            symbol_info: Optional symbol information for formatting
             
         Returns:
             List of formatted liquidation data dictionaries
@@ -442,9 +443,6 @@ class LiquidationService:
                     return []
                 
                 data = await response.json()
-                
-                # Get symbol info for formatting
-                symbol_info = self.symbol_info_cache.get(symbol)
                 
                 # Convert API format to our WebSocket format
                 return [self._convert_api_to_ws_format(item, symbol, symbol_info) for item in data]
