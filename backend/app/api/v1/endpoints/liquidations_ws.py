@@ -118,7 +118,7 @@ async def liquidation_stream(
         
         # Send initial data with cached liquidations
         initial_data = {
-            "type": "liquidations",
+            "type": "liquidation_order",  # Changed from "liquidations" for clarity
             "symbol": display_symbol,
             "data": list(liquidations_cache[display_symbol]),
             "initial": True,
@@ -187,7 +187,8 @@ async def liquidation_stream(
                             symbol=display_symbol,
                             timeframe=timeframe,
                             data=historical_volume,
-                            timestamp=datetime.utcnow().isoformat()
+                            timestamp=datetime.utcnow().isoformat(),
+                            is_update=False  # Historical data, not real-time update
                         )
                         await websocket.send_json(volume_update.dict())
                         logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
@@ -209,7 +210,7 @@ async def liquidation_stream(
                     
                     # Send update
                     update = {
-                        "type": "liquidation",
+                        "type": "liquidation_order",  # Changed from "liquidation" for clarity
                         "symbol": display_symbol,
                         "data": liquidation,
                         "timestamp": datetime.utcnow().isoformat()
@@ -236,11 +237,18 @@ async def liquidation_stream(
                     volume_data = await volume_queue.get()
                     
                     # Send volume update
+                    # Determine if this is a real-time update (single data point) or historical batch
+                    is_realtime_update = len(volume_data) == 1
+                    
+                    # Type check - timeframe is guaranteed to be not None in this function
+                    assert timeframe is not None
+                    
                     volume_update = LiquidationVolumeUpdate(
                         symbol=display_symbol,
                         timeframe=timeframe,
                         data=volume_data,
-                        timestamp=datetime.utcnow().isoformat()
+                        timestamp=datetime.utcnow().isoformat(),
+                        is_update=is_realtime_update  # True for real-time, False for historical batches
                     )
                     await websocket.send_json(volume_update.dict())
                     

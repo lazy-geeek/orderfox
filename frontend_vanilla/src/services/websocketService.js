@@ -179,14 +179,16 @@ export const connectWebSocketStream = async (
           updateTickerFromWebSocket(data);
         } else if (data.type === 'trades_update') {
           updateTradesFromWebSocket(data);
-        } else if (data.type === 'liquidations' || data.type === 'liquidation') {
-          // Handle liquidation data
+        } else if (data.type === 'liquidation_order' || data.type === 'liquidations' || data.type === 'liquidation') {
+          // Handle liquidation order data (for table display)
+          // Support old types for backward compatibility
+          console.debug('Received liquidation order:', data.data?.length, 'items for', data.symbol);
           if (typeof window !== 'undefined' && window.updateLiquidationDisplay) {
             window.updateLiquidationDisplay(data);
           }
         } else if (data.type === 'liquidation_volume') {
-          // Handle liquidation volume updates
-          console.log('Received liquidation volume:', data.data?.length, 'records for', data.symbol);
+          // Handle liquidation volume updates (for histogram display)
+          console.log('Received liquidation volume:', data.data?.length, 'records for', data.symbol, 'is_update:', data.is_update);
           if (typeof window !== 'undefined' && window.updateLiquidationVolume) {
             window.updateLiquidationVolume(data);
           }

@@ -302,6 +302,10 @@ The liquidation volume histogram follows this pattern:
 - Individual liquidation updates arrive as single items → uses `update()`
 - This prevents historical data from disappearing when new liquidations occur
 - The same pattern applies to candlestick updates and any other chart series
+- **Critical**: Check `is_update` flag from backend to determine update method
+- **Chart Initialization**: Buffer volume data in `pendingVolumeData` if chart not ready
+- **State Preservation**: Maintain `currentVolumeData` array for tooltips and state
+- **Troubleshooting**: If historical data disappears, verify `is_update` flag handling
 
 ## Vite Configuration
 

@@ -667,13 +667,13 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
   }
   
   // Debug: Log sample of volume data
-  console.log('Updating liquidation volume with', volumeData.length, 'data points');
+  console.log('Updating liquidation volume with', volumeData.length, 'data points', 'isRealTimeUpdate:', isRealTimeUpdate);
   if (volumeData.length > 0) {
     console.log('Sample data:', volumeData[0], '...', volumeData[volumeData.length - 1]);
   }
   
   if (isRealTimeUpdate && volumeData.length === 1) {
-    // Real-time update - use update() method like candlesticks
+    // Real-time update - use update() method to preserve existing data
     const item = volumeData[0];
     const deltaVolume = parseFloat(item.delta_volume || 0);
     
@@ -686,6 +686,7 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
       };
       
       try {
+        // CRITICAL: Use update() for real-time updates to preserve historical data
         volumeSeries.update(histogramBar);
         console.log('Updated liquidation volume bar:', histogramBar);
         
@@ -705,8 +706,43 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         updateLiquidationVolume(volumeData, false);
       }
     }
+  } else if (isRealTimeUpdate && volumeData.length > 1) {
+    // Real-time batch update - use update() for each item
+    console.log('Processing real-time batch update with', volumeData.length, 'items');
+    
+    volumeData.forEach(item => {
+      const deltaVolume = parseFloat(item.delta_volume || 0);
+      
+      if (deltaVolume !== 0) {
+        const color = deltaVolume > 0 ? '#0ECB81' : '#F6465D';
+        const histogramBar = {
+          time: timeToLocal(item.time),
+          value: Math.abs(deltaVolume),
+          color: color,
+        };
+        
+        try {
+          volumeSeries.update(histogramBar);
+          
+          // Update currentVolumeData for tooltips
+          const existingIndex = currentVolumeData.findIndex(d => d.time === item.time);
+          if (existingIndex >= 0) {
+            currentVolumeData[existingIndex] = item;
+          } else {
+            currentVolumeData.push(item);
+          }
+        } catch (error) {
+          console.error('Error updating liquidation volume bar:', error, histogramBar);
+        }
+      }
+    });
+    
+    // Sort after batch update
+    currentVolumeData.sort((a, b) => a.time - b.time);
   } else {
-    // Initial load or full update - use setData()
+    // Initial load - use setData() to establish the baseline
+    console.log('Initial volume data load - using setData()');
+    
     // Store volume data for tooltips
     currentVolumeData = volumeData;
     
@@ -738,6 +774,7 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
       console.warn('Volume series not initialized - cannot update liquidation volume');
       return;
     }
+    // CRITICAL: Only use setData() for initial load, not for updates
     volumeSeries.setData(histogramData);
   }
   
