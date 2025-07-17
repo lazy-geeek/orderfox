@@ -203,22 +203,39 @@ export class LiquidationDisplay {
         
         // Set up global liquidation update function
         window.updateLiquidationDisplay = (data) => {
-            if (data.type === 'liquidations' && data.initial) {
+            if ((data.type === 'liquidation_order' || data.type === 'liquidations') && data.initial) {
+                // Initial batch of historical liquidations
                 this.liquidations = data.data || [];
                 this.renderLiquidations();
                 this.updateConnectionStatus(true);
-            } else if (data.type === 'liquidation') {
-                const liquidation = data.data;
-                this.addLiquidation(liquidation);
-                this.updateConnectionStatus(true);
-                
-                // Update quantity header with baseAsset if provided
-                if (liquidation.baseAsset) {
-                    const quantityHeader = this.container.querySelector('.quantity-header');
-                    if (quantityHeader) {
-                        quantityHeader.textContent = `Quantity (${liquidation.baseAsset})`;
+            } else if (data.type === 'liquidation_order' || data.type === 'liquidation') {
+                // Single real-time liquidation update
+                if (Array.isArray(data.data)) {
+                    // Handle array of liquidations
+                    data.data.forEach(liquidation => {
+                        this.addLiquidation(liquidation);
+                        // Update quantity header with baseAsset if provided
+                        if (liquidation.baseAsset) {
+                            const quantityHeader = this.container.querySelector('.quantity-header');
+                            if (quantityHeader) {
+                                quantityHeader.textContent = `Quantity (${liquidation.baseAsset})`;
+                            }
+                        }
+                    });
+                } else {
+                    // Handle single liquidation
+                    const liquidation = data.data;
+                    this.addLiquidation(liquidation);
+                    
+                    // Update quantity header with baseAsset if provided
+                    if (liquidation.baseAsset) {
+                        const quantityHeader = this.container.querySelector('.quantity-header');
+                        if (quantityHeader) {
+                            quantityHeader.textContent = `Quantity (${liquidation.baseAsset})`;
+                        }
                     }
                 }
+                this.updateConnectionStatus(true);
             } else if (data.type === 'error') {
                 console.error('Liquidation stream error:', data.message);
                 this.updateConnectionStatus(false);

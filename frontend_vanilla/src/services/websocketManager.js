@@ -92,7 +92,9 @@ export class WebSocketManager {
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(newSymbol, 'trades');
-    connectWebSocketStream(newSymbol, 'liquidations', state.selectedTimeframe);
+    // Note: LiquidationDisplay component creates its own connection without timeframe
+    // connectWebSocketStream(newSymbol, 'liquidations'); // Handled by component
+    connectWebSocketStream(newSymbol, 'liquidations', state.selectedTimeframe); // For volume with timeframe
     
     // Fetch liquidation volume data for new symbol
     this.fetchLiquidationVolumeData(newSymbol, state.selectedTimeframe);
@@ -172,7 +174,9 @@ export class WebSocketManager {
     connectWebSocketStream(symbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(symbol, 'trades');
-    connectWebSocketStream(symbol, 'liquidations', state.selectedTimeframe);
+    // Note: LiquidationDisplay component creates its own connection without timeframe
+    // connectWebSocketStream(symbol, 'liquidations'); // Handled by component
+    connectWebSocketStream(symbol, 'liquidations', state.selectedTimeframe); // For volume with timeframe
     
     // Fetch initial liquidation volume data
     this.fetchLiquidationVolumeData(symbol, state.selectedTimeframe);

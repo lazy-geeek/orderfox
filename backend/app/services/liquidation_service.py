@@ -403,8 +403,10 @@ class LiquidationService:
         
     async def _notify_callbacks(self, symbol: str, data: Dict):
         """Notify all registered callbacks with new data"""
-        callbacks = self.data_callbacks.get(symbol, [])
+        callbacks = self.data_callbacks.get(symbol, []).copy()  # Copy to avoid modification during iteration
         logger.debug(f"Notifying {len(callbacks)} callbacks for {symbol} with liquidation data")
+        failed_callbacks = []
+        
         for callback in callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
@@ -413,6 +415,14 @@ class LiquidationService:
                     callback(data)
             except Exception as e:
                 logger.error(f"Error in liquidation callback: {e}")
+                # Track failed callbacks for removal
+                failed_callbacks.append(callback)
+        
+        # Remove failed callbacks
+        if failed_callbacks:
+            for callback in failed_callbacks:
+                logger.info(f"Removing failed callback for {symbol}")
+                await self.disconnect_stream(symbol, callback)
     
     async def _get_http_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session for API calls"""
@@ -798,7 +808,9 @@ class LiquidationService:
             timeframe not in self.buffer_callbacks[symbol]):
             return
         
-        callbacks = self.buffer_callbacks[symbol][timeframe]
+        callbacks = self.buffer_callbacks[symbol][timeframe].copy()  # Copy to avoid modification during iteration
+        failed_callbacks = []
+        
         for callback in callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
@@ -807,6 +819,14 @@ class LiquidationService:
                     callback(volume_data)
             except Exception as e:
                 logger.error(f"Error in volume callback: {e}")
+                # Track failed callbacks for removal
+                failed_callbacks.append(callback)
+        
+        # Remove failed callbacks
+        if failed_callbacks:
+            for callback in failed_callbacks:
+                logger.info(f"Removing failed callback for {symbol}/{timeframe}")
+                await self.unregister_volume_callback(symbol, timeframe, callback)
 
 # Singleton instance
 liquidation_service = LiquidationService()

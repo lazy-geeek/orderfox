@@ -9,7 +9,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.api.v1.endpoints.connection_manager import connection_manager as manager
 from app.services.symbol_service import symbol_service
 from app.services.liquidation_service import liquidation_service
-from app.models.liquidation import LiquidationVolumeUpdate
+from app.models.liquidation import LiquidationVolumeUpdate, LiquidationVolume
 from typing import List, Dict, Optional
 import asyncio
 import logging
@@ -183,15 +183,22 @@ async def liquidation_stream(
                     )
                 
                     if historical_volume:
-                        volume_update = LiquidationVolumeUpdate(
-                            symbol=display_symbol,
-                            timeframe=timeframe,
-                            data=historical_volume,
-                            timestamp=datetime.utcnow().isoformat(),
-                            is_update=False  # Historical data, not real-time update
-                        )
-                        await websocket.send_json(volume_update.dict())
-                        logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
+                        # Check if WebSocket is still connected before sending
+                        if websocket.client_state.name == "CONNECTED":
+                            # Convert dict objects to LiquidationVolume models
+                            volume_data = [LiquidationVolume(**vol) for vol in historical_volume]
+                            
+                            volume_update = LiquidationVolumeUpdate(
+                                symbol=display_symbol,
+                                timeframe=timeframe,
+                                data=volume_data,
+                                timestamp=datetime.utcnow().isoformat(),
+                                is_update=False  # Historical data, not real-time update
+                            )
+                            await websocket.send_json(volume_update.dict())
+                            logger.info(f"Sent {len(historical_volume)} historical volume records for {display_symbol}/{timeframe}")
+                        else:
+                            logger.debug(f"WebSocket disconnected for {display_symbol}, skipping historical volume send")
                 except Exception as e:
                     logger.error(f"Error fetching historical volume data: {e}")
             
@@ -208,6 +215,11 @@ async def liquidation_stream(
                     # Wait for new liquidation with timeout
                     liquidation = await asyncio.wait_for(liquidation_queue.get(), timeout=30)
                     
+                    # Check if WebSocket is still connected before sending
+                    if websocket.client_state.name != "CONNECTED":
+                        logger.debug(f"WebSocket disconnected for {display_symbol}, stopping liquidation updates")
+                        break
+                    
                     # Send update
                     update = {
                         "type": "liquidation_order",  # Changed from "liquidation" for clarity
@@ -218,6 +230,11 @@ async def liquidation_stream(
                     await websocket.send_json(update)
                     
                 except asyncio.TimeoutError:
+                    # Check if WebSocket is still connected before sending heartbeat
+                    if websocket.client_state.name != "CONNECTED":
+                        logger.debug(f"WebSocket disconnected for {display_symbol}, stopping heartbeats")
+                        break
+                        
                     # Send heartbeat
                     heartbeat = {
                         "type": "heartbeat",
@@ -225,6 +242,9 @@ async def liquidation_stream(
                         "timestamp": datetime.utcnow().isoformat()
                     }
                     await websocket.send_json(heartbeat)
+                except Exception as e:
+                    logger.error(f"Error in handle_liquidations: {e}")
+                    break
         
         # Task for volume data (if timeframe specified)
         async def handle_volume():
@@ -233,8 +253,13 @@ async def liquidation_stream(
                 
             while True:
                 try:
-                    # Wait for volume update
-                    volume_data = await volume_queue.get()
+                    # Wait for volume update with timeout
+                    volume_data = await asyncio.wait_for(volume_queue.get(), timeout=5.0)
+                    
+                    # Check if WebSocket is still connected before sending
+                    if websocket.client_state.name != "CONNECTED":
+                        logger.debug(f"WebSocket disconnected for {display_symbol}, stopping volume updates")
+                        break
                     
                     # Send volume update
                     # Determine if this is a real-time update (single data point) or historical batch
@@ -252,8 +277,17 @@ async def liquidation_stream(
                     )
                     await websocket.send_json(volume_update.dict())
                     
+                except asyncio.TimeoutError:
+                    # Check connection state on timeout
+                    if websocket.client_state.name != "CONNECTED":
+                        logger.debug(f"WebSocket disconnected for {display_symbol}, stopping volume updates")
+                        break
+                    # Continue waiting if still connected
+                    continue
                 except Exception as e:
                     logger.error(f"Error sending volume update: {e}")
+                    # If we can't send, the connection is likely closed
+                    break
         
         # Start tasks
         tasks.append(asyncio.create_task(handle_liquidations()))

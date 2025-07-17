@@ -41,7 +41,7 @@ class TestLiquidationsWebSocket:
                             # Receive initial data
                             data = websocket.receive_json()
                             
-                            assert data["type"] == "liquidations"
+                            assert data["type"] == "liquidation_order"
                             assert data["symbol"] == "BTCUSDT"
                             assert data["initial"] is True
                             assert isinstance(data["data"], list)
@@ -251,7 +251,7 @@ class TestLiquidationsWebSocket:
                                 # Receive initial data with historical liquidations
                                 data = websocket.receive_json()
                                 
-                                assert data["type"] == "liquidations"
+                                assert data["type"] == "liquidation_order"
                                 assert data["symbol"] == "HYPERUSDT"
                                 assert data["initial"] is True
                                 assert len(data["data"]) == 2
@@ -325,7 +325,7 @@ class TestLiquidationsWebSocket:
                                 # Should still receive initial message, just with empty data
                                 data = websocket.receive_json()
                                 
-                                assert data["type"] == "liquidations"
+                                assert data["type"] == "liquidation_order"
                                 assert data["symbol"] == "BTCUSDT"
                                 assert data["initial"] is True
                                 assert data["data"] == []  # Empty when API fails
