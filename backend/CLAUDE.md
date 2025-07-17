@@ -147,6 +147,13 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **WebSocket Messages**: Sends `liquidation_volume` type messages with aggregated data
 - **Chart Integration**: Provides formatted volume data for TradingView histogram overlays
 - **Performance**: Efficient time bucket calculations with proper caching
+- **Accumulation Pattern**: Volume data accumulates in `accumulated_volumes` dictionary - NEVER replaced, only added to
+- **Cache Lifecycle**: Global caches (`liquidations_cache`, `historical_loaded`) cleared when last subscriber disconnects
+- **Message Type Separation**: 
+  - `liquidation_order`: Individual liquidations for table display
+  - `liquidation_volume`: Aggregated volume data for histogram display
+- **Reference Counting**: Fan-out pattern tracks callbacks per symbol, only closes Binance connection when no subscribers remain
+- **Debug Logging**: Use `logger.debug()` to track volume aggregation flow, cache operations, and message routing
 
 ### Chart Data Service
 - **Container-Width Optimization**: Calculates optimal candle count based on container width: `min(max((containerWidth/6)*3, 200), 1000)`

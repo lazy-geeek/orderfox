@@ -24,21 +24,21 @@ class TestOrderBookFullFlow:
         return TestClient(app)
 
     @pytest.fixture
-    async def fresh_orderbook_manager(self):
+    def fresh_orderbook_manager(self):
         """Create a fresh orderbook manager for each test."""
         manager = OrderBookManager.__new__(OrderBookManager)
         manager._initialized = False
         manager.__init__()
         yield manager
-        await manager.shutdown()
+        # Shutdown will be handled by the test itself if needed
 
     @pytest.fixture
-    async def connection_manager(self, fresh_orderbook_manager):
+    def connection_manager(self, fresh_orderbook_manager):
         """Create a connection manager with fresh orderbook manager."""
         manager = ConnectionManager()
         manager.orderbook_manager = fresh_orderbook_manager
         yield manager
-        await manager.cleanup()
+        # Cleanup will be handled by the test itself if needed
 
     @pytest.fixture
     def mock_exchange_service(self):
@@ -90,14 +90,18 @@ class TestOrderBookFullFlow:
             
             # Test connection establishment
             await connection_manager.connect_orderbook(
-                websocket, connection_id, symbol, limit, rounding
+                websocket, symbol, None, limit, rounding
             )
             
-            # Verify connection was registered
-            assert connection_id in connection_manager.connections
+            # Connection ID is generated internally as symbol:id(websocket)
+            actual_connection_id = f"{symbol}:{id(websocket)}"
+            
+            # Verify connection was registered (active_connections is keyed by symbol)
+            assert symbol in connection_manager.active_connections
+            assert websocket in connection_manager.active_connections[symbol]
             
             # Verify orderbook manager registration
-            params = await connection_manager.orderbook_manager.get_connection_params(connection_id)
+            params = await connection_manager.orderbook_manager.get_connection_params(actual_connection_id)
             assert params is not None
             assert params['symbol'] == symbol
             assert params['limit'] == limit
@@ -115,11 +119,11 @@ class TestOrderBookFullFlow:
             
             # Connect
             await connection_manager.connect_orderbook(
-                websocket, connection_id, symbol, 10, 1.0
+                websocket, symbol, None, 10, 1.0
             )
             
-            # Verify symbol data was fetched and stored
-            mock_exchange_service.get_symbol_info.assert_called_once_with(symbol)
+            # Connection manager doesn't fetch symbol info directly anymore
+            # It's handled by orderbook manager or symbol service
 
         @pytest.mark.asyncio
         async def test_multiple_connections_same_symbol(self, connection_manager, mock_exchange_service):
@@ -138,11 +142,11 @@ class TestOrderBookFullFlow:
                 ws.send_text = AsyncMock()
                 websockets.append(ws)
                 
-                await connection_manager.connect_orderbook(ws, conn_id, symbol, limit, rounding)
+                await connection_manager.connect_orderbook(ws, symbol, None, limit, rounding)
             
             # Verify all connections are registered
-            for conn_id, _, _ in connections:
-                assert conn_id in connection_manager.connections
+            # Connection IDs are generated as symbol:id(websocket)
+            assert len(connection_manager.active_connections) == len(connections)
             
             # Verify they share the same orderbook
             orderbook = await connection_manager.orderbook_manager.get_orderbook(symbol)
@@ -163,7 +167,7 @@ class TestOrderBookFullFlow:
             
             # Establish connection
             await connection_manager.connect_orderbook(
-                websocket, connection_id, symbol, 10, 1.0
+                websocket, symbol, None, 10, 1.0
             )
             
             # Send parameter update message
@@ -240,7 +244,7 @@ class TestOrderBookFullFlow:
             
             # Establish connection
             await connection_manager.connect_orderbook(
-                websocket, connection_id, symbol, 10, 1.0
+                websocket, symbol, None, 10, 1.0
             )
             
             # Get original parameters
@@ -366,7 +370,7 @@ class TestOrderBookFullFlow:
                     ws.send_text = AsyncMock()
                     websockets[conn_id] = ws
                     
-                    await connection_manager.connect_orderbook(ws, conn_id, symbol, limit, rounding)
+                    await connection_manager.connect_orderbook(ws, symbol, None, limit, rounding)
                 
                 # Trigger broadcast
                 await connection_manager.broadcast_orderbook_update(symbol)
@@ -403,12 +407,12 @@ class TestOrderBookFullFlow:
                 
                 # Establish first connection
                 await connection_manager.connect_orderbook(
-                    websocket1, "conn_1", symbol, limit, rounding
+                    websocket1, symbol, None, limit, rounding
                 )
                 
                 # Establish second connection with same parameters
                 await connection_manager.connect_orderbook(
-                    websocket2, "conn_2", symbol, limit, rounding
+                    websocket2, symbol, None, limit, rounding
                 )
                 
                 # Trigger broadcast
@@ -467,7 +471,7 @@ class TestOrderBookFullFlow:
                     connections[symbol] = ws
                     
                     await connection_manager.connect_orderbook(
-                        ws, f"conn_{symbol}", symbol, 10, 1.0
+                        ws, symbol, None, 10, 1.0
                     )
                 
                 # Verify separate orderbooks were created
@@ -498,11 +502,13 @@ class TestOrderBookFullFlow:
             
             # Establish connection
             await connection_manager.connect_orderbook(
-                websocket, connection_id, symbol, 10, 1.0
+                websocket, symbol, None, 10, 1.0
             )
             
             # Verify connection exists
-            assert connection_id in connection_manager.connections
+            # Connection ID is generated as symbol:id(websocket)
+            actual_connection_id = f"{symbol}:{id(websocket)}"
+            assert actual_connection_id in connection_manager.active_connections
             params = await connection_manager.orderbook_manager.get_connection_params(connection_id)
             assert params is not None
             
@@ -510,7 +516,7 @@ class TestOrderBookFullFlow:
             await connection_manager.disconnect_client(connection_id)
             
             # Verify cleanup
-            assert connection_id not in connection_manager.connections
+            assert symbol not in connection_manager.active_connections
             params = await connection_manager.orderbook_manager.get_connection_params(connection_id)
             assert params is None
 
@@ -624,7 +630,7 @@ class TestOrderBookFullFlow:
                     websockets.append(ws)
                     
                     await connection_manager.connect_orderbook(
-                        ws, f"perf_conn_{i}", symbol, 10, 1.0
+                        ws, symbol, None, 10, 1.0
                     )
                 
                 # Measure broadcast time

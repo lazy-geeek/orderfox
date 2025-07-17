@@ -39,6 +39,9 @@ class LiquidationService:
         self.liquidation_cache: Dict[str, Tuple[List[Dict], float]] = {}  # cache_key -> (data, timestamp)
         self.cache_ttl = 60  # Cache TTL in seconds
         
+        # Store accumulated volume data to prevent overwriting historical data
+        self.accumulated_volumes: Dict[str, Dict[str, Dict[int, Dict]]] = {}  # symbol -> timeframe -> bucket_time -> volume_data
+        
     async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any], symbol_info: Optional[Dict] = None):
         """
         Connect to Binance liquidation stream for a specific symbol
@@ -400,7 +403,10 @@ class LiquidationService:
         
     async def _notify_callbacks(self, symbol: str, data: Dict):
         """Notify all registered callbacks with new data"""
-        callbacks = self.data_callbacks.get(symbol, [])
+        callbacks = self.data_callbacks.get(symbol, []).copy()  # Copy to avoid modification during iteration
+        logger.debug(f"Notifying {len(callbacks)} callbacks for {symbol} with liquidation data")
+        failed_callbacks = []
+        
         for callback in callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
@@ -409,6 +415,14 @@ class LiquidationService:
                     callback(data)
             except Exception as e:
                 logger.error(f"Error in liquidation callback: {e}")
+                # Track failed callbacks for removal
+                failed_callbacks.append(callback)
+        
+        # Remove failed callbacks
+        if failed_callbacks:
+            for callback in failed_callbacks:
+                logger.info(f"Removing failed callback for {symbol}")
+                await self.disconnect_stream(symbol, callback)
     
     async def _get_http_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session for API calls"""
@@ -416,13 +430,14 @@ class LiquidationService:
             self._http_session = aiohttp.ClientSession()
         return self._http_session
     
-    async def fetch_historical_liquidations(self, symbol: str, limit: int = 50) -> List[Dict]:
+    async def fetch_historical_liquidations(self, symbol: str, limit: int = 50, symbol_info: Optional[Dict] = None) -> List[Dict]:
         """
         Fetch historical liquidations from external API
         
         Args:
             symbol: Trading symbol (e.g., 'BTCUSDT')
             limit: Maximum number of liquidations to fetch
+            symbol_info: Optional symbol information for formatting
             
         Returns:
             List of formatted liquidation data dictionaries
@@ -442,9 +457,6 @@ class LiquidationService:
                     return []
                 
                 data = await response.json()
-                
-                # Get symbol info for formatting
-                symbol_info = self.symbol_info_cache.get(symbol)
                 
                 # Convert API format to our WebSocket format
                 return [self._convert_api_to_ws_format(item, symbol, symbol_info) for item in data]
@@ -550,6 +562,41 @@ class LiquidationService:
         if symbol in self.symbol_info_cache:
             del self.symbol_info_cache[symbol]
             
+        # Clear global caches from liquidations_ws when last subscriber disconnects
+        # This prevents stale data from persisting across reconnections
+        from app.api.v1.endpoints.liquidations_ws import liquidations_cache, historical_loaded
+        
+        if symbol in liquidations_cache:
+            logger.info(f"Clearing liquidations cache for {symbol} (contained {len(liquidations_cache[symbol])} items)")
+            del liquidations_cache[symbol]
+            
+        if symbol in historical_loaded:
+            logger.info(f"Resetting historical_loaded flag for {symbol}")
+            del historical_loaded[symbol]
+            
+        # Clear aggregation buffers for this symbol
+        if symbol in self.liquidation_buffers:
+            logger.info(f"Clearing liquidation aggregation buffers for {symbol}")
+            del self.liquidation_buffers[symbol]
+            
+        if symbol in self.buffer_callbacks:
+            del self.buffer_callbacks[symbol]
+            
+        if symbol in self.aggregation_tasks:
+            # Cancel any running aggregation tasks
+            for timeframe, task in self.aggregation_tasks[symbol].items():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            del self.aggregation_tasks[symbol]
+            
+        # Clear accumulated volumes to prevent stale data
+        if symbol in self.accumulated_volumes:
+            logger.info(f"Clearing accumulated volume data for {symbol}")
+            del self.accumulated_volumes[symbol]
+            
     async def disconnect_all(self):
         """Disconnect all active streams"""
         symbols = list(self.active_connections.keys())
@@ -563,6 +610,7 @@ class LiquidationService:
     
     async def _add_to_aggregation_buffers(self, symbol: str, liquidation_data: Dict):
         """Add liquidation to timeframe aggregation buffers"""
+        logger.debug(f"Adding liquidation to buffers for {symbol}: {liquidation_data.get('priceUsdt', 'N/A')} USDT, side: {liquidation_data.get('side', 'N/A')}")
         if symbol not in self.liquidation_buffers:
             self.liquidation_buffers[symbol] = {}
         
@@ -604,7 +652,10 @@ class LiquidationService:
                 await asyncio.sleep(1)
     
     async def _process_aggregation_buffer(self, symbol: str, timeframe: str):
-        """Process and emit aggregated liquidation data"""
+        """Process and emit aggregated liquidation data with accumulation"""
+        import time
+        start_time = time.time()
+        logger.debug(f"Starting aggregation processing for {symbol} {timeframe}")
         if (symbol not in self.liquidation_buffers or 
             timeframe not in self.liquidation_buffers[symbol]):
             return
@@ -613,6 +664,12 @@ class LiquidationService:
         if not buffer:
             return
         
+        # Initialize accumulated volumes for this symbol/timeframe if needed
+        if symbol not in self.accumulated_volumes:
+            self.accumulated_volumes[symbol] = {}
+        if timeframe not in self.accumulated_volumes[symbol]:
+            self.accumulated_volumes[symbol][timeframe] = {}
+        
         # Get current time and timeframe info
         current_time = int(time.time() * 1000)
         timeframe_ms = self._get_timeframe_ms(timeframe)
@@ -620,40 +677,52 @@ class LiquidationService:
         # Calculate current bucket
         current_bucket = (current_time // timeframe_ms) * timeframe_ms
         
-        # Group liquidations by bucket
-        buckets = defaultdict(lambda: {"buy_volume": Decimal("0"), "sell_volume": Decimal("0"), "count": 0})
-        
-        # Process all liquidations in buffer
-        remaining_buffer = []
+        # Process new liquidations and add to accumulated volumes
+        new_liquidations = []
         for liq in buffer:
             timestamp = liq.get("timestamp", 0)
             bucket_time = (timestamp // timeframe_ms) * timeframe_ms
             
-            # Keep only recent liquidations (last 2 buckets)
-            if bucket_time >= current_bucket - timeframe_ms:
-                remaining_buffer.append(liq)
-                
-                # Calculate volume
-                price_usdt = Decimal(liq.get("priceUsdt", "0"))
-                
-                # Add to appropriate side
-                side = liq.get("side", "").upper()
-                if side == "BUY":
-                    buckets[bucket_time]["buy_volume"] += price_usdt
-                elif side == "SELL":
-                    buckets[bucket_time]["sell_volume"] += price_usdt
-                
-                buckets[bucket_time]["count"] += 1
+            # Calculate volume
+            price_usdt = Decimal(liq.get("priceUsdt", "0"))
+            side = liq.get("side", "").upper()
+            
+            # Initialize bucket if needed
+            if bucket_time not in self.accumulated_volumes[symbol][timeframe]:
+                self.accumulated_volumes[symbol][timeframe][bucket_time] = {
+                    "buy_volume": Decimal("0"),
+                    "sell_volume": Decimal("0"),
+                    "count": 0
+                }
+            
+            # Accumulate volume (not replace)
+            if side == "BUY":
+                self.accumulated_volumes[symbol][timeframe][bucket_time]["buy_volume"] += price_usdt
+            elif side == "SELL":
+                self.accumulated_volumes[symbol][timeframe][bucket_time]["sell_volume"] += price_usdt
+            
+            self.accumulated_volumes[symbol][timeframe][bucket_time]["count"] += 1
+            new_liquidations.append(liq)
         
-        # Update buffer with remaining liquidations
-        self.liquidation_buffers[symbol][timeframe] = remaining_buffer
+        # Clear the buffer after processing
+        buffer_size = len(self.liquidation_buffers[symbol][timeframe])
+        self.liquidation_buffers[symbol][timeframe] = []
+        logger.debug(f"Cleared aggregation buffer for {symbol} {timeframe}, processed {buffer_size} liquidations")
         
-        # Format and emit aggregated data
-        if buckets:
+        # Get only the buckets that were updated
+        updated_buckets = set()
+        for liq in new_liquidations:
+            timestamp = liq.get("timestamp", 0)
+            bucket_time = (timestamp // timeframe_ms) * timeframe_ms
+            updated_buckets.add(bucket_time)
+        
+        # Format and emit only updated volume data
+        if updated_buckets:
             symbol_info = self.symbol_info_cache.get(symbol)
             volume_updates = []
             
-            for bucket_time, data in sorted(buckets.items()):
+            for bucket_time in sorted(updated_buckets):
+                data = self.accumulated_volumes[symbol][timeframe][bucket_time]
                 buy_volume = float(data["buy_volume"])
                 sell_volume = float(data["sell_volume"])
                 total_volume = buy_volume + sell_volume
@@ -661,7 +730,9 @@ class LiquidationService:
                 # Calculate delta (positive = more shorts liquidated, negative = more longs liquidated)
                 delta_volume = buy_volume - sell_volume
                 
-                # Include all buckets (even with zero delta) for continuous time series
+                logger.debug(f"Volume aggregation for {symbol} {timeframe} bucket {int(bucket_time/1000)}: "
+                           f"buy={buy_volume:.2f}, sell={sell_volume:.2f}, delta={delta_volume:.2f}, count={data['count']}")
+                
                 volume_updates.append({
                     "time": int(bucket_time / 1000),
                     "buy_volume": str(buy_volume),
@@ -676,7 +747,7 @@ class LiquidationService:
                     "timestamp_ms": bucket_time
                 })
             
-            # Notify callbacks
+            # Notify callbacks with updated data only
             await self._notify_volume_callbacks(symbol, timeframe, volume_updates)
     
     async def register_volume_callback(self, symbol: str, timeframe: str, callback: Callable):
@@ -737,7 +808,9 @@ class LiquidationService:
             timeframe not in self.buffer_callbacks[symbol]):
             return
         
-        callbacks = self.buffer_callbacks[symbol][timeframe]
+        callbacks = self.buffer_callbacks[symbol][timeframe].copy()  # Copy to avoid modification during iteration
+        failed_callbacks = []
+        
         for callback in callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
@@ -746,6 +819,14 @@ class LiquidationService:
                     callback(volume_data)
             except Exception as e:
                 logger.error(f"Error in volume callback: {e}")
+                # Track failed callbacks for removal
+                failed_callbacks.append(callback)
+        
+        # Remove failed callbacks
+        if failed_callbacks:
+            for callback in failed_callbacks:
+                logger.info(f"Removing failed callback for {symbol}/{timeframe}")
+                await self.unregister_volume_callback(symbol, timeframe, callback)
 
 # Singleton instance
 liquidation_service = LiquidationService()

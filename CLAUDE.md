@@ -64,6 +64,7 @@ npm run dev:bg          # Start servers in background (if not already running)
 npm run dev:wait        # Wait for servers to be ready (returns quickly)
 npm run dev:status      # Check if servers are running
 npm run dev:stop        # Stop background servers
+npm run dev:restart     # Stop servers, clean logs, and restart fresh
 ```
 
 ### Claude Code Workflow Pattern
@@ -96,12 +97,14 @@ npm run dev:status
 - **`npm run dev:wait`**: Use after `dev:bg` to ensure servers are ready
 - **`npm run dev:status`**: Check server health anytime
 - **`npm run dev:stop`**: Clean shutdown when needed
+- **`npm run dev:restart`**: Full restart with fresh logs (useful for debugging)
 
 ### Important Notes
 - Servers only need to be started once per session
 - They auto-reload on file changes (no restart needed)
 - Check `logs/backend.log` and `logs/frontend.log` for debugging
 - If ports are blocked, use `npm run dev:stop` first
+- Use `npm run dev:restart` when you need fresh logs or experiencing issues
 
 ## Environment Configuration
 
@@ -145,6 +148,7 @@ Quick reference for optimized development workflow:
 npm run dev                    # Smart server management (see Server Management section)
 npm run dev:bg                 # Claude Code: Start servers in background
 npm run dev:status             # Check server status
+npm run dev:restart            # Stop servers, clean logs, and restart
 npm run lint                   # Frontend linting
 npm run lint:fix              # Auto-fix frontend linting issues
 npm run typecheck              # Backend type checking (Pylance)
@@ -251,4 +255,5 @@ Container uses `/workspaces/orderfox` as working directory.
 
 ## Project Specific Rules
 
+See @backend/CLAUDE.md and @frontend_vanilla/CLAUDE.md for backend and frontend architecture.
 See @CLAUDE-RULES.md for detailed rules for this project.

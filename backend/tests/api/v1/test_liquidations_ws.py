@@ -41,7 +41,7 @@ class TestLiquidationsWebSocket:
                             # Receive initial data
                             data = websocket.receive_json()
                             
-                            assert data["type"] == "liquidations"
+                            assert data["type"] == "liquidation_order"
                             assert data["symbol"] == "BTCUSDT"
                             assert data["initial"] is True
                             assert isinstance(data["data"], list)
@@ -251,7 +251,7 @@ class TestLiquidationsWebSocket:
                                 # Receive initial data with historical liquidations
                                 data = websocket.receive_json()
                                 
-                                assert data["type"] == "liquidations"
+                                assert data["type"] == "liquidation_order"
                                 assert data["symbol"] == "HYPERUSDT"
                                 assert data["initial"] is True
                                 assert len(data["data"]) == 2
@@ -261,7 +261,7 @@ class TestLiquidationsWebSocket:
                                 assert data["data"][1]["timestamp"] == 1609459200000  # Older
                                 
                                 # Verify fetch_historical_liquidations was called
-                                mock_fetch.assert_called_once_with("HYPERUSDT", limit=50)
+                                mock_fetch.assert_called_once_with("HYPERUSDT", limit=50, symbol_info=symbol_info)
     
     @pytest.mark.asyncio
     async def test_liquidation_websocket_caches_historical_data(self):
@@ -270,8 +270,9 @@ class TestLiquidationsWebSocket:
         
         from app.api.v1.endpoints import liquidations_ws
         
-        # Clear the cache first
+        # Clear the cache and historical loaded flag first
         liquidations_ws.liquidations_cache.clear()
+        liquidations_ws.historical_loaded.clear()
         
         mock_historical = [{
             "symbol": "BTCUSDT",
@@ -311,6 +312,7 @@ class TestLiquidationsWebSocket:
         
         from app.api.v1.endpoints import liquidations_ws
         liquidations_ws.liquidations_cache.clear()
+        liquidations_ws.historical_loaded.clear()
         
         with patch('app.services.symbol_service.symbol_service.validate_symbol_exists', return_value=True):
             with patch('app.services.symbol_service.symbol_service.resolve_symbol_to_exchange_format', return_value="BTCUSDT"):
@@ -323,7 +325,7 @@ class TestLiquidationsWebSocket:
                                 # Should still receive initial message, just with empty data
                                 data = websocket.receive_json()
                                 
-                                assert data["type"] == "liquidations"
+                                assert data["type"] == "liquidation_order"
                                 assert data["symbol"] == "BTCUSDT"
                                 assert data["initial"] is True
                                 assert data["data"] == []  # Empty when API fails

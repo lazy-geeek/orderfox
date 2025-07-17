@@ -414,6 +414,11 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
   const isSymbolChange = lastSymbol !== symbol;
   const isTimeframeChange = lastTimeframe !== timeframe;
   const isContextChange = isSymbolChange || isTimeframeChange;
+  
+  // Enhanced symbol change detection for price scale reset
+  // Reason: Only reset price scale when switching between symbols (not initial load)
+  // This prevents unnecessary resets while ensuring proper scaling for new symbols
+  const requiresPriceScaleReset = isSymbolChange && lastSymbol !== null;
 
   // Context change handling
 
@@ -486,12 +491,11 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
     // Ensure the chart properly fits the new data
     chartInstance.timeScale().fitContent();
     
-    // For symbol changes, also ensure price scale adjusts to new price range
-    if (isSymbolChange && candlestickSeries) {
-      // Force price scale to recalculate its range for the new symbol
-      candlestickSeries.priceScale().applyOptions({
-        autoScale: true,
-      });
+    // For symbol changes, trigger comprehensive price scale reset
+    // Reason: Different symbols have vastly different price ranges (BTC ~$50k vs EUR ~$1.05)
+    // Multiple API calls ensure all price scale components are properly reset
+    if (requiresPriceScaleReset) {
+      resetPriceScaleForSymbolChange(true, 'auto');
     }
   }
 }
@@ -506,6 +510,20 @@ function updateChartTitle(symbol, timeframe) {
     }
   });
   window.dispatchEvent(titleEvent);
+}
+
+function showPriceScaleResetFeedback(trigger = 'auto') {
+  // Create visual feedback for price scale reset
+  const feedbackEvent = new CustomEvent('priceScaleResetFeedback', {
+    detail: {
+      message: trigger === 'double-click' ? 'Price scale reset manually' : 'Price scale auto-adjusted',
+      trigger: trigger,
+      symbol: lastSymbol,
+      timeframe: lastTimeframe,
+      timestamp: Date.now()
+    }
+  });
+  window.dispatchEvent(feedbackEvent);
 }
 
 function updateLatestCandle(candleData) {
@@ -583,6 +601,51 @@ function updateLatestCandle(candleData) {
   }
 }
 
+function resetPriceScaleForSymbolChange(showFeedback = false, trigger = 'auto') {
+  if (!chartInstance || !candlestickSeries) return;
+  
+  try {
+    // Method 1: Via chart right price scale API
+    // Reason: Resets the main price scale axis for the chart
+    const rightPriceScale = chartInstance.priceScale('right');
+    rightPriceScale.setAutoScale(true);
+    
+    // Method 2: Via series price scale API
+    // Reason: Ensures the candlestick series price scale is properly reset
+    const seriesPriceScale = candlestickSeries.priceScale();
+    seriesPriceScale.setAutoScale(true);
+    seriesPriceScale.applyOptions({autoScale: true});
+    
+    // Method 3: Apply options directly to candlestick series
+    // Reason: Alternative approach to ensure series-level price scale reset
+    candlestickSeries.applyOptions({
+      priceScale: {
+        autoScale: true,
+      }
+    });
+    
+    // Method 4: Force time scale fit to ensure proper display
+    // Reason: Ensures the time axis properly fits the new symbol's data range
+    chartInstance.timeScale().fitContent();
+    
+    // Method 5: Reset volume series price scale if exists
+    // Reason: Volume overlay must also adjust to new symbol's price range
+    if (volumeSeries) {
+      const volumePriceScale = volumeSeries.priceScale();
+      volumePriceScale.setAutoScale(true);
+      volumePriceScale.applyOptions({autoScale: true});
+    }
+    
+    // Show visual feedback if requested
+    if (showFeedback) {
+      showPriceScaleResetFeedback(trigger);
+    }
+    
+  } catch (error) {
+    console.error('Price scale reset failed:', error);
+  }
+}
+
 function resetZoomState() {
   // Reset zoom tracking when symbol or timeframe changes
   userHasZoomed = false;
@@ -604,13 +667,13 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
   }
   
   // Debug: Log sample of volume data
-  console.log('Updating liquidation volume with', volumeData.length, 'data points');
+  console.log('Updating liquidation volume with', volumeData.length, 'data points', 'isRealTimeUpdate:', isRealTimeUpdate);
   if (volumeData.length > 0) {
     console.log('Sample data:', volumeData[0], '...', volumeData[volumeData.length - 1]);
   }
   
   if (isRealTimeUpdate && volumeData.length === 1) {
-    // Real-time update - use update() method like candlesticks
+    // Real-time update - use update() method to preserve existing data
     const item = volumeData[0];
     const deltaVolume = parseFloat(item.delta_volume || 0);
     
@@ -623,6 +686,7 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
       };
       
       try {
+        // CRITICAL: Use update() for real-time updates to preserve historical data
         volumeSeries.update(histogramBar);
         console.log('Updated liquidation volume bar:', histogramBar);
         
@@ -642,8 +706,43 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         updateLiquidationVolume(volumeData, false);
       }
     }
+  } else if (isRealTimeUpdate && volumeData.length > 1) {
+    // Real-time batch update - use update() for each item
+    console.log('Processing real-time batch update with', volumeData.length, 'items');
+    
+    volumeData.forEach(item => {
+      const deltaVolume = parseFloat(item.delta_volume || 0);
+      
+      if (deltaVolume !== 0) {
+        const color = deltaVolume > 0 ? '#0ECB81' : '#F6465D';
+        const histogramBar = {
+          time: timeToLocal(item.time),
+          value: Math.abs(deltaVolume),
+          color: color,
+        };
+        
+        try {
+          volumeSeries.update(histogramBar);
+          
+          // Update currentVolumeData for tooltips
+          const existingIndex = currentVolumeData.findIndex(d => d.time === item.time);
+          if (existingIndex >= 0) {
+            currentVolumeData[existingIndex] = item;
+          } else {
+            currentVolumeData.push(item);
+          }
+        } catch (error) {
+          console.error('Error updating liquidation volume bar:', error, histogramBar);
+        }
+      }
+    });
+    
+    // Sort after batch update
+    currentVolumeData.sort((a, b) => a.time - b.time);
   } else {
-    // Initial load or full update - use setData()
+    // Initial load - use setData() to establish the baseline
+    console.log('Initial volume data load - using setData()');
+    
     // Store volume data for tooltips
     currentVolumeData = volumeData;
     
@@ -675,6 +774,7 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
       console.warn('Volume series not initialized - cannot update liquidation volume');
       return;
     }
+    // CRITICAL: Only use setData() for initial load, not for updates
     volumeSeries.setData(histogramData);
   }
   

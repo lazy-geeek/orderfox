@@ -63,9 +63,11 @@ class TestLiquidationVolumeE2E:
                 "buy_volume": "21000.0",  # 0.7 BTC total at avg 30000
                 "sell_volume": "9030.0",   # 0.3 BTC at 30100
                 "total_volume": "30030.0",
+                "delta_volume": "11970.0",  # buy_volume - sell_volume
                 "buy_volume_formatted": "21,000.00",
                 "sell_volume_formatted": "9,030.00",
                 "total_volume_formatted": "30,030.00",
+                "delta_volume_formatted": "11,970.00",
                 "count": 3,
                 "timestamp_ms": 1609459200000
             }
@@ -106,7 +108,7 @@ class TestLiquidationVolumeE2E:
                                 with client.websocket_connect("/api/v1/ws/liquidations/BTCUSDT?timeframe=1m") as websocket:
                                     # Should receive initial liquidations
                                     initial_msg = websocket.receive_json()
-                                    assert initial_msg["type"] == "liquidations"
+                                    assert initial_msg["type"] == "liquidation_order"
                                     
                                     # Look for volume update message
                                     # WebSocket might send multiple messages
@@ -184,9 +186,11 @@ class TestLiquidationVolumeE2E:
                 "buy_volume": "15000.0",
                 "sell_volume": "25000.0",
                 "total_volume": "40000.0",
+                "delta_volume": "-10000.0",  # buy_volume - sell_volume
                 "buy_volume_formatted": "15,000.00",
                 "sell_volume_formatted": "25,000.00",
                 "total_volume_formatted": "40,000.00",
+                "delta_volume_formatted": "-10,000.00",
                 "count": 50,
                 "timestamp_ms": 1609459200000
             }
@@ -198,9 +202,11 @@ class TestLiquidationVolumeE2E:
                 "buy_volume": "75000.0",
                 "sell_volume": "125000.0",
                 "total_volume": "200000.0",
+                "delta_volume": "-50000.0",  # buy_volume - sell_volume
                 "buy_volume_formatted": "75,000.00",
                 "sell_volume_formatted": "125,000.00",
                 "total_volume_formatted": "200,000.00",
+                "delta_volume_formatted": "-50,000.00",
                 "count": 250,
                 "timestamp_ms": 1609459200000
             }
@@ -251,9 +257,9 @@ class TestLiquidationVolumeE2E:
         """Test that data format is consistent across REST and WebSocket"""
         
         expected_fields = [
-            "time", "buy_volume", "sell_volume", "total_volume",
+            "time", "buy_volume", "sell_volume", "total_volume", "delta_volume",
             "buy_volume_formatted", "sell_volume_formatted", 
-            "total_volume_formatted", "count", "timestamp_ms"
+            "total_volume_formatted", "delta_volume_formatted", "count", "timestamp_ms"
         ]
         
         mock_data = [{
@@ -261,9 +267,11 @@ class TestLiquidationVolumeE2E:
             "buy_volume": "1234.56",
             "sell_volume": "2345.67",
             "total_volume": "3580.23",
+            "delta_volume": "-1111.11",  # buy_volume - sell_volume
             "buy_volume_formatted": "1,234.56",
             "sell_volume_formatted": "2,345.67",
             "total_volume_formatted": "3,580.23",
+            "delta_volume_formatted": "-1,111.11",
             "count": 10,
             "timestamp_ms": 1609459200000
         }]
@@ -301,10 +309,10 @@ class TestLiquidationVolumeE2E:
         
         for i in range(1000):
             large_dataset.append({
-                "order_trade_time": base_time + (i * 1000),  # 1 second apart
+                "timestamp": base_time + (i * 1000),  # 1 second apart
                 "symbol": "BTCUSDT",
                 "side": "buy" if i % 2 == 0 else "sell",
-                "order_filled_accumulated_quantity": str(0.1 * (i % 10 + 1)),
+                "cumulated_usd_size": 1000.0 * (i % 10 + 1),  # Varying sizes in USD
                 "average_price": str(30000 + i),
                 "liquidation_order_id": str(i)
             })

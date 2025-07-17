@@ -9,6 +9,7 @@
     "dev:status": "./scripts/check-servers.sh",
     "dev:stop": "./scripts/stop-servers.sh",
     "dev:wait": "./scripts/wait-for-servers.sh",
+    "dev:restart": "./scripts/restart-servers.sh",
     "lint": "cd frontend_vanilla && npm run lint",
     "lint:fix": "cd frontend_vanilla && npm run lint:fix",
     "typecheck": "echo 'Use Pylance in VS Code for Python type checking'"

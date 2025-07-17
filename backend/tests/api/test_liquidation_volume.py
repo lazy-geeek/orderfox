@@ -319,7 +319,7 @@ class TestLiquidationVolumeWebSocket:
                                 data = websocket.receive_json()
                                 
                                 # Basic structure validation
-                                assert data["type"] == "liquidations"
+                                assert data["type"] == "liquidation_order"
                                 assert data["symbol"] == "BTCUSDT"
                                 
                                 # Give async task time to start

@@ -53,3 +53,4 @@ class LiquidationVolumeUpdate(BaseModel):
     timeframe: str = Field(..., description="Timeframe")
     data: List[LiquidationVolume] = Field(..., description="Volume updates")
     timestamp: str = Field(..., description="ISO format timestamp")
+    is_update: bool = Field(default=False, description="True for real-time updates, False for historical data")
