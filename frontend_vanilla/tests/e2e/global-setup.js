@@ -52,15 +52,9 @@ async function initializeTestDatabase() {
   console.log('🗄️ Initializing test database...');
   
   try {
-    // Clear existing test data
-    const clearResponse = await fetch('http://localhost:8000/api/v1/test/clear-database', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    
-    if (!clearResponse.ok) {
-      console.log('⚠️ Database clear endpoint not available (this is expected in production)');
-    }
+    // Note: Database clearing is not implemented in the backend
+    // Tests should be idempotent and handle existing data
+    console.log('ℹ️ Skipping database clear (endpoint not implemented)');
     
     // Create test bots
     const testBots = [

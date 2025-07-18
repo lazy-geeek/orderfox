@@ -12,6 +12,7 @@
 export function createBotList() {
   const container = document.createElement('div');
   container.className = 'w-full';
+  container.setAttribute('data-testid', 'bot-list');
   
   // Header section
   const header = document.createElement('div');
@@ -21,9 +22,9 @@ export function createBotList() {
       <h1 class="text-2xl font-bold">My Trading Bots</h1>
       <p class="text-base-content/60">Manage your automated trading strategies</p>
     </div>
-    <button class="btn btn-primary" id="create-bot-btn">
+    <button class="btn btn-primary" id="create-bot-btn" data-testid="new-bot-button">
       <span class="text-lg">➕</span>
-      Create New Bot
+      New Bot
     </button>
   `;
   
@@ -96,6 +97,7 @@ export function createBotCard(bot) {
   const card = document.createElement('div');
   card.className = 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow duration-200';
   card.setAttribute('data-bot-id', bot.id);
+  card.setAttribute('data-testid', 'bot-card');
   
   const statusColor = bot.isActive ? 'success' : 'warning';
   const statusText = bot.isActive ? 'Active' : 'Inactive';
@@ -106,22 +108,22 @@ export function createBotCard(bot) {
       <div class="flex justify-between items-start mb-3">
         <div class="flex items-center gap-2">
           <span class="text-lg">${statusIcon}</span>
-          <div class="badge badge-${statusColor}">${statusText}</div>
+          <div class="badge badge-${statusColor}" data-testid="bot-status">${statusText}</div>
         </div>
         <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-circle">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-circle" data-testid="bot-menu-button">
             <span class="text-lg">⋮</span>
           </div>
           <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-            <li><a class="edit-bot-btn" data-bot-id="${bot.id}">
+            <li><a class="edit-bot-btn" data-bot-id="${bot.id}" data-testid="edit-bot-button">
               <span>✏️</span>
               Edit Bot
             </a></li>
-            <li><a class="toggle-bot-btn" data-bot-id="${bot.id}">
+            <li><a class="toggle-bot-btn" data-bot-id="${bot.id}" data-testid="toggle-bot-button">
               <span>${bot.isActive ? '⏸️' : '▶️'}</span>
               ${bot.isActive ? 'Deactivate' : 'Activate'}
             </a></li>
-            <li><a class="delete-bot-btn text-error" data-bot-id="${bot.id}">
+            <li><a class="delete-bot-btn text-error" data-bot-id="${bot.id}" data-testid="delete-bot-button">
               <span>🗑️</span>
               Delete Bot
             </a></li>
@@ -129,10 +131,10 @@ export function createBotCard(bot) {
         </div>
       </div>
       
-      <h3 class="card-title text-lg mb-2">${bot.name}</h3>
+      <h3 class="card-title text-lg mb-2" data-testid="bot-name">${bot.name}</h3>
       
       <div class="flex items-center gap-2 mb-4">
-        <div class="badge badge-outline">${bot.symbol}</div>
+        <div class="badge badge-outline" data-testid="bot-symbol">${bot.symbol}</div>
         <div class="text-sm text-base-content/60">
           Created: ${new Date(bot.createdAt).toLocaleDateString()}
         </div>

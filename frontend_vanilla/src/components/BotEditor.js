@@ -13,6 +13,7 @@ export function createBotEditor() {
   const modal = document.createElement('div');
   modal.id = 'bot-editor-modal';
   modal.className = 'modal';
+  modal.setAttribute('data-testid', 'bot-editor-modal');
   
   modal.innerHTML = `
     <div class="modal-box w-11/12 max-w-2xl">
@@ -35,6 +36,7 @@ export function createBotEditor() {
             class="input input-bordered w-full" 
             required
             maxlength="50"
+            data-testid="bot-name-input"
           />
           <label class="label">
             <span class="label-text-alt text-error hidden" id="name-error"></span>
@@ -51,6 +53,7 @@ export function createBotEditor() {
             name="symbol"
             class="select select-bordered w-full"
             required
+            data-testid="bot-symbol-select"
           >
             <option value="">Select a trading pair</option>
           </select>
@@ -112,8 +115,8 @@ export function createBotEditor() {
         
         <!-- Modal Actions -->
         <div class="modal-action">
-          <button type="button" class="btn btn-ghost" id="cancel-btn">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="save-btn">
+          <button type="button" class="btn btn-ghost" id="cancel-btn" data-testid="cancel-bot-button">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="save-btn" data-testid="save-bot-button">
             <span class="loading loading-spinner loading-sm hidden" id="save-loading"></span>
             <span id="save-text">Create Bot</span>
           </button>

@@ -11,7 +11,7 @@ import { createTradingModeToggle, updateTradingModeToggle } from './components/T
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 import { createBotNavigation, addNavigationEventListeners, showSelectedBotInfo } from './components/BotNavigation.js';
 import { createBotList, updateBotList, addBotListEventListeners } from './components/BotList.js';
-import { createBotEditor, showBotEditor, hideBotEditor, addBotEditorEventListeners } from './components/BotEditor.js';
+import { createBotEditor, showBotEditor, hideBotEditor, addBotEditorEventListeners, showFormError, setFormLoading } from './components/BotEditor.js';
 
 import {
   state,
@@ -190,6 +190,7 @@ addBotEditorEventListeners(botEditor, {
   onSave: async (formData) => {
     try {
       clearBotError();
+      setFormLoading(botEditor, true);
       
       // Check if we're editing by looking at the modal title
       const modalTitle = botEditor.querySelector('#modal-title');
@@ -212,14 +213,19 @@ addBotEditorEventListeners(botEditor, {
         console.log('Bot created successfully');
       }
       
+      // Success - close modal and refresh list
       hideBotEditor(botEditor);
-      
-      // Refresh bot list
       await fetchBots();
       
     } catch (error) {
       console.error('Error saving bot:', error);
       setBotError(error.message);
+      
+      // Show error in modal
+      showFormError(botEditor, error.message);
+      setFormLoading(botEditor, false);
+      
+      // Don't close modal on error - let user see the error and retry
     }
   },
   onCancel: () => {

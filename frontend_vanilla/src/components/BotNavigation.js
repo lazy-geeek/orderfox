@@ -11,6 +11,7 @@
 export function createBotNavigation() {
   const navigation = document.createElement('div');
   navigation.className = 'flex flex-col h-full';
+  navigation.setAttribute('data-testid', 'bot-navigation');
   
   // Navigation header
   const header = document.createElement('div');

@@ -333,7 +333,7 @@ if settings.SERVE_STATIC_FILES:
         """Serve SPA frontend for client-side routing."""
         # Check if it's an API request
         if path.startswith(
-                "api/") or path.startswith("docs") or path.startswith("redoc"):
+                "api/") or path.startswith("docs") or path.startswith("redoc") or path == "health":
             raise HTTPException(status_code=404, detail="Not found")
 
         # Try to serve the requested file

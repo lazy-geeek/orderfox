@@ -10,6 +10,7 @@ export function createMainLayout() {
   drawerToggle.id = 'drawer-toggle';
   drawerToggle.type = 'checkbox';
   drawerToggle.className = 'drawer-toggle';
+  drawerToggle.checked = true; // Make sidebar open by default
   drawerWrapper.appendChild(drawerToggle);
 
   // Main drawer content
@@ -68,6 +69,7 @@ export function createMainLayout() {
   // Main content area (trading interface)
   const mainContent = document.createElement('div');
   mainContent.id = 'main-content';
+  mainContent.setAttribute('data-testid', 'trading-interface');
   mainContent.className = 'flex-1 p-4 bg-base-100 overflow-auto';
   mainContent.style.display = 'none'; // Hidden by default until bot is selected
   

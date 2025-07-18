@@ -90,6 +90,24 @@ cd /home/bail/github/orderfox/backend && python -m pytest tests/load/ -v
 - **Cache Management**: Symbol caches with proper TTL and invalidation mechanisms
 - **Critical Rule**: Never bypass Symbol Service - always use it for symbol-related operations
 
+### FastAPI/Starlette Routing Patterns
+- **Trailing Slash Behavior**: FastAPI/Starlette requires exact path matching including trailing slashes
+- **Route Definition Rule**: If a route is defined WITH a trailing slash, requests MUST include it. If defined WITHOUT, requests must NOT include it
+- **GET vs POST/PATCH/DELETE**: GET requests handle path mismatches more gracefully than other HTTP methods
+- **Recommended Pattern**: Define all routes WITHOUT trailing slashes for consistency
+- **Frontend Integration**: Ensure all frontend API calls match the exact path defined in backend routes
+- **Common Error**: 405 Method Not Allowed often indicates trailing slash mismatch on POST/PATCH/DELETE requests
+- **Example**:
+  ```python
+  # Good - consistent no trailing slashes
+  @router.post("", response_model=BotPublic)  # POST /api/v1/bots
+  @router.get("", response_model=BotList)     # GET /api/v1/bots
+  
+  # Bad - inconsistent trailing slashes
+  @router.post("/", response_model=BotPublic)  # POST /api/v1/bots/
+  @router.get("", response_model=BotList)      # GET /api/v1/bots
+  ```
+
 ## Service Implementations
 
 ### Order Book System

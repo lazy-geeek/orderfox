@@ -6,21 +6,9 @@
 async function globalTeardown() {
   console.log('🧹 Cleaning up test environment...');
   
-  try {
-    // Clear test database
-    const clearResponse = await fetch('http://localhost:8000/api/v1/test/clear-database', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    
-    if (clearResponse.ok) {
-      console.log('✅ Test database cleared');
-    } else {
-      console.log('⚠️ Database clear endpoint not available (this is expected in production)');
-    }
-  } catch (error) {
-    console.log(`⚠️ Cleanup failed: ${error.message}`);
-  }
+  // Note: Database clearing is not implemented in the backend
+  // Tests should be idempotent and handle existing data
+  console.log('ℹ️ Skipping database clear (endpoint not implemented)');
   
   console.log('✅ Test environment cleaned up');
 }

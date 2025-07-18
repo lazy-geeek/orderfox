@@ -205,6 +205,15 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 4. **Bot Context**: WebSocket connections contextualized to selected bot
 5. **Testing**: Unit tests for bot components and E2E tests for bot workflows
 
+### DaisyUI v5 Patterns
+1. **Drawer Component**: Main layout uses DaisyUI drawer for sidebar navigation
+2. **Default Open State**: Drawer toggle is checked by default for better UX (`drawerToggle.checked = true`)
+3. **Navigation Links**: Sidebar links use DaisyUI menu component with emoji icons
+4. **Modal Dialogs**: Bot editor uses DaisyUI modal with form controls
+5. **Dropdown Menus**: Bot actions use DaisyUI dropdown pattern for edit/delete/toggle operations
+6. **Button Variants**: Consistent use of btn-primary, btn-secondary, btn-ghost classes
+7. **Loading States**: DaisyUI loading spinner for async operations
+
 ### Modifying Chart Display
 1. Update chart component in `LightweightChart.js`
 2. Ensure container width is passed to backend

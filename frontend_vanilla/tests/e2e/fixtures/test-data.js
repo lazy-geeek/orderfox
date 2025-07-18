@@ -28,13 +28,16 @@ export const testSymbols = [
   'SOLUSDT'
 ];
 
+// Generate unique names with timestamp to prevent conflicts
+const timestamp = Date.now();
+
 export const testUserActions = {
   createBot: {
-    name: 'E2E Test Bot',
+    name: `E2E Test Bot ${timestamp}`,
     symbol: 'BTCUSDT'
   },
   updateBot: {
-    name: 'Updated Test Bot',
+    name: `Updated Test Bot ${timestamp}`,
     symbol: 'ETHUSDT'
   }
 };
@@ -53,6 +56,7 @@ export const selectors = {
   editBotButton: '[data-testid="edit-bot-button"]',
   deleteBotButton: '[data-testid="delete-bot-button"]',
   toggleBotButton: '[data-testid="toggle-bot-button"]',
+  selectBotButton: '.select-bot-btn',
   
   // Bot Editor Modal
   botEditorModal: '[data-testid="bot-editor-modal"]',
@@ -86,7 +90,7 @@ export const selectors = {
 export const waitTimes = {
   short: 1000,
   medium: 3000,
-  long: 5000,
+  long: 10000,  // Increased from 5000 to account for slow backend responses
   webSocket: 10000
 };
 

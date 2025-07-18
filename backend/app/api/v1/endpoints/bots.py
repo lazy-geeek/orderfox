@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/", response_model=BotPublic, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BotPublic, status_code=status.HTTP_201_CREATED)
 async def create_bot(
     bot_data: BotCreate,
     session: AsyncSession = Depends(get_session)
@@ -63,7 +63,7 @@ async def create_bot(
         )
 
 
-@router.get("/", response_model=BotList)
+@router.get("", response_model=BotList)
 async def get_bots(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=100, description="Number of bots per page"),
