@@ -47,8 +47,17 @@ class Settings:
     # Liquidation API Configuration
     LIQUIDATION_API_BASE_URL: Optional[str] = os.getenv("LIQUIDATION_API_BASE_URL", "")
 
-    # Firebase Configuration
-    FIREBASE_CONFIG_JSON: Optional[str] = os.getenv("FIREBASE_CONFIG_JSON")
+    # Database Configuration
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql://orderfox_user:orderfox_password@localhost:5432/orderfox_db"
+    )
+    
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        """Get async database URL by converting sync URL to async format."""
+        return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
 
     # API Configuration
     API_V1_STR: str = "/api/v1"

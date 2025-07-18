@@ -13,6 +13,7 @@ from app.api.v1.endpoints.market_data_ws import router as market_data_ws_router
 from app.api.v1.endpoints.trades_ws import router as trades_ws_router
 from app.api.v1.endpoints.liquidations_ws import router as liquidations_ws_router
 from app.api.v1.endpoints.liquidation_volume import router as liquidation_volume_router
+from app.api.v1.endpoints.bots import router as bots_router
 from app.api.v1.endpoints import trading as trading_router
 from app.core.logging_config import (
     setup_logging,
@@ -20,6 +21,7 @@ from app.core.logging_config import (
     get_logger,
 )
 from app.core.config import settings, DEVCONTAINER_MODE, DEVELOPMENT
+from app.core.database import init_db
 
 # Setup logging
 setup_logging("DEBUG" if settings.DEBUG else "INFO")
@@ -143,6 +145,16 @@ async def startup_event():
     logger.info(f"Container mode: {DEVCONTAINER_MODE}")
     logger.info(f"Server binding to: {settings.HOST}:{settings.PORT}")
 
+    # Initialize database
+    try:
+        logger.info("Initializing database...")
+        await init_db()
+        logger.info("Database initialization completed")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't fail startup - allow the app to run without database for development
+        logger.warning("Application will continue without database initialization")
+
     # Mount static files in development
     if settings.SERVE_STATIC_FILES:
         static_path = Path(settings.STATIC_FILES_PATH)
@@ -228,6 +240,7 @@ app.include_router(
     liquidation_volume_router,
     prefix="/api/v1",
     tags=["liquidation-volume"])
+app.include_router(bots_router, prefix="/api/v1/bots", tags=["bots"])
 app.include_router(trading_router.router, prefix="/api/v1", tags=["trading"])
 
 

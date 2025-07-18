@@ -12,6 +12,7 @@ import {
   clearTrades,
   setSelectedSymbol,
   setSelectedTimeframe,
+  getSelectedBot,
 } from '../store/store.js';
 
 import { resetZoomState } from '../components/LightweightChart.js';
@@ -40,14 +41,26 @@ function getContainerWidth() {
 
 /**
  * WebSocket connection manager with centralized logic for common operations.
+ * Now includes bot context support for trading operations.
  */
 export class WebSocketManager {
   /**
    * Switch to a new trading symbol with full WebSocket reconnection.
+   * Includes bot context validation.
    * 
    * @param {string} newSymbol - The new symbol to switch to
+   * @param {boolean} validateBotContext - Whether to validate bot context (default: true)
    */
-  static async switchSymbol(newSymbol) {
+  static async switchSymbol(newSymbol, validateBotContext = true) {
+    // Bot context validation
+    if (validateBotContext) {
+      const selectedBot = getSelectedBot();
+      if (selectedBot && selectedBot.symbol !== newSymbol) {
+        console.warn(`Symbol ${newSymbol} does not match selected bot symbol ${selectedBot.symbol}`);
+        // Allow the switch but log the mismatch for debugging
+      }
+    }
+    
     // CRITICAL: Clear any pending chart updates immediately
     if (typeof window !== 'undefined' && window.updateLatestCandleDirectly) {
       // Temporarily disable direct updates during symbol switch
@@ -220,6 +233,143 @@ export class WebSocketManager {
     } catch (error) {
       console.warn('Failed to initialize liquidation volume:', error);
     }
+  }
+
+  /**
+   * Initialize connections for a specific bot context.
+   * This method ensures the symbol and bot are properly synchronized.
+   * 
+   * @param {Object} bot - Bot object with symbol and configuration
+   */
+  static async initializeBotContext(bot) {
+    if (!bot || !bot.symbol) {
+      throw new Error('Invalid bot object or missing symbol');
+    }
+
+    console.log(`Initializing bot context for ${bot.name} (${bot.symbol})`);
+    
+    // Update state with bot's symbol
+    setSelectedSymbol(bot.symbol);
+    
+    // Reset UI state for bot context
+    resetZoomState();
+    clearOrderBook();
+    clearTrades();
+    
+    // Start WebSocket connections for the bot's symbol
+    const containerWidth = getContainerWidth();
+    connectWebSocketStream(bot.symbol, 'candles', state.selectedTimeframe, containerWidth);
+    connectWebSocketStream(bot.symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
+    connectWebSocketStream(bot.symbol, 'trades');
+    connectWebSocketStream(bot.symbol, 'liquidations', state.selectedTimeframe);
+    
+    // Fetch initial liquidation volume data
+    this.fetchLiquidationVolumeData(bot.symbol, state.selectedTimeframe);
+  }
+
+  /**
+   * Switch to a bot's trading context with full validation.
+   * This is the preferred method for bot-based trading.
+   * 
+   * @param {Object} bot - Bot object to switch to
+   */
+  static async switchToBotContext(bot) {
+    if (!bot || !bot.symbol) {
+      throw new Error('Invalid bot object or missing symbol');
+    }
+
+    // If the bot's symbol is different from current, switch to it
+    if (bot.symbol !== state.selectedSymbol) {
+      console.log(`Switching to bot context: ${bot.name} (${bot.symbol})`);
+      await this.switchSymbol(bot.symbol, false); // Don't validate bot context since we're setting it
+    }
+    
+    // Additional bot-specific setup could go here
+    // For example, setting up bot-specific trading parameters
+    console.log(`Bot context active: ${bot.name} (${bot.isActive ? 'Active' : 'Inactive'})`);
+  }
+
+  /**
+   * Validate current WebSocket connections against bot context.
+   * 
+   * @param {Object} bot - Bot object to validate against
+   * @returns {boolean} True if connections are valid for bot context
+   */
+  static validateBotConnections(bot) {
+    if (!bot || !bot.symbol) {
+      return false;
+    }
+
+    // Check if current symbol matches bot symbol
+    if (state.selectedSymbol !== bot.symbol) {
+      console.warn(`Connection validation failed: Symbol mismatch (${state.selectedSymbol} vs ${bot.symbol})`);
+      return false;
+    }
+
+    // Additional validation could be added here
+    // For example, checking if bot is still active
+    if (!bot.isActive) {
+      console.warn(`Bot ${bot.name} is not active`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get current bot context information.
+   * 
+   * @returns {Object} Bot context info
+   */
+  static getBotContext() {
+    const selectedBot = getSelectedBot();
+    return {
+      bot: selectedBot,
+      symbol: state.selectedSymbol,
+      timeframe: state.selectedTimeframe,
+      isValid: selectedBot ? this.validateBotConnections(selectedBot) : false,
+      hasActiveConnections: state.candlesWsConnected || state.orderBookWsConnected || state.tradesWsConnected
+    };
+  }
+
+  /**
+   * Handle bot deactivation by cleaning up connections.
+   * 
+   * @param {Object} bot - Bot that was deactivated
+   */
+  static async handleBotDeactivation(bot) {
+    if (!bot) return;
+
+    console.log(`Handling bot deactivation: ${bot.name}`);
+    
+    // If this is the currently active bot, we might want to disconnect
+    const currentBot = getSelectedBot();
+    if (currentBot && currentBot.id === bot.id) {
+      console.log('Deactivated bot was currently active, maintaining connections but adding warning');
+      // We could disconnect here, but for now just log the warning
+      // In a future version, we might want to switch to a different bot or show a warning
+    }
+  }
+
+  /**
+   * Get connection status for bot context.
+   * 
+   * @returns {Object} Connection status object
+   */
+  static getBotConnectionStatus() {
+    const selectedBot = getSelectedBot();
+    return {
+      bot: selectedBot,
+      symbol: state.selectedSymbol,
+      connections: {
+        candles: state.candlesWsConnected,
+        orderbook: state.orderBookWsConnected,
+        trades: state.tradesWsConnected,
+        liquidations: state.liquidationsWsConnected
+      },
+      isValid: selectedBot ? this.validateBotConnections(selectedBot) : false,
+      lastUpdate: new Date().toISOString()
+    };
   }
 }
 

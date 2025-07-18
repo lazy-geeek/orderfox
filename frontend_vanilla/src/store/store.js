@@ -36,6 +36,18 @@ const state = {
   positionsLoading: false,
   positionsError: null,
   currentTheme: localStorage.getItem('theme') || 'dark',
+  
+  // Bot management state
+  bots: [],
+  selectedBotId: null,
+  botLoading: false,
+  botError: null,
+  botStats: {
+    total: 0,
+    active: 0,
+    inactive: 0
+  },
+  currentView: 'bot-selection', // 'bot-selection', 'bot-management', 'trading'
 };
 
 const subscribers = [];
@@ -501,6 +513,216 @@ async function setTradingModeApi(mode) {
   }
 }
 
+// Bot management functions
+function setBots(bots) {
+  state.bots = bots;
+  updateBotStats();
+  notify('bots');
+  notify('botStats');
+}
+
+function addBot(bot) {
+  state.bots.push(bot);
+  updateBotStats();
+  notify('bots');
+  notify('botStats');
+}
+
+function updateBot(botId, updatedBot) {
+  const index = state.bots.findIndex(bot => bot.id === botId);
+  if (index !== -1) {
+    state.bots[index] = updatedBot;
+    updateBotStats();
+    notify('bots');
+    notify('botStats');
+  }
+}
+
+function removeBot(botId) {
+  state.bots = state.bots.filter(bot => bot.id !== botId);
+  if (state.selectedBotId === botId) {
+    state.selectedBotId = null;
+    notify('selectedBotId');
+  }
+  updateBotStats();
+  notify('bots');
+  notify('botStats');
+}
+
+function setSelectedBotId(botId) {
+  state.selectedBotId = botId;
+  notify('selectedBotId');
+}
+
+function getSelectedBot() {
+  if (!state.selectedBotId) return null;
+  return state.bots.find(bot => bot.id === state.selectedBotId) || null;
+}
+
+function setBotLoading(loading) {
+  state.botLoading = loading;
+  notify('botLoading');
+}
+
+function setBotError(error) {
+  state.botError = error;
+  notify('botError');
+}
+
+function clearBotError() {
+  state.botError = null;
+  notify('botError');
+}
+
+function setCurrentView(view) {
+  state.currentView = view;
+  notify('currentView');
+}
+
+function updateBotStats() {
+  const total = state.bots.length;
+  const active = state.bots.filter(bot => bot.isActive).length;
+  const inactive = total - active;
+  
+  state.botStats = {
+    total,
+    active,
+    inactive
+  };
+}
+
+// Bot API functions
+async function fetchBots() {
+  setBotLoading(true);
+  clearBotError();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/bots`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to fetch bots');
+    }
+    const data = await response.json();
+    setBots(data.bots || []);
+    setBotLoading(false);
+  } catch (error) {
+    setBotLoading(false);
+    setBotError(error.message);
+    throw error;
+  }
+}
+
+async function createBot(botData) {
+  setBotLoading(true);
+  clearBotError();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/bots`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(botData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to create bot');
+    }
+    
+    const newBot = await response.json();
+    addBot(newBot);
+    setBotLoading(false);
+    return newBot;
+  } catch (error) {
+    setBotLoading(false);
+    setBotError(error.message);
+    throw error;
+  }
+}
+
+async function updateBotById(botId, botData) {
+  setBotLoading(true);
+  clearBotError();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/bots/${botId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(botData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to update bot');
+    }
+    
+    const updatedBot = await response.json();
+    updateBot(botId, updatedBot);
+    setBotLoading(false);
+    return updatedBot;
+  } catch (error) {
+    setBotLoading(false);
+    setBotError(error.message);
+    throw error;
+  }
+}
+
+async function deleteBotById(botId) {
+  setBotLoading(true);
+  clearBotError();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/bots/${botId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to delete bot');
+    }
+    
+    removeBot(botId);
+    setBotLoading(false);
+  } catch (error) {
+    setBotLoading(false);
+    setBotError(error.message);
+    throw error;
+  }
+}
+
+async function toggleBotStatus(botId) {
+  const bot = state.bots.find(b => b.id === botId);
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+  
+  setBotLoading(true);
+  clearBotError();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/bots/${botId}/status?is_active=${!bot.isActive}`, {
+      method: 'PATCH',
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to toggle bot status');
+    }
+    
+    const updatedBot = await response.json();
+    updateBot(botId, updatedBot);
+    setBotLoading(false);
+    return updatedBot;
+  } catch (error) {
+    setBotLoading(false);
+    setBotError(error.message);
+    throw error;
+  }
+}
+
 export { 
   state, 
   subscribe, 
@@ -548,5 +770,22 @@ export {
   fetchOpenPositions,
   executePaperTrade,
   executeLiveTrade,
-  setTradingModeApi
+  setTradingModeApi,
+  // Bot management functions
+  setBots,
+  addBot,
+  updateBot,
+  removeBot,
+  setSelectedBotId,
+  getSelectedBot,
+  setBotLoading,
+  setBotError,
+  clearBotError,
+  setCurrentView,
+  // Bot API functions
+  fetchBots,
+  createBot,
+  updateBotById,
+  deleteBotById,
+  toggleBotStatus
 };

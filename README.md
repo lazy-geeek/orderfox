@@ -1,6 +1,6 @@
 # OrderFox Trading Bot
 
-A full-stack trading application with vanilla JavaScript frontend and FastAPI backend for cryptocurrency trading, featuring TradingView Lightweight Charts for professional-grade chart visualization.
+A full-stack cryptocurrency trading application with bot management capabilities, featuring vanilla JavaScript frontend and FastAPI backend with PostgreSQL database, TradingView Lightweight Charts, and comprehensive bot trading system.
 
 ## Prerequisites
 
@@ -10,43 +10,93 @@ Before setting up the project, ensure you have the following installed:
 - **Node.js 16+** - Required for the frontend vanilla JavaScript application
 - **npm** - Comes with Node.js, used for frontend package management
 - **pip** - Python package manager (usually comes with Python)
+- **PostgreSQL 12+** - Required for bot management database
+- **Docker** (optional) - For containerized deployment
 
 ## Project Structure
 
-- `frontend_vanilla/` - Vanilla JavaScript application with Vite build system and TradingView Lightweight Charts
-- `backend/` - FastAPI Python backend with WebSocket support and optimized chart data streaming
-- `.env.example` - Example environment configuration file  
-- `backend/tests/` - Backend unit tests using pytest
-- `frontend_vanilla/src/` - Frontend source code with components, services, and chart integration
+```
+orderfox/
+├── backend/                     # FastAPI backend
+│   ├── app/
+│   │   ├── main.py             # FastAPI entry point
+│   │   ├── api/                # API endpoints
+│   │   ├── services/           # Business logic
+│   │   ├── models/             # SQLModel database models
+│   │   └── core/               # Config, logging, database
+│   └── tests/                  # Pytest test suite
+├── frontend_vanilla/            # Vanilla JS frontend
+│   ├── src/
+│   │   ├── components/         # UI components (DaisyUI)
+│   │   ├── services/           # API & WebSocket services
+│   │   ├── config/             # Configuration
+│   │   └── store/              # State management
+│   ├── tests/                  # Vitest & Playwright tests
+│   └── main.js                 # App entry point
+├── docker-compose.yml          # Docker development setup
+├── .env.example               # Environment configuration template
+└── scripts/                   # Development scripts
+```
 
 ## Configuration
-
-Before running the application, you need to set up your environment variables:
 
 ### 1. Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
 
-### 2. Open the newly created `.env` file and fill in your actual credentials and configuration values.
+### 2. Database Setup
 
-### Environment Variables
+The application uses PostgreSQL for bot management. You have two options:
 
-- **`BINANCE_API_KEY`**: Your API key for the Binance exchange. You can obtain this from your Binance account settings under API Management.
+#### Option A: Docker (Recommended)
+```bash
+docker-compose up -d postgres postgres-test
+```
 
-- **`BINANCE_SECRET_KEY`**: Your secret key for the Binance exchange. This is provided when you create your API key.
+#### Option B: Local PostgreSQL
+Install PostgreSQL locally and create databases:
+```sql
+CREATE DATABASE orderfox_db;
+CREATE USER orderfox_user WITH PASSWORD 'orderfox_password';
+GRANT ALL PRIVILEGES ON DATABASE orderfox_db TO orderfox_user;
 
-- **`FIREBASE_CONFIG_JSON`**: Path to your Firebase service account JSON file. This is optional and only needed if you want to use Firebase features. You can obtain this from your Firebase project settings under Service Accounts.
+-- For testing
+CREATE DATABASE orderfox_test_db;
+CREATE USER orderfox_test_user WITH PASSWORD 'orderfox_test_password';
+GRANT ALL PRIVILEGES ON DATABASE orderfox_test_db TO orderfox_test_user;
+```
 
-- **`REACT_APP_API_BASE_URL`**: The base URL for API calls from the frontend to the backend API (default: http://localhost:8000/api/v1).
+### 3. Environment Variables
 
-- **`DEFAULT_TRADING_MODE`**: The default trading mode for the application (default: paper). Options are "paper" for paper trading or "live" for live trading.
+Key environment variables (see `.env.example` for complete list):
 
-**Important:** The `.env` file contains sensitive information and should not be committed to version control. It is included in `.gitignore` by default.
+- **`DATABASE_URL`**: PostgreSQL connection string
+- **`BINANCE_API_KEY`**: Your API key for the Binance exchange
+- **`BINANCE_SECRET_KEY`**: Your secret key for the Binance exchange
+- **`LIQUIDATION_API_BASE_URL`**: Optional external API for liquidation data
+- **`VITE_APP_API_BASE_URL`**: Frontend API endpoint (default: http://localhost:8000/api/v1)
+
+**Important:** The `.env` file contains sensitive information and should not be committed to version control.
 
 ## Getting Started
 
-### Backend Setup
+### Quick Start (Recommended)
+
+Use the smart server management system:
+
+```bash
+# Start both frontend and backend servers
+npm run dev
+
+# For background operation (Claude Code)
+npm run dev:bg
+npm run dev:wait
+```
+
+### Manual Setup
+
+#### Backend Setup
 
 1. **Create and activate a Python virtual environment** (recommended):
 ```bash
@@ -54,135 +104,240 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-2. **Navigate to the backend directory:**
+2. **Install Python dependencies:**
 ```bash
 cd backend
-```
-
-3. **Install Python dependencies:**
-```bash
 pip install -r requirements.txt
 ```
 
-4. **Run the FastAPI server:**
+3. **Run the FastAPI server:**
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend Setup
+#### Frontend Setup
 
-1. **Navigate to the frontend directory:**
+1. **Install Node.js dependencies:**
 ```bash
 cd frontend_vanilla
-```
-
-2. **Install Node.js dependencies:**
-```bash
 npm install
 ```
 
-3. **Start the Vite development server:**
+2. **Start the Vite development server:**
 ```bash
 npm run dev
+```
+
+### Docker Development
+
+For a complete containerized setup:
+
+```bash
+docker-compose up --build
 ```
 
 ## Running the Application
 
-### Starting the Backend
-Navigate to the `backend` directory and run:
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Starting the Frontend
-Navigate to the `frontend_vanilla` directory and run:
-```bash
-npm run dev
-```
-
 ### Access URLs
-- **Frontend Application:** http://localhost:3000 (or your configured port)
+- **Frontend Application:** http://localhost:3000
 - **Backend API:** http://localhost:8000
 - **API Documentation:** http://localhost:8000/docs (Swagger UI)
+- **Database:** PostgreSQL on localhost:5432 (dev) and localhost:5433 (test)
 
 ## Usage
 
-### Basic Application Flow
+### Bot Management System
 
-1. **Select a Trading Symbol:** Use the symbol selector to choose a cryptocurrency trading pair (e.g., BTCUSDT, ETHUSDT).
+1. **Create Trading Bots:**
+   - Use the "New Bot" button to create trading bots
+   - Configure bot name, trading symbol, and initial status
+   - Each bot can trade a specific cryptocurrency pair
 
-2. **View Market Data:**
-   - Monitor professional-grade candlestick charts powered by TradingView Lightweight Charts
-   - Switch between different timeframes (1m, 5m, 15m, 1h, 4h, 1d)
-   - Observe the order book with current bid/ask prices and volumes
-   - All data updates automatically via optimized WebSocket connections
+2. **Bot Operations:**
+   - **Edit Bot:** Modify bot configuration (name, symbol)
+   - **Toggle Status:** Start/stop bot trading
+   - **Delete Bot:** Remove bot from system
+   - **Select Bot:** Choose active bot for trading interface
 
-3. **Paper Trading:**
-   - The application starts in paper trading mode by default for safe testing
-   - Use the manual trading form to simulate buy/sell orders
-   - Monitor your positions in the positions table
-   - All trades are simulated with virtual funds
-
-4. **Trading Interface:**
-   - **Manual Trade Form:** Enter order details (symbol, side, quantity, price)
-   - **Order Book Display:** View current market depth and liquidity
-   - **Positions Table:** Track your current holdings and P&L
-   - **Trading Mode Toggle:** Switch between paper and live trading (when configured)
+3. **Trading Interface:**
+   - **Professional Charts:** TradingView Lightweight Charts with multiple timeframes
+   - **Real-time Data:** Live market data via WebSocket connections
+   - **Order Book:** Current bid/ask prices and market depth
+   - **Trade History:** Recent trades with buy/sell indicators
+   - **Liquidation Data:** Real-time liquidation events and volume
 
 ### Key Features in Use
 
-- **Real-time Data:** Market data updates automatically without page refresh
-- **Paper Trading:** Test strategies safely with simulated funds
-- **Order Management:** Place and track trading orders
-- **Portfolio Tracking:** Monitor positions and performance
-- **Responsive Design:** Works on desktop and mobile devices
+- **Bot Context:** All trading data is contextualized to the selected bot
+- **Real-time Updates:** Market data updates automatically without page refresh
+- **Responsive Design:** Works on desktop, tablet, and mobile devices
+- **State Persistence:** Bot configurations and selections persist across sessions
+- **Error Handling:** Graceful error handling with user-friendly messages
 
 ## Features
 
-- **Professional Chart Visualization:** TradingView Lightweight Charts for high-performance candlestick display
-- **Real-time Market Data:** Live chart updates and order book data via optimized WebSocket streams
-- **Manual Trading Interface:** Intuitive form for placing buy/sell orders
-- **Order Book Display:** Real-time bid/ask prices with market depth visualization
-- **Position Management:** Track holdings, P&L, and portfolio performance
-- **Paper Trading Mode:** Safe testing environment with simulated funds
-- **Trading Mode Toggle:** Switch between paper and live trading
-- **Theme Support:** Dark/light mode switching with smooth chart transitions
-- **Responsive Design:** Works seamlessly on desktop and mobile devices
-- **API Documentation:** Auto-generated Swagger UI for backend endpoints
+### Frontend Features
+- **Bot Management UI:** Create, edit, delete, and manage trading bots
+- **Professional Chart Visualization:** TradingView Lightweight Charts
+- **Real-time Market Data:** Live updates via WebSocket connections
+- **Order Book Display:** Real-time bid/ask prices with market depth
+- **Trade History:** Live trade feed with buy/sell indicators  
+- **Liquidation Monitoring:** Real-time liquidation events and volume
+- **Responsive Design:** DaisyUI components with mobile-first approach
+- **Dark/Light Mode:** Theme switching with smooth transitions
+
+### Backend Features
+- **Bot Management API:** Full CRUD operations for trading bots
+- **PostgreSQL Database:** Persistent bot storage with SQLModel
+- **WebSocket Streaming:** Real-time market data delivery
+- **Symbol Service:** Centralized symbol management with caching
+- **Exchange Integration:** Binance API with ccxt and ccxt pro
+- **Data Aggregation:** Server-side processing and formatting
+- **Connection Management:** Efficient WebSocket connection handling
 
 ## Testing
 
 ### Backend Tests
-Run the backend test suite:
 ```bash
 cd backend
 python -m pytest tests/ -v
 ```
 
 ### Frontend Tests
-Run the frontend test suite:
 ```bash
-cd frontend
+cd frontend_vanilla
+
+# Unit tests (Vitest)
 npm test
+npm run test:run
+
+# End-to-end tests (Playwright)
+npm run test:e2e
+npm run test:e2e:ui
 ```
 
-### Paper Trading Test
-A comprehensive paper trading test is available:
-```bash
-python test_paper_trading.py
-```
+### Test Coverage
+- **Backend:** 98% test coverage with pytest
+- **Frontend:** 100% test coverage with Vitest
+- **E2E Tests:** Comprehensive Playwright browser tests
+- **Integration Tests:** WebSocket and API integration testing
 
 ## Development
 
 ### Technology Stack
-- **Frontend:** React 18 with TypeScript, Redux Toolkit for state management, CSS3 for styling
-- **Backend:** FastAPI with Python 3.8+, WebSocket support for real-time data, Pydantic for data validation
-- **Testing:** Jest and React Testing Library for frontend, pytest for backend
-- **API Integration:** Binance API for market data and trading operations
-- **Real-time Communication:** WebSocket connections for live market data updates
+
+**Frontend:**
+- **Framework:** Vanilla JavaScript with Vite
+- **UI Components:** DaisyUI v5 with TailwindCSS v4
+- **Charts:** TradingView Lightweight Charts
+- **State Management:** Custom subscribe/notify pattern
+- **Testing:** Vitest for unit tests, Playwright for E2E
+- **Build Tool:** Vite with hot module replacement
+
+**Backend:**
+- **Framework:** FastAPI with Python 3.8+
+- **Database:** PostgreSQL with SQLModel ORM
+- **WebSocket:** Real-time data streaming
+- **Testing:** pytest with async support
+- **API Integration:** Binance API via ccxt/ccxt pro
+- **Data Processing:** Pandas for aggregation
 
 ### Architecture
-- **Frontend:** Component-based React architecture with Redux for global state
-- **Backend:** RESTful API with WebSocket endpoints, service layer pattern
-- **Data Flow:** Real-time market data via WebSocket, trading operations via REST API
-- **State Management:** Redux slices for market data and trading state
+
+**Frontend Architecture:**
+- **Thin Client:** All business logic handled by backend
+- **Component-based:** Modular UI components with shared base classes
+- **State Management:** Lightweight subscribe/notify pattern
+- **WebSocket Manager:** Centralized connection management
+- **Bot Context:** All trading data contextualized to selected bot
+
+**Backend Architecture:**
+- **Service Layer:** Clean separation of business logic
+- **Repository Pattern:** Database operations abstracted
+- **WebSocket Streams:** Real-time data delivery
+- **Caching Layer:** Performance optimization for market data
+- **Error Handling:** Comprehensive exception handling
+
+### Development Workflow
+
+1. **Server Management:**
+   ```bash
+   npm run dev:status    # Check server status
+   npm run dev:restart   # Restart with fresh logs
+   npm run dev:stop      # Stop all servers
+   ```
+
+2. **Code Quality:**
+   ```bash
+   npm run lint          # Frontend linting
+   npm run lint:fix      # Auto-fix linting issues
+   cd backend && python -m pylint app/  # Backend linting
+   ```
+
+3. **Testing:**
+   ```bash
+   npm run test:run      # Frontend unit tests
+   npm run test:e2e      # E2E browser tests
+   cd backend && python -m pytest tests/ -v  # Backend tests
+   ```
+
+## Database Schema
+
+### Bot Model
+```sql
+CREATE TABLE bots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    symbol VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## API Endpoints
+
+### Bot Management
+- `GET /api/v1/bots` - List all bots
+- `POST /api/v1/bots` - Create new bot
+- `GET /api/v1/bots/{bot_id}` - Get bot details
+- `PUT /api/v1/bots/{bot_id}` - Update bot
+- `DELETE /api/v1/bots/{bot_id}` - Delete bot
+- `PATCH /api/v1/bots/{bot_id}/toggle` - Toggle bot status
+
+### Market Data
+- `GET /api/v1/symbols` - List available symbols
+- `ws://localhost:8000/api/v1/ws/candles/{symbol}` - Chart data stream
+- `ws://localhost:8000/api/v1/ws/trades/{symbol}` - Trades stream
+- `ws://localhost:8000/api/v1/ws/orderbook` - Order book stream
+- `ws://localhost:8000/api/v1/ws/liquidations/{symbol}` - Liquidations stream
+
+## Deployment
+
+### Docker Deployment
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Production deployment
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Manual Deployment
+1. Set up PostgreSQL database
+2. Configure environment variables
+3. Install dependencies
+4. Run production builds
+5. Start services with process manager
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details.

@@ -6,14 +6,16 @@ This file provides global guidance to Claude Code when working with the OrderFox
 
 ## Project Overview
 
-OrderFox is a cryptocurrency trading application with real-time market data and paper trading capabilities.
+OrderFox is a cryptocurrency trading application with bot management capabilities, real-time market data, and comprehensive trading system.
 
 **Tech Stack:**
-- Frontend: Vanilla JavaScript with Vite and TradingView Lightweight Charts
-- Backend: FastAPI + Python with WebSocket support
+- Frontend: Vanilla JavaScript with Vite, DaisyUI, and TradingView Lightweight Charts
+- Backend: FastAPI + Python with WebSocket support and PostgreSQL database
+- Database: PostgreSQL with SQLModel ORM for bot management
 - Trading: Binance API integration via ccxt
 - Real-time: WebSocket connections for live market data
 - Charts: TradingView Lightweight Charts for professional candlestick visualization
+- UI Framework: DaisyUI v5 with TailwindCSS v4
 
 ## Quick Start
 
@@ -123,6 +125,9 @@ npm run dev:status
 
 ### Required Environment Variables
 ```bash
+# Database Configuration
+DATABASE_URL=postgresql://orderfox_user:orderfox_password@localhost:5432/orderfox_db
+
 # Backend Configuration
 BACKEND_PORT=8000
 BACKEND_URL=http://localhost:8000
@@ -160,10 +165,13 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm install                   
 # 🧪 TESTING (use absolute paths)
 cd /home/bail/github/orderfox/backend && python -m pytest tests/ -v
 cd /home/bail/github/orderfox/frontend_vanilla && npm run test:run
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e
 
 # 🔍 SPECIFIC TESTS
-cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_trade_service.py -v
-cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
+cd /home/bail/github/orderfox/backend && python -m pytest tests/services/test_bot_service.py -v
+cd /home/bail/github/orderfox/backend && python -m pytest tests/api/v1/test_bots.py -v
+cd /home/bail/github/orderfox/frontend_vanilla && npm test -- BotNavigation
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e -- bot-management.spec.js
 
 # 🐳 DOCKER ALTERNATIVE (from root)
 docker-compose up --build     # Alternative to npm run dev
@@ -177,18 +185,32 @@ orderfox/
 │   ├── app/
 │   │   ├── main.py             # FastAPI entry point
 │   │   ├── api/                # API endpoints
+│   │   │   └── v1/endpoints/   # Bot management endpoints
 │   │   ├── services/           # Business logic
+│   │   │   └── bot_service.py  # Bot CRUD operations
 │   │   ├── models/             # Data models
-│   │   └── core/               # Config, logging
+│   │   │   └── bot.py          # Bot SQLModel
+│   │   └── core/               # Config, logging, database
+│   │       └── database.py     # PostgreSQL configuration
 │   └── tests/                  # Pytest test suite
+│       ├── api/v1/             # Bot API tests
+│       └── services/           # Bot service tests
 ├── frontend_vanilla/            # Vanilla JS frontend (see frontend_vanilla/CLAUDE.md)
 │   ├── src/
-│   │   ├── components/         # UI components
+│   │   ├── components/         # UI components (DaisyUI)
+│   │   │   ├── BotNavigation.js # Bot navigation component
+│   │   │   ├── BotList.js      # Bot list component
+│   │   │   └── BotEditor.js    # Bot editor modal
 │   │   ├── services/           # API & WebSocket services
+│   │   │   └── botApiService.js # Bot API integration
 │   │   ├── config/             # Configuration
-│   │   └── store/              # State management
-│   ├── tests/                  # Vitest test suite
+│   │   └── store/              # State management with bot context
+│   ├── tests/                  # Vitest & Playwright test suites
+│   │   ├── components/         # Component unit tests
+│   │   ├── integration/        # Integration tests
+│   │   └── e2e/                # Playwright E2E tests
 │   └── main.js                 # App entry point
+├── docker-compose.yml          # Docker services (PostgreSQL, app)
 └── scripts/
     ├── common.sh               # Shared configuration and functions
     ├── check-servers.sh        # Server status checking
@@ -210,6 +232,9 @@ docker-compose down          # Stop and remove containers
 
 Create `.env` file in root:
 ```
+# Database Configuration
+DATABASE_URL=postgresql://orderfox_user:orderfox_password@localhost:5432/orderfox_db
+
 # API Keys (optional for demo mode)
 BINANCE_API_KEY=your_key
 BINANCE_SECRET_KEY=your_secret
@@ -235,10 +260,12 @@ See backend/CLAUDE.md and frontend_vanilla/CLAUDE.md for component-specific envi
 - **Configuration Override**: Pass env vars before script: `BACKEND_PORT=8001 ./scripts/check-servers.sh`
 
 ### Architecture Principles
+- **Bot Management System**: Complete CRUD operations for trading bots with PostgreSQL persistence
 - **Thin Client Architecture**: All calculations and business logic in backend, frontend only displays
 - **Backend Coordination**: Backend handles all timing, sequencing, and synchronization
 - **No Frontend Calculations**: Time ranges, data aggregation, and formatting all happen server-side
 - **WebSocket Connections**: Frontend can connect all WebSockets simultaneously, backend handles sequencing
+- **Bot Context**: All trading data is contextualized to the selected bot for isolated trading operations
 
 ### VS Code Dev Container
 

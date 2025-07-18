@@ -1,6 +1,10 @@
 /* Import Binance-style font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Import Tailwind CSS and DaisyUI */
+@import 'tailwindcss';
+@plugin 'daisyui';
+
 /* Global Dark Mode Theme */
 :root {
   /* Binance Dark Theme Colors */
