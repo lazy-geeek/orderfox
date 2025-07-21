@@ -106,9 +106,12 @@ export function createBotCard(bot) {
   card.innerHTML = `
     <div class="card-body">
       <div class="flex justify-between items-start mb-3">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="text-lg">${statusIcon}</span>
-          <div class="badge badge-${statusColor}" data-testid="bot-status">${statusText}</div>
+          <span class="badge badge-${statusColor}" data-testid="bot-status">${statusText}</span>
+          <span class="badge badge-${bot.isPaperTrading ? 'info' : 'error'}">
+            ${bot.isPaperTrading ? '📝 Paper' : '💰 Live'}
+          </span>
         </div>
         <div class="dropdown dropdown-end">
           <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-circle" data-testid="bot-menu-button">

@@ -58,7 +58,7 @@ describe('BotList Component', () => {
       // Check for create button
       const createBtn = container.querySelector('#create-bot-btn');
       expect(createBtn).toBeTruthy();
-      expect(createBtn.textContent).toContain('Create New Bot');
+      expect(createBtn.textContent).toContain('New Bot');
       
       // Check for loading state
       const loadingState = container.querySelector('#bot-list-loading');

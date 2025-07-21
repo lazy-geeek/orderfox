@@ -16,6 +16,7 @@ class BotBase(SQLModel):
     name: str = Field(min_length=1, max_length=100, description="Bot name")
     symbol: str = Field(min_length=1, max_length=20, description="Trading symbol (e.g., BTCUSDT)")
     is_active: bool = Field(default=True, description="Whether the bot is active")
+    is_paper_trading: bool = Field(default=True, description="Trading mode: True for paper, False for live")
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Last update timestamp")
     
@@ -77,11 +78,14 @@ class Bot(BotBase, table=True):
     )
     
     def __repr__(self):
-        return f"<Bot(id={self.id}, name={self.name}, symbol={self.symbol}, is_active={self.is_active})>"
+        return f"<Bot(id={self.id}, name={self.name}, symbol={self.symbol}, is_active={self.is_active}, is_paper_trading={self.is_paper_trading})>"
 
 
 class BotCreate(BotBase):
     """Model for creating a new bot."""
+    
+    # Override is_paper_trading to make it optional with default True
+    is_paper_trading: Optional[bool] = Field(default=True, description="Trading mode")
     
     # Exclude id, created_at, updated_at from creation
     pass
@@ -93,6 +97,7 @@ class BotUpdate(SQLModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Bot name")
     symbol: Optional[str] = Field(None, min_length=1, max_length=20, description="Trading symbol")
     is_active: Optional[bool] = Field(None, description="Whether the bot is active")
+    is_paper_trading: Optional[bool] = Field(default=None, description="Trading mode")
     updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Update timestamp")
     
     model_config = ConfigDict(

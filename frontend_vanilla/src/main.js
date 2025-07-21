@@ -6,7 +6,6 @@ import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButt
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
 import { LiquidationDisplay } from './components/LiquidationDisplay.js';
-import { createTradingModeToggle, updateTradingModeToggle } from './components/TradingModeToggle.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 import { createBotNavigation, addNavigationEventListeners, showSelectedBotInfo } from './components/BotNavigation.js';
 import { createBotList, updateBotList, addBotListEventListeners } from './components/BotList.js';
@@ -16,7 +15,6 @@ import {
   state,
   subscribe,
   fetchSymbols,
-  setTradingModeApi,
   setSelectedRounding,
   setDisplayDepth,
   notify,
@@ -54,7 +52,6 @@ const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-p
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
 const lastTradesPlaceholder = document.querySelector('#last-trades-container');
 const liquidationPlaceholder = document.querySelector('#liquidation-container');
-const tradingModeTogglePlaceholder = document.querySelector('#trading-mode-toggle-placeholder');
 const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 const botNavigationPlaceholder = document.querySelector('#bot-navigation-placeholder');
 const botListPlaceholder = document.querySelector('#bot-list-placeholder');
@@ -75,8 +72,6 @@ lastTradesPlaceholder.replaceWith(lastTradesDisplay);
 // Initialize liquidation display
 const liquidationDisplay = new LiquidationDisplay(liquidationPlaceholder); // eslint-disable-line no-unused-vars
 
-const tradingModeToggle = createTradingModeToggle();
-tradingModeTogglePlaceholder.replaceWith(tradingModeToggle);
 
 const themeSwitcher = createThemeSwitcher();
 themeSwitcherPlaceholder.replaceWith(themeSwitcher);
@@ -281,7 +276,6 @@ window.showTradingInterface = () => {
 updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
 updateOrderBookDisplay(orderBookDisplay, state);
 updateLastTradesDisplay(lastTradesDisplay, state);
-updateTradingModeToggle(tradingModeToggle, state);
 
 // Subscribe to state changes and update UI
 subscribe((key) => {
@@ -339,7 +333,6 @@ subscribe((key) => {
       updateLastTradesDisplay(lastTradesDisplay, state);
       break;
     case 'tradingMode':
-      updateTradingModeToggle(tradingModeToggle, state);
       break;
     case 'candlesWsConnected':
       // Update chart to reflect connection status - don't reset zoom
@@ -396,10 +389,7 @@ orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e
 });
 
 
-tradingModeToggle.querySelector('.mode-button').addEventListener('click', async () => {
-  const newMode = state.tradingMode === 'paper' ? 'live' : 'paper';
-  await setTradingModeApi(newMode);
-});
+// Trading mode toggle removed - now a per-bot setting
 
 // Initial data fetch
 Promise.all([

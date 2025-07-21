@@ -65,6 +65,7 @@ export async function createBot(botData) {
         name: botData.name.trim(),
         symbol: botData.symbol,
         isActive: botData.isActive !== undefined ? botData.isActive : true,
+        isPaperTrading: botData.isPaperTrading !== undefined ? botData.isPaperTrading : true,
         description: botData.description ? botData.description.trim() : null,
       }),
     });
@@ -103,6 +104,7 @@ export async function updateBot(botId, botData) {
         name: botData.name ? botData.name.trim() : undefined,
         symbol: botData.symbol,
         isActive: botData.isActive,
+        isPaperTrading: botData.isPaperTrading,
         description: botData.description ? botData.description.trim() : undefined,
       }),
     });
@@ -277,6 +279,7 @@ export function formatBotDataForApi(botData) {
     name: botData.name ? botData.name.trim() : '',
     symbol: botData.symbol || '',
     isActive: botData.isActive !== undefined ? Boolean(botData.isActive) : true,
+    isPaperTrading: botData.isPaperTrading !== undefined ? Boolean(botData.isPaperTrading) : true,
     description: botData.description ? botData.description.trim() : null,
   };
 }

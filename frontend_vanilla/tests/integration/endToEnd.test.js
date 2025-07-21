@@ -165,6 +165,7 @@ describe('End-to-End Integration Tests', () => {
         name: 'My First Bot',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: 'First trading bot'
       });
       
@@ -394,6 +395,7 @@ describe('End-to-End Integration Tests', () => {
         name: 'Test Bot',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: ''
       });
     });

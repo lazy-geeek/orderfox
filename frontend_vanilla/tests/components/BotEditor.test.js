@@ -9,6 +9,7 @@ import {
   hideBotEditor, 
   resetBotForm,
   updateStatusText,
+  updatePaperTradingText,
   updateDescriptionCount,
   showFormError,
   showFormSuccess,
@@ -40,6 +41,7 @@ describe('BotEditor Component', () => {
       name: 'Test Bot',
       symbol: 'BTCUSDT',
       isActive: true,
+      isPaperTrading: true,
       description: 'Test description'
     };
 
@@ -71,11 +73,13 @@ describe('BotEditor Component', () => {
       const nameInput = modal.querySelector('#bot-name');
       const symbolSelect = modal.querySelector('#bot-symbol');
       const activeToggle = modal.querySelector('#bot-active');
+      const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput).toBeTruthy();
       expect(symbolSelect).toBeTruthy();
       expect(activeToggle).toBeTruthy();
+      expect(paperTradingToggle).toBeTruthy();
       expect(descriptionTextarea).toBeTruthy();
       
       // Check for action buttons
@@ -90,11 +94,13 @@ describe('BotEditor Component', () => {
       const nameInput = modal.querySelector('#bot-name');
       const symbolSelect = modal.querySelector('#bot-symbol');
       const activeToggle = modal.querySelector('#bot-active');
+      const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput.value).toBe('');
       expect(symbolSelect.value).toBe('');
       expect(activeToggle.checked).toBe(true);
+      expect(paperTradingToggle.checked).toBe(true); // Default to paper trading
       expect(descriptionTextarea.value).toBe('');
     });
   });
@@ -138,11 +144,13 @@ describe('BotEditor Component', () => {
       const nameInput = modal.querySelector('#bot-name');
       const symbolSelect = modal.querySelector('#bot-symbol');
       const activeToggle = modal.querySelector('#bot-active');
+      const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput.value).toBe(mockBot.name);
       expect(symbolSelect.value).toBe(mockBot.symbol);
       expect(activeToggle.checked).toBe(mockBot.isActive);
+      expect(paperTradingToggle.checked).toBe(mockBot.isPaperTrading);
       expect(descriptionTextarea.value).toBe(mockBot.description);
     });
 
@@ -208,11 +216,26 @@ describe('BotEditor Component', () => {
       
       activeToggle.checked = true;
       updateStatusText(modal);
-      expect(statusText.textContent).toBe('Active');
+      expect(statusText.textContent).toBe('Bot will start trading immediately');
       
       activeToggle.checked = false;
       updateStatusText(modal);
-      expect(statusText.textContent).toBe('Inactive');
+      expect(statusText.textContent).toBe('Bot will be created but not start trading');
+    });
+  });
+
+  describe('updatePaperTradingText', () => {
+    it('should update paper trading text based on toggle state', () => {
+      const paperTradingToggle = modal.querySelector('#bot-paper-trading');
+      const paperTradingText = modal.querySelector('#paper-trading-text');
+      
+      paperTradingToggle.checked = true;
+      updatePaperTradingText(modal);
+      expect(paperTradingText.textContent).toBe('Paper trading mode (simulated trades)');
+      
+      paperTradingToggle.checked = false;
+      updatePaperTradingText(modal);
+      expect(paperTradingText.textContent).toBe('Live trading mode (real trades)');
     });
   });
 
@@ -306,6 +329,7 @@ describe('BotEditor Component', () => {
       const nameInput = modal.querySelector('#bot-name');
       const symbolSelect = modal.querySelector('#bot-symbol');
       const activeToggle = modal.querySelector('#bot-active');
+      const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       // Add an option to the select for testing
@@ -314,6 +338,7 @@ describe('BotEditor Component', () => {
       nameInput.value = 'Test Bot';
       symbolSelect.value = 'BTCUSDT';
       activeToggle.checked = false;
+      paperTradingToggle.checked = false;
       descriptionTextarea.value = 'Test description';
       
       const formData = getFormData(modal);
@@ -321,6 +346,7 @@ describe('BotEditor Component', () => {
       expect(formData.name).toBe('Test Bot');
       expect(formData.symbol).toBe('BTCUSDT');
       expect(formData.isActive).toBe(false);
+      expect(formData.isPaperTrading).toBe(false);
       expect(formData.description).toBe('Test description');
     });
   });
@@ -412,6 +438,7 @@ describe('BotEditor Component', () => {
         name: 'Test Bot',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: ''
       });
     });
@@ -439,7 +466,7 @@ describe('BotEditor Component', () => {
       activeToggle.checked = false;
       activeToggle.dispatchEvent(new Event('change'));
       
-      expect(statusText.textContent).toBe('Inactive');
+      expect(statusText.textContent).toBe('Bot will be created but not start trading');
     });
 
     it('should handle description input for character count', () => {

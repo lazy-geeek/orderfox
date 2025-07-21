@@ -27,7 +27,8 @@ class TestBotService:
         bot_data = BotCreate(
             name="Test Bot",
             symbol="BTCUSDT",
-            is_active=True
+            is_active=True,
+            is_paper_trading=True
         )
         
         result = await bot_service.create_bot(bot_data, test_session)
@@ -36,9 +37,23 @@ class TestBotService:
         assert result.name == "Test Bot"
         assert result.symbol == "BTCUSDT"
         assert result.is_active is True
+        assert result.is_paper_trading is True
         assert result.id is not None
         assert result.created_at is not None
         assert result.updated_at is not None
+    
+    async def test_create_bot_defaults_to_paper_trading(self, bot_service: BotService, test_session):
+        """Test creating a bot defaults to paper trading when not specified."""
+        bot_data = BotCreate(
+            name="Test Bot",
+            symbol="BTCUSDT",
+            is_active=True
+            # Note: is_paper_trading not specified, should default to True
+        )
+        
+        result = await bot_service.create_bot(bot_data, test_session)
+        
+        assert result.is_paper_trading is True
     
     async def test_get_all_bots_empty(self, bot_service: BotService, test_session):
         """Test getting all bots when database is empty."""
@@ -106,7 +121,8 @@ class TestBotService:
         """Test updating an existing bot."""
         update_data = BotUpdate(
             name="Updated Bot",
-            is_active=False
+            is_active=False,
+            is_paper_trading=False
         )
         
         result = await bot_service.update_bot(sample_bot.id, update_data, test_session)
@@ -116,6 +132,7 @@ class TestBotService:
         assert result.name == "Updated Bot"
         assert result.symbol == sample_bot.symbol  # Unchanged
         assert result.is_active is False
+        assert result.is_paper_trading is False
         assert result.updated_at >= sample_bot.updated_at
     
     async def test_update_bot_nonexistent(self, bot_service: BotService, test_session):
@@ -310,3 +327,12 @@ class TestBotService:
         assert result2.name == "New Name Only"  # Previous update preserved
         assert result2.symbol == original_symbol  # Still unchanged
         assert result2.is_active is False  # Now changed
+    
+    async def test_create_bot_defaults_to_paper_trading(self, bot_service: BotService, test_session):
+        """Test that bot defaults to paper trading when not specified."""
+        bot_data = BotCreate(name="Test Bot", symbol="BTCUSDT", is_active=True)
+        # Note: is_paper_trading not specified, should default to True
+        
+        created_bot = await bot_service.create_bot(bot_data, test_session)
+        
+        assert created_bot.is_paper_trading is True

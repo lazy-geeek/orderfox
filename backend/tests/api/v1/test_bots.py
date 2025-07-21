@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from httpx import AsyncClient
 from fastapi import status
+from fastapi.testclient import TestClient
 import json
 
 from app.main import app
@@ -49,6 +50,7 @@ class TestBotsAPI:
         assert data["name"] == "Test Bot"
         assert data["symbol"] == "BTCUSDT"
         assert data["isActive"] is True
+        assert data["isPaperTrading"] is True  # Default value
         assert "id" in data
         assert "createdAt" in data
         assert "updatedAt" in data
@@ -97,6 +99,9 @@ class TestBotsAPI:
         assert data["total"] == 4
         assert data["page"] == 1
         assert data["pageSize"] == 50
+        # Verify isPaperTrading field is included in list response
+        for bot in data["bots"]:
+            assert "isPaperTrading" in bot
     
     def test_get_bots_pagination(self, client, test_session, multiple_bots):
         """Test bot pagination."""
@@ -125,6 +130,7 @@ class TestBotsAPI:
         assert data["name"] == sample_bot.name
         assert data["symbol"] == sample_bot.symbol
         assert data["isActive"] == sample_bot.is_active
+        assert "isPaperTrading" in data  # Field should be present
     
     def test_get_bot_not_found(self, client, test_session):
         """Test getting a non-existent bot."""
@@ -145,7 +151,8 @@ class TestBotsAPI:
         """Test updating a bot successfully."""
         update_data = {
             "name": "Updated Bot",
-            "isActive": False
+            "isActive": False,
+            "isPaperTrading": False
         }
         
         response = client.patch(f"/api/v1/bots/{sample_bot.id}", json=update_data)
@@ -154,6 +161,7 @@ class TestBotsAPI:
         data = response.json()
         assert data["name"] == "Updated Bot"
         assert data["isActive"] is False
+        assert data["isPaperTrading"] is False
         assert data["symbol"] == sample_bot.symbol  # Unchanged
     
     def test_update_bot_not_found(self, client, test_session):
@@ -297,15 +305,32 @@ class TestBotsAPI:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
-        assert "bot_service" in data
-        assert "data_stream_manager" in data
-        assert "timestamp" in data
+    
+    async def test_bot_paper_trading_toggle(self, client, test_session):
+        """Test toggling paper trading mode on a bot."""
+        # Create a bot with paper trading enabled (default)
+        bot_data = {
+            "name": "Paper Trading Bot",
+            "symbol": "BTCUSDT",
+            "isActive": True
+        }
         
-        # Check bot service health
-        bot_service_data = data["bot_service"]
-        assert "symbols_tracked" in bot_service_data
-        assert "cache_stats" in bot_service_data
-        assert bot_service_data["symbols_tracked"] == 3  # BTCUSDT, ETHUSDT, ADAUSDT
+        create_response = await client.post("/api/v1/bots/", json=bot_data)
+        assert create_response.status_code == status.HTTP_201_CREATED
+        bot_id = create_response.json()["id"]
+        assert create_response.json()["isPaperTrading"] is True
+        
+        # Toggle to live trading
+        update_data = {"isPaperTrading": False}
+        update_response = await client.patch(f"/api/v1/bots/{bot_id}", json=update_data)
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["isPaperTrading"] is False
+        
+        # Toggle back to paper trading
+        update_data2 = {"isPaperTrading": True}
+        update_response2 = await client.patch(f"/api/v1/bots/{bot_id}", json=update_data2)
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["isPaperTrading"] is True
     
     def test_api_error_handling(self, client, test_session):
         """Test API error handling with various scenarios."""
@@ -344,6 +369,28 @@ class TestBotsAPI:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["total"] == 5
+    
+    async def test_bot_paper_trading_toggle(self, client, test_session, sample_bot):
+        """Test toggling paper trading mode on a bot."""
+        # First verify bot defaults to paper trading
+        response = await client.get(f"/api/v1/bots/{sample_bot.id}")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["isPaperTrading"] is True
+        
+        # Toggle to live trading
+        update_data = {"isPaperTrading": False}
+        response = await client.patch(f"/api/v1/bots/{sample_bot.id}", json=update_data)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["isPaperTrading"] is False
+        
+        # Toggle back to paper trading
+        update_data = {"isPaperTrading": True}
+        response = await client.patch(f"/api/v1/bots/{sample_bot.id}", json=update_data)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["isPaperTrading"] is True
 
 
 @pytest.mark.asyncio

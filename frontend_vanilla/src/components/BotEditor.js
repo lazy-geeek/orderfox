@@ -16,6 +16,7 @@ export function createBotEditor() {
   modal.setAttribute('data-testid', 'bot-editor-modal');
   
   modal.innerHTML = `
+    <label class="modal-backdrop" for=""></label>
     <div class="modal-box w-11/12 max-w-2xl">
       <div class="flex justify-between items-center mb-6">
         <h3 class="font-bold text-lg" id="modal-title">Create New Bot</h3>
@@ -62,13 +63,16 @@ export function createBotEditor() {
           </label>
         </div>
         
-        <!-- Bot Status -->
-        <div class="form-control">
+        <!-- Bot Settings -->
+        <div class="form-control space-y-4">
           <label class="label">
-            <span class="label-text font-semibold">Bot Status</span>
+            <span class="label-text font-semibold">Bot Settings</span>
           </label>
-          <div class="flex items-center gap-4">
-            <label class="label cursor-pointer">
+          
+          <!-- Active Toggle -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="label-text font-semibold">Active</span>
               <input 
                 type="checkbox" 
                 id="bot-active" 
@@ -76,11 +80,23 @@ export function createBotEditor() {
                 class="toggle toggle-success" 
                 checked
               />
-              <span class="label-text ml-2">
-                <span id="status-text">Active</span>
-                <span class="text-sm text-base-content/60 block">Bot will start trading immediately</span>
-              </span>
-            </label>
+            </div>
+            <p id="status-text" class="text-sm text-base-content/60">Bot will start trading immediately</p>
+          </div>
+          
+          <!-- Paper Trading Toggle -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="label-text font-semibold">Paper Trading</span>
+              <input 
+                type="checkbox" 
+                id="bot-paper-trading" 
+                name="isPaperTrading" 
+                class="toggle toggle-info" 
+                checked 
+              />
+            </div>
+            <p id="paper-trading-text" class="text-sm text-base-content/60">Paper trading mode (simulated trades)</p>
           </div>
         </div>
         
@@ -123,9 +139,6 @@ export function createBotEditor() {
         </div>
       </form>
     </div>
-    
-    <!-- Modal backdrop -->
-    <div class="modal-backdrop" id="modal-backdrop"></div>
   `;
   
   return modal;
@@ -167,6 +180,7 @@ export function showBotEditor(modal, options = {}) {
     modal.querySelector('#bot-name').value = bot.name;
     modal.querySelector('#bot-symbol').value = bot.symbol;
     modal.querySelector('#bot-active').checked = bot.isActive;
+    modal.querySelector('#bot-paper-trading').checked = bot.isPaperTrading ?? true;
     modal.querySelector('#bot-description').value = bot.description || '';
   } else {
     resetBotForm(modal);
@@ -174,6 +188,7 @@ export function showBotEditor(modal, options = {}) {
   
   // Update status text
   updateStatusText(modal);
+  updatePaperTradingText(modal);
   
   // Show modal
   modal.classList.add('modal-open');
@@ -215,11 +230,24 @@ export function updateStatusText(modal) {
   const statusText = modal.querySelector('#status-text');
   
   if (toggle.checked) {
-    statusText.textContent = 'Active';
-    statusText.nextElementSibling.textContent = 'Bot will start trading immediately';
+    statusText.textContent = 'Bot will start trading immediately';
   } else {
-    statusText.textContent = 'Inactive';
-    statusText.nextElementSibling.textContent = 'Bot will be created but not start trading';
+    statusText.textContent = 'Bot will be created but not start trading';
+  }
+}
+
+/**
+ * Update paper trading text based on toggle state
+ * @param {HTMLElement} modal - Modal element
+ */
+export function updatePaperTradingText(modal) {
+  const toggle = modal.querySelector('#bot-paper-trading');
+  const text = modal.querySelector('#paper-trading-text');
+  
+  if (toggle.checked) {
+    text.textContent = 'Paper trading mode (simulated trades)';
+  } else {
+    text.textContent = 'Live trading mode (real trades)';
   }
 }
 
@@ -326,6 +354,7 @@ export function getFormData(modal) {
     name: formData.get('name').trim(),
     symbol: formData.get('symbol'),
     isActive: modal.querySelector('#bot-active').checked,
+    isPaperTrading: modal.querySelector('#bot-paper-trading').checked,
     description: formData.get('description').trim()
   };
 }
@@ -374,13 +403,15 @@ export function addBotEditorEventListeners(modal, callbacks = {}) {
   // Close modal events
   const closeBtn = modal.querySelector('#close-modal-btn');
   const cancelBtn = modal.querySelector('#cancel-btn');
-  const backdrop = modal.querySelector('#modal-backdrop');
+  const backdrop = modal.querySelector('.modal-backdrop');
   
   [closeBtn, cancelBtn, backdrop].forEach(element => {
-    element.addEventListener('click', () => {
-      onCancel();
-      hideBotEditor(modal);
-    });
+    if (element) {
+      element.addEventListener('click', () => {
+        onCancel();
+        hideBotEditor(modal);
+      });
+    }
   });
   
   // Prevent modal close on content click
@@ -415,6 +446,12 @@ export function addBotEditorEventListeners(modal, callbacks = {}) {
   const statusToggle = modal.querySelector('#bot-active');
   statusToggle.addEventListener('change', () => {
     updateStatusText(modal);
+  });
+  
+  // Paper trading toggle change
+  const paperTradingToggle = modal.querySelector('#bot-paper-trading');
+  paperTradingToggle.addEventListener('change', () => {
+    updatePaperTradingText(modal);
   });
   
   // Description character count

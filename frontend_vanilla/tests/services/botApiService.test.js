@@ -126,6 +126,7 @@ describe('BotApiService', () => {
           name: 'New Bot',
           symbol: 'BTCUSDT',
           isActive: true,
+          isPaperTrading: true,
           description: 'New bot description'
         })
       });
@@ -158,6 +159,7 @@ describe('BotApiService', () => {
       
       expect(bodyData.name).toBe('Test Bot');
       expect(bodyData.description).toBe('Test description');
+      expect(bodyData.isPaperTrading).toBe(true);
     });
   });
 
@@ -187,6 +189,7 @@ describe('BotApiService', () => {
           name: 'Updated Bot',
           symbol: 'ETHUSDT',
           isActive: false,
+          isPaperTrading: undefined,
           description: 'Updated description'
         })
       });
@@ -364,6 +367,7 @@ describe('BotApiService', () => {
         name: '  Test Bot  ',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: '  Test description  '
       };
 
@@ -373,6 +377,7 @@ describe('BotApiService', () => {
         name: 'Test Bot',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: 'Test description'
       });
     });
@@ -388,6 +393,7 @@ describe('BotApiService', () => {
         name: 'Test Bot',
         symbol: '',
         isActive: true,
+        isPaperTrading: true,
         description: null
       });
     });

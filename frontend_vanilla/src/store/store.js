@@ -29,8 +29,6 @@ const state = {
   selectedRounding: null,
   availableRoundingOptions: [], // Provided by backend
   displayDepth: 10,
-  tradingMode: 'paper',
-  isSubmittingTrade: false,
   tradeError: null,
   openPositions: [],
   positionsLoading: false,
@@ -341,10 +339,6 @@ function clearOrderBook() {
   notify('orderBookLoading');
 }
 
-function setTradingMode(mode) {
-  state.tradingMode = mode;
-  notify('tradingMode');
-}
 
 function clearTradeError() {
   state.tradeError = null;
@@ -455,9 +449,7 @@ async function fetchOpenPositions() {
 }
 
 async function executeTrade(tradeDetails, mode) {
-  state.isSubmittingTrade = true;
   state.tradeError = null;
-  notify('isSubmittingTrade');
   notify('tradeError');
   try {
     const response = await fetch(`${API_BASE_URL}/trade`, {
@@ -474,12 +466,8 @@ async function executeTrade(tradeDetails, mode) {
     const data = await response.json();
     addToTradeHistory(data);
     await fetchOpenPositions(); // Re-fetch positions after successful trade
-    state.isSubmittingTrade = false;
-    notify('isSubmittingTrade');
   } catch (error) {
-    state.isSubmittingTrade = false;
     state.tradeError = error.message;
-    notify('isSubmittingTrade');
     notify('tradeError');
   }
 }
@@ -492,26 +480,7 @@ async function executeLiveTrade(tradeDetails) {
   await executeTrade(tradeDetails, 'live');
 }
 
-async function setTradingModeApi(mode) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/set_trading_mode`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ mode }),
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || errorData.message || 'Could not change trading mode.');
-    }
-    state.tradingMode = mode;
-    notify('tradingMode');
-  } catch (error) {
-    state.tradeError = error.message;
-    notify('tradeError');
-  }
-}
+// Trading mode removed - now a per-bot setting
 
 // Bot management functions
 function setBots(bots) {
@@ -762,7 +731,6 @@ export {
   clearOrderBook,
   fetchSymbols,
   fetchOrderBook,
-  setTradingMode,
   clearTradeError,
   clearPositionsError,
   setTheme,
@@ -770,7 +738,6 @@ export {
   fetchOpenPositions,
   executePaperTrade,
   executeLiveTrade,
-  setTradingModeApi,
   // Bot management functions
   setBots,
   addBot,

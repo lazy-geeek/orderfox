@@ -64,6 +64,7 @@ describe('Bot Flow Integration Tests', () => {
         name: 'Test Bot 1',
         symbol: 'BTCUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: 'Test bot for BTC trading',
         createdAt: '2023-01-01T00:00:00Z'
       },
@@ -72,6 +73,7 @@ describe('Bot Flow Integration Tests', () => {
         name: 'Test Bot 2',
         symbol: 'ETHUSDT',
         isActive: false,
+        isPaperTrading: true,
         description: 'Test bot for ETH trading',
         createdAt: '2023-01-02T00:00:00Z'
       }
@@ -95,6 +97,7 @@ describe('Bot Flow Integration Tests', () => {
         name: 'New Test Bot',
         symbol: 'ADAUSDT',
         isActive: true,
+        isPaperTrading: true,
         description: 'New bot description',
         createdAt: '2023-01-03T00:00:00Z'
       };
@@ -146,6 +149,7 @@ describe('Bot Flow Integration Tests', () => {
           name: 'New Test Bot',
           symbol: 'ADAUSDT',
           isActive: true,
+          isPaperTrading: true,
           description: 'New bot description'
         })
       });

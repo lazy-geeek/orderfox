@@ -47,15 +47,10 @@ export function createMainLayout() {
   const navbarEnd = document.createElement('div');
   navbarEnd.className = 'navbar-end gap-4';
   
-  const tradingModeTogglePlaceholder = document.createElement('div');
-  tradingModeTogglePlaceholder.id = 'trading-mode-toggle-placeholder';
-  tradingModeTogglePlaceholder.textContent = 'TradingModeToggle';
-  
   const themeSwitcherPlaceholder = document.createElement('div');
   themeSwitcherPlaceholder.id = 'theme-switcher-placeholder';
   themeSwitcherPlaceholder.textContent = 'ThemeSwitcher';
   
-  navbarEnd.appendChild(tradingModeTogglePlaceholder);
   navbarEnd.appendChild(themeSwitcherPlaceholder);
   
   navbar.appendChild(navbarEnd);
