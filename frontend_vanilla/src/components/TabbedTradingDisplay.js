@@ -50,28 +50,30 @@ export function createTabbedTradingDisplay() {
 
     // Build the HTML structure with DaisyUI tabs
     container.innerHTML = `
-        <div role="tablist" class="tabs tabs-boxed">
-            <input type="radio" name="trading_tabs" class="tab" aria-label="Order Book" checked />
-            <div class="tab-content bg-base-100 border-base-300 p-6">
-                <div id="orderbook-placeholder" class="component-placeholder">
-                    <div class="loading loading-spinner loading-lg"></div>
-                    <span>Loading Order Book...</span>
-                </div>
+        <div class="tabs-container">
+            <div role="tablist" class="tabs">
+                <input type="radio" name="trading_tabs" class="tab" aria-label="Order Book" id="tab-orderbook" checked />
+                <input type="radio" name="trading_tabs" class="tab" aria-label="Trades" id="tab-trades" />
+                <input type="radio" name="trading_tabs" class="tab" aria-label="Liquidations" id="tab-liquidations" />
             </div>
-
-            <input type="radio" name="trading_tabs" class="tab" aria-label="Trades" />
-            <div class="tab-content bg-base-100 border-base-300 p-6">
-                <div id="trades-placeholder" class="component-placeholder">
-                    <div class="loading loading-spinner loading-lg"></div>
-                    <span>Loading Trades...</span>
+            <div class="tab-content-container">
+                <div class="tab-content" data-tab="orderbook">
+                    <div id="orderbook-placeholder" class="component-placeholder">
+                        <div class="loading loading-spinner loading-lg"></div>
+                        <span>Loading Order Book...</span>
+                    </div>
                 </div>
-            </div>
-
-            <input type="radio" name="trading_tabs" class="tab" aria-label="Liquidations" />
-            <div class="tab-content bg-base-100 border-base-300 p-6">
-                <div id="liquidations-placeholder" class="component-placeholder">
-                    <div class="loading loading-spinner loading-lg"></div>
-                    <span>Loading Liquidations...</span>
+                <div class="tab-content" data-tab="trades" style="display: none;">
+                    <div id="trades-placeholder" class="component-placeholder">
+                        <div class="loading loading-spinner loading-lg"></div>
+                        <span>Loading Trades...</span>
+                    </div>
+                </div>
+                <div class="tab-content" data-tab="liquidations" style="display: none;">
+                    <div id="liquidations-placeholder" class="component-placeholder">
+                        <div class="loading loading-spinner loading-lg"></div>
+                        <span>Loading Liquidations...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -98,13 +100,13 @@ export function createTabbedTradingDisplay() {
             let component;
 
             switch (tabName) {
-                case 'orderbook':
+                case 'orderbook': {
                     // OrderBook uses external WebSocketManager for connection management
                     // This allows for dynamic parameter updates (depth, rounding) and
                     // centralized connection handling across the application
                     const orderBookElement = createOrderBookDisplay();
                     
-                    // Initial update with current state
+                    // Initial update with current state (same pattern as trades)
                     updateOrderBookDisplay(orderBookElement, state);
                     
                     // Subscribe to state changes
@@ -114,8 +116,9 @@ export function createTabbedTradingDisplay() {
                     component = { element: orderBookElement, destroy: () => {} };
                     componentState.components.orderbook = component;
                     break;
+                }
 
-                case 'trades':
+                case 'trades': {
                     // LastTrades also uses external WebSocketManager to maintain
                     // consistency with OrderBook and enable centralized symbol switching
                     const tradesElement = createLastTradesDisplay();
@@ -130,8 +133,9 @@ export function createTabbedTradingDisplay() {
                     component = { element: tradesElement, destroy: () => {} };
                     componentState.components.trades = component;
                     break;
+                }
 
-                case 'liquidations':
+                case 'liquidations': {
                     // LiquidationDisplay uses internal WebSocket management because:
                     // 1. It connects to different streams (Binance @forceOrder)
                     // 2. It has complex connection pooling logic
@@ -145,6 +149,7 @@ export function createTabbedTradingDisplay() {
                     };
                     componentState.components.liquidations = component;
                     break;
+                }
 
                 default:
                     console.error(`Unknown tab name: ${tabName}`);
@@ -188,6 +193,20 @@ export function createTabbedTradingDisplay() {
         const tabName = tabMapping[selectedLabel];
         if (tabName) {
             console.log(`Switching to ${selectedLabel} tab`);
+            
+            // Hide all tab contents
+            const allTabContents = container.querySelectorAll('.tab-content');
+            allTabContents.forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            // Show selected tab content
+            const selectedContent = container.querySelector(`.tab-content[data-tab="${tabName}"]`);
+            if (selectedContent) {
+                selectedContent.style.display = 'block';
+            }
+            
+            // Initialize component if needed
             initializeTabComponent(tabName);
         }
     }
@@ -201,6 +220,12 @@ export function createTabbedTradingDisplay() {
     // Initialize the default tab (Order Book) immediately since it's checked
     // Use setTimeout to ensure DOM is fully ready
     setTimeout(() => {
+        console.log('Initializing default orderbook tab with symbol:', state.selectedSymbol || 'No symbol selected');
+        // Make sure the orderbook tab content is visible
+        const orderbookContent = container.querySelector('.tab-content[data-tab="orderbook"]');
+        if (orderbookContent) {
+            orderbookContent.style.display = 'block';
+        }
         initializeTabComponent('orderbook');
     }, 0);
 

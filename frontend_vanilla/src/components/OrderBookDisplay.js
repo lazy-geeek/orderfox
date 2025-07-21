@@ -173,8 +173,9 @@ function updateOrderBookDisplay(container, data) {
     
     } else {
       // Show empty state if no data
-      asksList.innerHTML = '<div class="empty-state">No order book data</div>';
-      bidsList.innerHTML = '<div class="empty-state">No order book data</div>';
+      const emptyMessage = selectedSymbol ? 'Waiting for order book data...' : 'No order book data';
+      asksList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+      bidsList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
     }
   }
 

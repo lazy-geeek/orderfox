@@ -1093,24 +1093,52 @@ body {
 /* TabbedTradingDisplay styles */
 .orderfox-tabbed-trading-display {
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.orderfox-tabbed-trading-display .tabs {
+.orderfox-tabbed-trading-display .tabs-container {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.orderfox-tabbed-trading-display .tab-content {
-  flex: 1;
-  overflow-y: auto;
-  height: 100%;
-  display: none;
+.orderfox-tabbed-trading-display .tabs {
+  margin-bottom: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  background-color: var(--fallback-b1,oklch(var(--b1)));
+  padding: 0.5rem;
+  border-radius: var(--rounded-box, 1rem);
+  border: 1px solid var(--fallback-bc,oklch(var(--bc)/0.2));
 }
 
-.orderfox-tabbed-trading-display input[type="radio"]:checked + .tab-content {
-  display: block;
+.orderfox-tabbed-trading-display .tab {
+  text-align: center;
+  justify-content: center;
+}
+
+.orderfox-tabbed-trading-display .tab-content-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.orderfox-tabbed-trading-display .tab-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--fallback-b1,oklch(var(--b1)));
+  border: 1px solid var(--fallback-bc,oklch(var(--bc)/0.2));
+  border-radius: var(--rounded-box, 1rem);
+  margin-top: 0.5rem;
 }
 
 .orderfox-tabbed-trading-display .component-placeholder {
