@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   orderfox-dev:
     build:
@@ -10,6 +8,8 @@ services:
       - ../:/workspaces/orderfox:cached
       - orderfox-node-modules:/workspaces/orderfox/frontend_vanilla/node_modules
       - orderfox-pip-cache:/root/.cache/pip
+      # Mount Claude Code settings and commands from host
+      - /home/bail/.claude:/home/vscode/.claude:ro
     ports:
       - "3000:3000"   # Frontend Vite dev server
       - "8000:8000"   # FastAPI Backend
@@ -21,44 +21,47 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - DEBUG=true
+      # Database configuration - using container hostname
+      - DATABASE_URL=postgresql://orderfox_user:orderfox_password@postgres:5432/orderfox_db
     networks:
       - orderfox-network
     working_dir: /workspaces/orderfox
     command: bash .devcontainer/docker-entrypoint.sh
     stdin_open: true
     tty: true
+    depends_on:
+      postgres:
+        condition: service_healthy
 
-  # Firebase Emulator Suite (optional separate service)
-  # firebase-emulators:
-  #   image: node:18-alpine
-  #   container_name: orderfox-firebase-emulators
-  #   volumes:
-  #     - ../:/workspaces/orderfox:cached
-  #     - orderfox-firebase-cache:/root/.cache/firebase
-  #   ports:
-  #     - "4000:4000"   # Emulator Suite UI
-  #     - "4001:4001"   # Auth Emulator
-  #     - "4002:4002"   # Firestore Emulator
-  #     - "4003:4003"   # Functions Emulator
-  #     - "4004:4004"   # Hosting Emulator
-  #     - "4005:4005"   # Pub/Sub Emulator
-  #     - "4400:4400"   # Emulator Hub
-  #   working_dir: /workspaces/orderfox
-  #   command: |
-  #     sh -c "
-  #       npm install -g firebase-tools &&
-  #       firebase emulators:start --only auth,firestore,functions,hosting,pubsub --host 0.0.0.0
-  #     "
-  #   networks:
-  #     - orderfox-network
-  #   depends_on:
-  #     - orderfox-dev
-
+  # PostgreSQL database service
+  postgres:
+    image: postgres:16
+    container_name: orderfox-postgres-dev
+    environment:
+      POSTGRES_DB: orderfox_db
+      POSTGRES_USER: orderfox_user
+      POSTGRES_PASSWORD: orderfox_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - orderfox-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderfox_user -d orderfox_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  
 volumes:
   orderfox-node-modules:
     name: orderfox-node-modules
   orderfox-pip-cache:
     name: orderfox-pip-cache
+  postgres_data:
+    name: orderfox-postgres-data
 
 networks:
   orderfox-network:

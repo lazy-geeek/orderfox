@@ -38,14 +38,22 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm run test:ui
 # Test specific component
 cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LightweightChart
 cd /home/bail/github/orderfox/frontend_vanilla && npm test -- LastTradesDisplay
+
+# End-to-end browser tests (Playwright)
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e:ui
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e:headed
+cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e:debug
 ```
 
 ### Frontend Test Coverage
-- **Price Precision Logic**: 14 unit tests covering default precision, dynamic updates, error handling, and edge cases
-- **Last Trades Component**: 14 unit tests covering component creation, trade updates, color coding, and state management
-- **Integration Tests**: 4 tests validating main.js flow and performance optimization patterns
-- **Framework**: Vitest with jsdom environment for DOM testing
-- **Test Structure**: Mirrors backend structure with `/tests/components/` and `/tests/integration/`
+- **Unit Tests (Vitest)**: 254 tests covering components, services, and integration
+- **Bot Management Tests**: Complete CRUD operations testing
+- **WebSocket Integration**: Connection management and real-time data flow
+- **E2E Tests (Playwright)**: Browser automation testing for user workflows
+- **Component Tests**: Individual component functionality and UI interactions
+- **Framework**: Vitest with jsdom environment for DOM testing, Playwright for browser testing
+- **Test Structure**: Mirrors backend structure with `/tests/components/`, `/tests/integration/`, and `/tests/e2e/`
 
 ## Architecture Patterns
 
@@ -189,6 +197,22 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 6. Test with both light and dark themes
 7. Integrate with WebSocketManager for data
 8. Subscribe to relevant state updates
+
+### Working with Bot Management
+1. **Bot Components**: Use `BotNavigation`, `BotList`, and `BotEditor` components
+2. **Bot State**: Bot data managed in `store/store.js` with subscribe/notify pattern
+3. **Bot API**: All bot operations go through `botApiService.js`
+4. **Bot Context**: WebSocket connections contextualized to selected bot
+5. **Testing**: Unit tests for bot components and E2E tests for bot workflows
+
+### DaisyUI v5 Patterns
+1. **Drawer Component**: Main layout uses DaisyUI drawer for sidebar navigation
+2. **Default Open State**: Drawer toggle is checked by default for better UX (`drawerToggle.checked = true`)
+3. **Navigation Links**: Sidebar links use DaisyUI menu component with emoji icons
+4. **Modal Dialogs**: Bot editor uses DaisyUI modal with form controls
+5. **Dropdown Menus**: Bot actions use DaisyUI dropdown pattern for edit/delete/toggle operations
+6. **Button Variants**: Consistent use of btn-primary, btn-secondary, btn-ghost classes
+7. **Loading States**: DaisyUI loading spinner for async operations
 
 ### Modifying Chart Display
 1. Update chart component in `LightweightChart.js`

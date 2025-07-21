@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for bot management
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: orderfox_db
+      POSTGRES_USER: orderfox_user
+      POSTGRES_PASSWORD: orderfox_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderfox_user -d orderfox_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Test PostgreSQL database (separate instance for testing)
+  postgres-test:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: orderfox_test_db
+      POSTGRES_USER: orderfox_test_user
+      POSTGRES_PASSWORD: orderfox_test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderfox_test_user -d orderfox_test_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend API service
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://orderfox_user:orderfox_password@postgres:5432/orderfox_db
+      - ASYNC_DATABASE_URL=postgresql+asyncpg://orderfox_user:orderfox_password@postgres:5432/orderfox_db
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - DEBUG=true
+      - FASTAPI_PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Frontend service
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend_vanilla/Dockerfile
+    environment:
+      - VITE_APP_API_BASE_URL=http://localhost:8000/api/v1
+      - VITE_APP_WS_BASE_URL=ws://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend_vanilla:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  postgres_test_data:

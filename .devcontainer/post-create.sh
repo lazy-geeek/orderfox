@@ -15,8 +15,8 @@ echo "📦 Installing Python backend dependencies..."
 if [ -f "backend/requirements.txt" ]; then
     echo "   Installing from backend/requirements.txt (using pre-built wheels when possible)..."
     pip install --prefer-binary -r backend/requirements.txt
-    # Install additional development tools
-    pip install --prefer-binary debugpy ipython black flake8 mypy pytest-asyncio
+    # Install additional development tools (no flake8 - using Pylance only)
+    pip install --prefer-binary debugpy ipython black mypy pytest-asyncio
     echo "   ✅ Python dependencies installed"
 else
     echo "⚠️  backend/requirements.txt not found, skipping Python dependency installation"
@@ -26,9 +26,18 @@ fi
 echo "📦 Installing frontend dependencies..."
 if [ -f "frontend_vanilla/package.json" ]; then
     cd frontend_vanilla
-    npm install
+    # Fix npm permissions by using force and cache options
+    echo "   Installing with npm (handling any existing node_modules)..."
+    # Use force to overwrite any problematic files and set cache location
+    npm install --force --cache /home/vscode/.npm --no-fund --no-audit || {
+        echo "   ⚠️  First install attempt failed, trying alternative approach..."
+        # If that fails, try without removing node_modules
+        npm install --cache /home/vscode/.npm --no-fund --no-audit || {
+            echo "   ⚠️  npm install failed. Will need manual installation."
+        }
+    }
     cd ..
-    echo "   ✅ Frontend dependencies installed"
+    echo "   ✅ Frontend dependencies installation attempted"
 else
     echo "⚠️  frontend_vanilla/package.json not found, skipping frontend dependency installation"
 fi
@@ -74,7 +83,11 @@ fi
 # Install root development dependencies
 echo "📦 Installing root development dependencies..."
 if [ -f "package.json" ]; then
-    npm install
+    # Use same approach as frontend
+    echo "   Installing root dependencies with npm..."
+    npm install --force --cache /home/vscode/.npm --no-fund --no-audit || {
+        echo "   ⚠️  npm install failed. Will need manual installation."
+    }
 else
     echo "⚠️  package.json not found, skipping root dependency installation"
 fi
@@ -87,7 +100,9 @@ if [ ! -f ".env" ]; then
         echo "✅ Created .env from .env.docker.example"
     elif [ -f ".env.example" ]; then
         cp .env.example .env
-        echo "✅ Created .env from .env.example"
+        # Update DATABASE_URL to use container hostname
+        sed -i 's|DATABASE_URL=postgresql://orderfox_user:orderfox_password@localhost:5432/orderfox_db|DATABASE_URL=postgresql://orderfox_user:orderfox_password@postgres:5432/orderfox_db|g' .env
+        echo "✅ Created .env from .env.example with container database URL"
     else
         echo "⚠️  .env.docker.example not found, creating basic .env file"
         cat > .env << 'EOF'
@@ -95,9 +110,24 @@ if [ ! -f ".env" ]; then
 NODE_ENV=development
 DEVCONTAINER_MODE=true
 
+# Database Configuration (using container hostname)
+DATABASE_URL=postgresql://orderfox_user:orderfox_password@postgres:5432/orderfox_db
+
 # Binance API Configuration (Required for trading functionality)
 BINANCE_API_KEY=your_binance_api_key_here
 BINANCE_SECRET_KEY=your_binance_secret_key_here
+BINANCE_WS_BASE_URL=wss://fstream.binance.com
+
+# Backend Configuration
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+BACKEND_PORT=8000
+BACKEND_URL=http://localhost:8000
+
+# Frontend Configuration
+FRONTEND_PORT=3000
+FRONTEND_URL=http://localhost:3000
+VITE_APP_API_BASE_URL=/api/v1
+VITE_APP_WS_BASE_URL=/api/v1
 
 # Development Settings
 DEBUG=true
@@ -105,7 +135,7 @@ MAX_ORDERBOOK_LIMIT=5000
 PYTHONDONTWRITEBYTECODE=1
 PYTHONUNBUFFERED=1
 
-# Container-specific URLs
+# Container-specific settings
 FASTAPI_HOST=0.0.0.0
 FASTAPI_PORT=8000
 VITE_HOST=0.0.0.0
@@ -132,6 +162,24 @@ echo "📁 Creating development directories..."
 mkdir -p logs
 mkdir -p data
 mkdir -p tmp
+
+# Wait for PostgreSQL to be ready
+echo "⏳ Waiting for PostgreSQL to be ready..."
+until pg_isready -h postgres -U orderfox_user -d orderfox_db; do
+    echo "   PostgreSQL is not ready yet, waiting..."
+    sleep 2
+done
+echo "✅ PostgreSQL is ready!"
+
+# Run database migrations if needed
+echo "🗄️ Checking database setup..."
+if [ -f "backend/app/core/database.py" ]; then
+    echo "   Running database initialization..."
+    cd backend
+    python -c "from app.core.database import init_db; init_db()" || echo "   Database already initialized or init script not found"
+    cd ..
+    echo "✅ Database setup complete"
+fi
 
 # Set up VS Code debugging configuration
 echo "🐛 Setting up VS Code debugging configuration..."
@@ -342,9 +390,10 @@ echo "   • Environment variables set for Windows host → container connectivi
 echo "   • HMR (Hot Module Reload) optimized for container environment"
 echo ""
 echo "📋 Next steps:"
-echo "1. Update .env file with your Binance API credentials"
-echo "2. Services will start automatically via supervisord"
-echo "3. Access the application:"
+echo "1. Update .env file with your Binance API credentials if needed"
+echo "2. The PostgreSQL database is already running in the container"
+echo "3. Services will start automatically via supervisord"
+echo "4. Access the application:"
 echo "   • Frontend: http://localhost:3000"
 echo "   • Backend API: http://localhost:8000"
 echo "   • API Documentation: http://localhost:8000/docs"
@@ -354,6 +403,7 @@ echo "   • npm run dev                 - Start both frontend and backend"
 echo "   • supervisorctl status        - Check service status"
 echo "   • supervisorctl restart all   - Restart all services"
 echo "   • tail -f /var/log/supervisor/*.log - View logs"
+echo "   • psql -h postgres -U orderfox_user -d orderfox_db - Access PostgreSQL"
 echo "   • claude                      - Launch Claude Code CLI"
 echo ""
 echo "🌐 Network Configuration:"

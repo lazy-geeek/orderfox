@@ -10,6 +10,43 @@ echo "🔄 OrderFox Dev Container Post-Start Setup"
 # Ensure we're in the workspace directory
 cd /workspaces/orderfox
 
+# Clear any VS Code workspace state to ensure folder mode
+echo "🔧 Configuring VS Code to open as folder..."
+if [ -d "/home/vscode/.vscode-server" ] || [ -d "/home/vscode/.vscode-server-insiders" ]; then
+    # Remove any cached workspace references
+    find /home/vscode/.vscode-server* -name "workspace.json" -type f -exec rm -f {} \; 2>/dev/null || true
+    find /home/vscode/.vscode-server* -name "*.code-workspace" -type f -exec rm -f {} \; 2>/dev/null || true
+    
+    # Remove any workspace storage that might contain workspace references
+    rm -rf /home/vscode/.vscode-server*/data/User/workspaceStorage/*orderfox* 2>/dev/null || true
+    rm -rf /home/vscode/.vscode-server*/data/User/globalStorage/*orderfox* 2>/dev/null || true
+    
+    echo "   ✅ Cleared VS Code workspace cache"
+fi
+
+# Remove any workspace files that might exist in the project
+find /workspaces/orderfox -name "*.code-workspace" -type f -exec rm -f {} \; 2>/dev/null || true
+if [ $? -eq 0 ]; then
+    echo "   ✅ Removed any workspace files from project"
+fi
+
+# Create a .gitignore entry to prevent workspace files from being created
+if ! grep -q "*.code-workspace" /workspaces/orderfox/.gitignore 2>/dev/null; then
+    echo "*.code-workspace" >> /workspaces/orderfox/.gitignore
+    echo "   ✅ Added *.code-workspace to .gitignore"
+fi
+
+# Set VS Code to prefer opening folders
+if [ -d "/home/vscode/.vscode-server" ] || [ -d "/home/vscode/.vscode-server-insiders" ]; then
+    # Create VS Code user settings to disable workspace trust prompt
+    mkdir -p /home/vscode/.vscode-server/data/Machine 2>/dev/null || true
+    mkdir -p /home/vscode/.vscode-server-insiders/data/Machine 2>/dev/null || true
+    
+    # Add settings to prevent workspace mode
+    echo '{"security.workspace.trust.enabled": false}' > /home/vscode/.vscode-server/data/Machine/settings.json 2>/dev/null || true
+    echo '{"security.workspace.trust.enabled": false}' > /home/vscode/.vscode-server-insiders/data/Machine/settings.json 2>/dev/null || true
+fi
+
 # Check if services are already running
 echo "🔍 Checking service status..."
 

@@ -1,6 +1,10 @@
 /* Import Binance-style font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Import Tailwind CSS and DaisyUI */
+@import 'tailwindcss';
+@plugin 'daisyui';
+
 /* Global Dark Mode Theme */
 :root {
   /* Binance Dark Theme Colors */
@@ -541,72 +545,6 @@ code {
   font-style: italic;
 }
 
-
-/* TradingModeToggle.css */
-.orderfox-trading-mode-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.orderfox-trading-mode-toggle .mode-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.orderfox-trading-mode-toggle .mode-button {
-  padding: 8px 16px;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.orderfox-trading-mode-toggle .mode-button:hover {
-  background: var(--hover-bg);
-  border-color: var(--color-info);
-}
-
-.orderfox-trading-mode-toggle .mode-button.paper-mode {
-  color: var(--color-warning);
-  border-color: var(--color-warning);
-}
-
-.orderfox-trading-mode-toggle .mode-button.live-mode {
-  color: var(--color-sell);
-  border-color: var(--color-sell);
-}
-
-/* Symbol Selector Styles */
-.symbol-selector {
-  padding: 8px 12px;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 120px;
-}
-
-.symbol-selector:focus {
-  outline: none;
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
-}
-
-.symbol-selector option {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
 
 /* Timeframe Selector Styles */
 .timeframe-selector {
