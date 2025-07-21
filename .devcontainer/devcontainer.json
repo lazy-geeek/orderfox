@@ -1,10 +1,12 @@
 {
 	"name": "OrderFox Development Container",
-	"dockerFile": "Dockerfile",
-	"context": "..",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "orderfox-dev",
+	"workspaceFolder": "/workspaces/orderfox",
+	// "postStartCommand": "code /workspaces/orderfox/.devcontainer/orderfox-devcontainer.code-workspace || true",
 	
 	// Configure which ports to forward
-	"forwardPorts": [8000, 3000, 5678],
+	"forwardPorts": [8000, 3000, 5432, 5678],
 	"portsAttributes": {
 		"8000": {
 			"label": "FastAPI Backend",
@@ -13,6 +15,10 @@
 		"3000": {
 			"label": "Vite Dev Server",
 			"onAutoForward": "notify"
+		},
+		"5432": {
+			"label": "PostgreSQL Database",
+			"onAutoForward": "silent"
 		},
 		"5678": {
 			"label": "Python Debug",
@@ -28,6 +34,8 @@
 		"DEBUG": "true",
 		"DEVCONTAINER_MODE": "true",
 		"WORKSPACE_FOLDER": "/workspaces/orderfox",
+		// Database configuration (container hostname)
+		"DATABASE_URL": "postgresql://orderfox_user:orderfox_password@postgres:5432/orderfox_db",
 		// Frontend proxy configuration (to avoid CORS issues when connecting from host to container)
 		"VITE_APP_API_BASE_URL": "/api/v1",
 		"VITE_APP_WS_BASE_URL": "/api/v1"
@@ -40,7 +48,6 @@
 				"ms-python.python",
 				"ms-python.vscode-pylance",
 				"ms-python.debugpy",
-				"ms-python.black-formatter",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
 				"eamodio.gitlens",
@@ -59,13 +66,16 @@
 				"christian-kohler.npm-intellisense",
 				"christian-kohler.path-intellisense",
 				"ethanfann.restore-terminals",
-				"pkief.material-icon-theme"
+				"pkief.material-icon-theme",
+				"bradlc.vscode-tailwindcss",
+				"mtxr.sqltools",
+				"mtxr.sqltools-driver-pg"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
-				"python.formatting.provider": "black",
-				"python.linting.enabled": true,
 				"python.testing.pytestEnabled": true,
+				"python.analysis.typeCheckingMode": "basic",
+				"python.analysis.autoImportCompletions": true,
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestArgs": [
 					"backend/tests"
@@ -126,5 +136,5 @@
 	"initializeCommand": "echo 'Initializing OrderFox Dev Container...'",
 	"onCreateCommand": "echo 'Dev Container created successfully!'",
 	"updateContentCommand": "echo 'Updating dev container content...'",
-	"postStartCommand": "echo 'Dev Container started. Ready for development!'"
+	"postStartCommand": "bash .devcontainer/post-start.sh"
 }

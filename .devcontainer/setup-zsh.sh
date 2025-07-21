@@ -177,27 +177,37 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
+# DevContainer specific configuration
+export PYTHONPATH=/workspaces/orderfox
+export NODE_ENV=development
+export DEVCONTAINER_MODE=true
+
+# Add npm global bin to PATH (for Claude Code CLI and other global packages)
+export PATH=~/.npm-global/bin:$PATH
+
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-export PATH=~/.npm-global/bin:$PATH
 EOF
 
 # Set proper ownership
 chown vscode:vscode $USER_HOME/.zshrc
 
-# Create a basic p10k configuration (user can customize later)
-echo "Creating basic Powerlevel10k configuration..."
-# Remove any existing broken config first
-rm -f $USER_HOME/.p10k.zsh
-cat > $USER_HOME/.p10k.zsh << 'EOF'
-# Simple Powerlevel10k configuration to avoid parsing errors
-# Type `p10k configure` to generate a more advanced config
+# Copy p10k configuration from host if available
+echo "Setting up Powerlevel10k configuration..."
+HOST_P10K="/workspaces/orderfox/.devcontainer/host-p10k.zsh"
+if [ -f "$HOST_P10K" ]; then
+    echo "Copying host p10k configuration..."
+    cp "$HOST_P10K" "$USER_HOME/.p10k.zsh"
+else
+    echo "Creating basic Powerlevel10k configuration..."
+    # Basic p10k config if host config not available
+    cat > $USER_HOME/.p10k.zsh << 'EOF'
+# Basic Powerlevel10k configuration
+# Run `p10k configure` to generate a full configuration
 
-# Enable instant prompt
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 
-# Left prompt elements
+# Prompt elements matching the host style
 typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
     os_icon
     dir
@@ -206,44 +216,32 @@ typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
     prompt_char
 )
 
-# Right prompt elements  
 typeset -g POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(
     status
     command_execution_time
     background_jobs
-    context
     time
 )
 
-# Basic styling
-typeset -g POWERLEVEL9K_BACKGROUND=
-typeset -g POWERLEVEL9K_LEFT_SUBSEGMENT_SEPARATOR=' '
-typeset -g POWERLEVEL9K_RIGHT_SUBSEGMENT_SEPARATOR=' '
-typeset -g POWERLEVEL9K_LEFT_SEGMENT_SEPARATOR=
-typeset -g POWERLEVEL9K_RIGHT_SEGMENT_SEPARATOR=
-
-# Directory styling
+# Directory styling to match host
 typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=1
 typeset -g POWERLEVEL9K_SHORTEN_DELIMITER=…
-typeset -g POWERLEVEL9K_DIR_ANCHOR_BOLD=true
 
-# Prompt character
-typeset -g POWERLEVEL9K_PROMPT_CHAR_OK_VIINS_FOREGROUND=76
-typeset -g POWERLEVEL9K_PROMPT_CHAR_ERROR_VIINS_FOREGROUND=196
+# Prompt character style
 typeset -g POWERLEVEL9K_PROMPT_CHAR_OK_VIINS_CONTENT_EXPANSION='❯'
 typeset -g POWERLEVEL9K_PROMPT_CHAR_ERROR_VIINS_CONTENT_EXPANSION='❯'
-
-# Git settings
-typeset -g POWERLEVEL9K_VCS_BACKENDS=(git)
-
-# Context (user@host) - only show when in SSH or container
-typeset -g POWERLEVEL9K_CONTEXT_DEFAULT_FOREGROUND=244
-typeset -g POWERLEVEL9K_CONTEXT_{DEFAULT,SUDO}_{CONTENT,VISUAL_IDENTIFIER}_EXPANSION=
+typeset -g POWERLEVEL9K_PROMPT_CHAR_OK_VIINS_FOREGROUND=76
+typeset -g POWERLEVEL9K_PROMPT_CHAR_ERROR_VIINS_FOREGROUND=196
 
 # Time format
 typeset -g POWERLEVEL9K_TIME_FORMAT='%D{%H:%M:%S}'
 
+# Context - show "Deb" for Debian container
+typeset -g POWERLEVEL9K_CONTEXT_TEMPLATE='Deb'
+typeset -g POWERLEVEL9K_CONTEXT_DEFAULT_FOREGROUND=244
+
 EOF
+fi
 
 # Set proper ownership for p10k config
 chown vscode:vscode $USER_HOME/.p10k.zsh

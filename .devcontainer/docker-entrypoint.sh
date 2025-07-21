@@ -9,6 +9,9 @@ echo "🚀 Starting OrderFox Dev Container..."
 mkdir -p /var/log/supervisor
 mkdir -p /var/run
 
+# Prevent VS Code workspace files early
+find /workspaces/orderfox -name "*.code-workspace" -type f -exec rm -f {} \; 2>/dev/null || true
+
 # Set up environment
 export PYTHONPATH="/workspaces/orderfox:$PYTHONPATH"
 export WORKSPACE_FOLDER="/workspaces/orderfox"
@@ -65,6 +68,25 @@ health_check() {
         exit 1
     fi
     
+    # Wait for PostgreSQL to be ready
+    echo "   ⏳ Checking PostgreSQL connection..."
+    max_attempts=30
+    attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if pg_isready -h postgres -U orderfox_user -d orderfox_db -q; then
+            echo "   ✅ PostgreSQL is ready"
+            break
+        fi
+        echo "   Waiting for PostgreSQL (attempt $attempt/$max_attempts)..."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    if [ $attempt -gt $max_attempts ]; then
+        echo "   ❌ PostgreSQL not ready after $max_attempts attempts"
+        exit 1
+    fi
+    
     echo "✅ Health checks passed"
 }
 
@@ -107,6 +129,12 @@ wait_for_deps() {
         echo "   Waiting for Node dependencies..."
         sleep 2
     done
+    
+    # Ensure PostgreSQL client tools are available
+    if ! command -v pg_isready &> /dev/null; then
+        echo "   ⚠️  PostgreSQL client not found, installing..."
+        apt-get update && apt-get install -y postgresql-client
+    fi
     
     echo "✅ Dependencies ready"
 }
