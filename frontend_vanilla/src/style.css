@@ -586,32 +586,6 @@ code {
   border-color: var(--color-sell);
 }
 
-/* Symbol Selector Styles */
-.symbol-selector {
-  padding: 8px 12px;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 120px;
-}
-
-.symbol-selector:focus {
-  outline: none;
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px rgba(27, 168, 247, 0.2);
-}
-
-.symbol-selector option {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
 /* Timeframe Selector Styles */
 .timeframe-selector {
   display: flex;

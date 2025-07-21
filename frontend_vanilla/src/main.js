@@ -2,7 +2,6 @@
 import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
-import { createSymbolSelector, updateSymbolSelector } from './components/SymbolSelector.js';
 import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButton, updateCandlestickChart, updateLatestCandle, updateLiquidationVolume, toggleLiquidationVolume, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
 import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
@@ -51,7 +50,6 @@ const mainLayout = createMainLayout();
 app.appendChild(mainLayout);
 
 // Get references to the component placeholders in the main layout
-const symbolSelectorPlaceholder = document.querySelector('#symbol-selector-placeholder');
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
 const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
 const lastTradesPlaceholder = document.querySelector('#last-trades-container');
@@ -62,9 +60,6 @@ const botNavigationPlaceholder = document.querySelector('#bot-navigation-placeho
 const botListPlaceholder = document.querySelector('#bot-list-placeholder');
 
 // Create and append the actual components
-const symbolSelector = createSymbolSelector();
-symbolSelectorPlaceholder.replaceWith(symbolSelector);
-
 const candlestickChartContainer = document.createElement('div');
 candlestickChartPlaceholder.replaceWith(candlestickChartContainer);
 createCandlestickChart(candlestickChartContainer);
@@ -283,7 +278,6 @@ window.showTradingInterface = () => {
 // Note: getOptimalCandleCount() function moved to WebSocketManager for centralization
 
 // Initial renders
-updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
 updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
 updateOrderBookDisplay(orderBookDisplay, state);
 updateLastTradesDisplay(lastTradesDisplay, state);
@@ -292,9 +286,6 @@ updateTradingModeToggle(tradingModeToggle, state);
 // Subscribe to state changes and update UI
 subscribe((key) => {
   switch (key) {
-    case 'symbolsList':
-      updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
-      break;
     case 'bots':
     case 'botLoading':
     case 'botError':
@@ -308,7 +299,6 @@ subscribe((key) => {
       break;
     case 'selectedSymbol': {
       const selectedSymbolData = state.symbolsList.find(s => s.id === state.selectedSymbol);
-      updateSymbolSelector(symbolSelector, state.symbolsList, state.selectedSymbol);
       // Pass symbol data when symbol changes - reset zoom and treat as initial load
       resetZoomState();
       updateCandlestickChart(
@@ -361,34 +351,6 @@ subscribe((key) => {
 });
 
 // Event Listeners
-symbolSelector.addEventListener('change', async (e) => {
-  try {
-    const selectedBot = getSelectedBot();
-    if (selectedBot) {
-      // If a bot is selected, validate the symbol change
-      const newSymbol = e.target.value;
-      if (newSymbol !== selectedBot.symbol) {
-        const confirmChange = confirm(
-          `This will switch from ${selectedBot.symbol} to ${newSymbol}.\n` +
-          `This may not match your selected bot "${selectedBot.name}".\n` +
-          'Continue?'
-        );
-        if (!confirmChange) {
-          // Reset to bot's symbol
-          e.target.value = selectedBot.symbol;
-          return;
-        }
-      }
-      await WebSocketManager.switchSymbol(newSymbol, true); // Validate bot context
-    } else {
-      // No bot selected, allow free symbol switching
-      await WebSocketManager.switchSymbol(e.target.value, false);
-    }
-  } catch (error) {
-    console.error('Error switching symbol:', error);
-  }
-});
-
 const timeframeSelector = createTimeframeSelector((newTimeframe) => {
   WebSocketManager.switchTimeframe(newTimeframe);
 });
