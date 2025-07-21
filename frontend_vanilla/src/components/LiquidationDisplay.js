@@ -6,7 +6,7 @@
  * Follows the thin client pattern - backend provides all formatted data.
  */
 
-import { subscribe, state } from '../store/store.js';
+import { subscribe, state, setLiquidationsWsConnected } from '../store/store.js';
 import { connectWebSocketStream, disconnectWebSocketStream } from '../services/websocketService.js';
 
 export class LiquidationDisplay {
@@ -30,10 +30,9 @@ export class LiquidationDisplay {
         this.container.innerHTML = `
             <div class="orderfox-liquidation-display orderfox-display-base">
                 <div class="display-header">
-                    <h3>Liquidations</h3>
                     <div class="header-controls">
                         <span class="symbol-label"></span>
-                        <div class="connection-status">
+                        <div class="connection-status" style="display: none;">
                             <span class="status-indicator disconnected">○</span>
                             <span class="status-text">Disconnected</span>
                         </div>
@@ -161,6 +160,10 @@ export class LiquidationDisplay {
     
     updateConnectionStatus(connected) {
         this.isConnected = connected;
+        
+        // Update global state for tab indicators
+        setLiquidationsWsConnected(connected);
+        
         const statusIndicator = this.container.querySelector('.status-indicator');
         const statusText = this.container.querySelector('.status-text');
         

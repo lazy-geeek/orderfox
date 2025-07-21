@@ -53,8 +53,20 @@ export function createTabbedTradingDisplay() {
         <div class="tabs-container">
             <div role="tablist" class="tabs">
                 <input type="radio" name="trading_tabs" class="tab" aria-label="Order Book" id="tab-orderbook" checked />
+                <label for="tab-orderbook" class="tab-label">
+                    <span>Order Book</span>
+                    <span class="tab-status-indicator" data-tab="orderbook">○</span>
+                </label>
                 <input type="radio" name="trading_tabs" class="tab" aria-label="Trades" id="tab-trades" />
+                <label for="tab-trades" class="tab-label">
+                    <span>Trades</span>
+                    <span class="tab-status-indicator" data-tab="trades">○</span>
+                </label>
                 <input type="radio" name="trading_tabs" class="tab" aria-label="Liquidations" id="tab-liquidations" />
+                <label for="tab-liquidations" class="tab-label">
+                    <span>Liquidations</span>
+                    <span class="tab-status-indicator" data-tab="liquidations">○</span>
+                </label>
             </div>
             <div class="tab-content-container">
                 <div class="tab-content" data-tab="orderbook">
@@ -228,6 +240,34 @@ export function createTabbedTradingDisplay() {
         }
         initializeTabComponent('orderbook');
     }, 0);
+
+    /**
+     * Updates the connection status indicator for a specific tab
+     * @param {string} tabName - The tab name ('orderbook', 'trades', or 'liquidations')
+     * @param {boolean} isConnected - Whether the connection is active
+     */
+    function updateTabConnectionStatus(tabName, isConnected) {
+        const indicator = container.querySelector(`.tab-status-indicator[data-tab="${tabName}"]`);
+        if (indicator) {
+            indicator.textContent = isConnected ? '●' : '○';
+            indicator.className = `tab-status-indicator ${isConnected ? 'connected' : 'disconnected'}`;
+        }
+    }
+
+    /**
+     * Subscribe to state changes for connection status updates
+     */
+    const connectionStatusUpdate = () => {
+        updateTabConnectionStatus('orderbook', state.orderBookWsConnected);
+        updateTabConnectionStatus('trades', state.tradesWsConnected);
+        updateTabConnectionStatus('liquidations', state.liquidationsWsConnected);
+    };
+    
+    // Subscribe to state changes
+    subscribe(connectionStatusUpdate);
+    
+    // Initial connection status update
+    connectionStatusUpdate();
 
     /**
      * Cleanup method to destroy all initialized components and remove event listeners.

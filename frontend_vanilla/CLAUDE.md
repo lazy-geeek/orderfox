@@ -81,6 +81,10 @@ cd /home/bail/github/orderfox/frontend_vanilla && npm run test:e2e:debug
   - Use `.four-columns` for 4-column layouts (e.g., order book)
 - **Color Inheritance**: Amount values inherit color from `.bid-price` (green) and `.ask-price` (red) classes
 - **Alignment**: Numeric columns use `text-align: right` for consistent visual alignment
+- **Tab Connection Indicators**: 
+  - Use `.tab-status-indicator` for connection status dots in tabs
+  - `.connected` class shows green dots, `.disconnected` class shows red dots
+  - Tab labels (`.tab-label`) use flexbox to align text and status indicators
 
 ### WebSocket Connection Management
 - **Centralized Manager**: `WebSocketManager` class eliminates duplicate connection logic across UI components
@@ -194,6 +198,8 @@ The TabbedTradingDisplay component consolidates OrderBook, LastTrades, and Liqui
 - **Mixed WebSocket Management**: OrderBook and LastTrades use external WebSocketManager, while Liquidations manages its own connections
 - **State Persistence**: Tab selection state managed through DaisyUI radio inputs without JavaScript state management
 - **Component Lifecycle**: Each integrated component maintains its own lifecycle and cleanup methods
+- **Connection Status Integration**: Each tab displays real-time connection status indicators (green/red dots) without redundant text
+- **Compact Design**: Individual component headers are hidden to reduce redundancy since tab labels clearly indicate content
 
 #### Usage Pattern
 ```javascript
@@ -242,8 +248,10 @@ When working with the consolidated tabbed trading interface:
 3. **WebSocket Management**: 
    - OrderBook and LastTrades: Use external WebSocketManager
    - Liquidations: Uses internal WebSocket management with `window.updateLiquidationDisplay`
-4. **Testing**: E2E tests must switch to appropriate tabs before checking component content
-5. **Layout Integration**: Tabbed display fits in right section of side-by-side layout
+4. **Connection Status**: Each component must update global state (`setLiquidationsWsConnected`, etc.) to reflect tab indicator status
+5. **Header Management**: Individual component headers are hidden (`display: none`) since tabs provide clear labeling
+6. **Testing**: E2E tests must switch to appropriate tabs before checking component content and account for hidden radio inputs
+7. **Layout Integration**: Tabbed display fits in right section of side-by-side layout
 
 #### Integration Example
 ```javascript
@@ -263,6 +271,13 @@ rightSection.appendChild(tabbedTradingDisplay.element);
 - **CSS-Only Transitions**: Smooth tab switching without JavaScript interference
 - **Accessibility**: Full keyboard navigation and screen reader support
 - **Persistence**: Tab selection persists across page interactions
+
+#### Connection Status Implementation
+- **Real-time Indicators**: Each tab displays connection status with colored dots (● for connected, ○ for disconnected)
+- **Global State Integration**: Components must call state setters (`setLiquidationsWsConnected`, etc.) to update tab indicators
+- **Color Coding**: Green dots for active connections, red dots for disconnected states
+- **Compact Design**: No text labels ("Live"/"Disconnected") in tabs - only colored indicators
+- **State Synchronization**: Tab indicators automatically update when WebSocket connection state changes
 
 #### Component Integration Patterns
 - **Consistent Lifecycle**: TabbedTradingDisplay wraps component DOM elements in objects with `element` and `destroy` properties

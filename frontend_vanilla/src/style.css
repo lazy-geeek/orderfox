@@ -926,6 +926,14 @@ body {
 
 /* Individual tab styles */
 .orderfox-tabbed-trading-display .tab {
+  display: none; /* Hide radio inputs */
+}
+
+/* Tab label styles */
+.orderfox-tabbed-trading-display .tab-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -935,20 +943,35 @@ body {
   padding: 12px 16px;
   transition: all 0.2s ease;
   border-bottom: 2px solid transparent;
+  cursor: pointer;
 }
 
 /* Tab hover state */
-.orderfox-tabbed-trading-display .tab:hover {
+.orderfox-tabbed-trading-display .tab-label:hover {
   background: var(--hover-bg);
   color: var(--text-primary);
 }
 
 /* Active/checked tab state */
-.orderfox-tabbed-trading-display .tab:checked {
+.orderfox-tabbed-trading-display .tab:checked + .tab-label {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border-bottom-color: var(--color-info);
   font-weight: 600;
+}
+
+/* Tab status indicator styles */
+.tab-status-indicator {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.tab-status-indicator.connected {
+  color: var(--color-buy);
+}
+
+.tab-status-indicator.disconnected {
+  color: var(--color-sell);
 }
 
 /* Tab content area */
@@ -1067,7 +1090,7 @@ body {
   }
   
   /* Adjust tab interface for small screens */
-  .orderfox-tabbed-trading-display .tab {
+  .orderfox-tabbed-trading-display .tab-label {
     padding: 10px 12px;
     font-size: 12px;
   }
@@ -1080,7 +1103,7 @@ body {
     min-height: 250px;
   }
   
-  .orderfox-tabbed-trading-display .tab {
+  .orderfox-tabbed-trading-display .tab-label {
     padding: 8px 10px;
     font-size: 11px;
   }
@@ -1107,8 +1130,7 @@ body {
 .orderfox-tabbed-trading-display .tabs {
   margin-bottom: 0;
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 0.5rem;
   background-color: var(--fallback-b1,oklch(var(--b1)));
   padding: 0.5rem;
@@ -1116,7 +1138,8 @@ body {
   border: 1px solid var(--fallback-bc,oklch(var(--bc)/0.2));
 }
 
-.orderfox-tabbed-trading-display .tab {
+.orderfox-tabbed-trading-display .tab-label {
+  flex: 1;
   text-align: center;
   justify-content: center;
 }

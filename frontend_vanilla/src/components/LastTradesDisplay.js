@@ -15,10 +15,9 @@ function createLastTradesDisplay() {
 
   container.innerHTML = `
     <div class="display-header">
-      <h3>Trades</h3>
       <div class="header-controls">
         <span class="symbol-label"></span>
-        <div class="connection-status">
+        <div class="connection-status" style="display: none;">
           <span class="status-indicator disconnected">○</span>
           <span class="status-text">Disconnected</span>
         </div>
