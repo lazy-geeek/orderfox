@@ -186,6 +186,42 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 - **Dynamic Headers**: Quantity header shows base asset
 - **Newest First**: Liquidations sorted with newest at top
 
+### TabbedTradingDisplay Component
+The TabbedTradingDisplay component consolidates OrderBook, LastTrades, and Liquidations into a single tabbed interface using DaisyUI v5 tabs pattern.
+
+#### Architecture
+- **Lazy Initialization**: Components are only created when their tab is first selected, improving initial load performance
+- **Mixed WebSocket Management**: OrderBook and LastTrades use external WebSocketManager, while Liquidations manages its own connections
+- **State Persistence**: Tab selection state managed through DaisyUI radio inputs without JavaScript state management
+- **Component Lifecycle**: Each integrated component maintains its own lifecycle and cleanup methods
+
+#### Usage Pattern
+```javascript
+// Create tabbed display
+const tabbedDisplay = createTabbedTradingDisplay();
+
+// Append to container
+container.appendChild(tabbedDisplay.element);
+
+// Cleanup when needed
+tabbedDisplay.destroy();
+```
+
+#### Tab Structure
+- **Order Book Tab**: Default active tab, lazily initializes OrderBookDisplay
+- **Trades Tab**: Lazily initializes LastTradesDisplay on first selection
+- **Liquidations Tab**: Lazily initializes LiquidationDisplay class instance on first selection
+
+#### WebSocket Integration
+- **OrderBook**: Uses WebSocketManager for connection management and dynamic parameter updates
+- **LastTrades**: Uses WebSocketManager for connection management and historical data merging
+- **Liquidations**: Manages own WebSocket connections with internal connection pooling
+
+#### Responsive Design
+- **Desktop (>1024px)**: Tabbed display in right sidebar alongside chart
+- **Tablet (768-1024px)**: Maintains tabbed layout with adjusted spacing
+- **Mobile (<768px)**: Stacked below chart with optimized tab sizing
+
 ## Common Tasks
 
 ### Adding a New Display Component
@@ -197,6 +233,106 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 6. Test with both light and dark themes
 7. Integrate with WebSocketManager for data
 8. Subscribe to relevant state updates
+
+### Working with Tabbed Components
+When working with the consolidated tabbed trading interface:
+
+1. **Accessing Components**: Individual components (OrderBook, LastTrades, Liquidations) are now inside the TabbedTradingDisplay
+2. **Lazy Loading**: Components are only initialized when their tab is first selected
+3. **WebSocket Management**: 
+   - OrderBook and LastTrades: Use external WebSocketManager
+   - Liquidations: Uses internal WebSocket management with `window.updateLiquidationDisplay`
+4. **Testing**: E2E tests must switch to appropriate tabs before checking component content
+5. **Layout Integration**: Tabbed display fits in right section of side-by-side layout
+
+#### Integration Example
+```javascript
+// In main.js - create and integrate tabbed display
+import { createTabbedTradingDisplay } from './components/TabbedTradingDisplay.js';
+
+// Create tabbed display
+const tabbedTradingDisplay = createTabbedTradingDisplay();
+
+// Add to right section of layout
+const rightSection = document.querySelector('.right-section');
+rightSection.appendChild(tabbedTradingDisplay.element);
+```
+
+#### Tab State Management
+- **No JavaScript State**: Tab state managed entirely through DaisyUI radio inputs
+- **CSS-Only Transitions**: Smooth tab switching without JavaScript interference
+- **Accessibility**: Full keyboard navigation and screen reader support
+- **Persistence**: Tab selection persists across page interactions
+
+#### Component Integration Patterns
+- **Consistent Lifecycle**: TabbedTradingDisplay wraps component DOM elements in objects with `element` and `destroy` properties
+- **Factory vs Class**: OrderBook/LastTrades use factory functions returning DOM elements, while LiquidationDisplay is a class requiring container in constructor
+- **State Subscriptions**: The store's `subscribe` function doesn't return an unsubscribe method - design components accordingly
+- **Component Wrapping**: When integrating disparate component patterns, wrap them in a consistent interface for uniform handling
+
+## Component Hierarchy
+
+### Updated Trading Interface Architecture
+
+```
+MainLayout
+├── Navbar (Bot Selection, Theme Toggle)
+├── Sidebar (Navigation, Selected Bot Info)
+└── Main Content (Side-by-side Layout)
+    ├── Left Section (Chart Area)
+    │   ├── TimeframeSelector
+    │   ├── VolumeToggleButton  
+    │   └── LightweightChart
+    └── Right Section (Consolidated Trading Tables)
+        └── TabbedTradingDisplay ⭐ NEW
+            ├── Tab Controls (DaisyUI Radio Inputs)
+            │   ├── Order Book Tab (default active)
+            │   ├── Trades Tab
+            │   └── Liquidations Tab
+            └── Tab Content Areas (Lazy Initialized)
+                ├── OrderBookDisplay (WebSocketManager) 🔄
+                ├── LastTradesDisplay (WebSocketManager) 🔄  
+                └── LiquidationDisplay (Internal WebSocket) 🔄
+
+Legend:
+⭐ = New consolidated component
+🔄 = Lazy initialization (created on first tab selection)
+```
+
+### Key Architectural Changes
+
+1. **Before**: Three separate components in bottom grid layout
+   ```
+   MainLayout
+   ├── Chart (top section)
+   └── Bottom Section (3-column grid)
+       ├── OrderBookDisplay
+       ├── LastTradesDisplay  
+       └── LiquidationDisplay
+   ```
+
+2. **After**: Single tabbed component in side-by-side layout
+   ```
+   MainLayout
+   ├── Left: Chart (flexible width)
+   └── Right: TabbedTradingDisplay (fixed width)
+   ```
+
+### Lazy Initialization Flow
+
+```
+User loads page → TabbedTradingDisplay created → Only "Order Book" tab initialized
+                                                  ↓
+User clicks "Trades" → LastTradesDisplay created and WebSocket connected
+                                                  ↓
+User clicks "Liquidations" → LiquidationDisplay instantiated with internal WebSocket
+
+Benefits:
+✅ Faster initial page load
+✅ Reduced memory usage  
+✅ Better user experience
+✅ Preserved existing functionality
+```
 
 ### Working with Bot Management
 1. **Bot Components**: Use `BotNavigation`, `BotList`, and `BotEditor` components
@@ -213,6 +349,9 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 5. **Dropdown Menus**: Bot actions use DaisyUI dropdown pattern for edit/delete/toggle operations
 6. **Button Variants**: Consistent use of btn-primary, btn-secondary, btn-ghost classes
 7. **Loading States**: DaisyUI loading spinner for async operations
+8. **Tabbed Interface**: TabbedTradingDisplay uses DaisyUI radio input tabs pattern for state management without JavaScript
+   - **Important**: Each radio input must be immediately followed by its corresponding `tab-content` div
+   - Do not group all inputs together and then all content divs separately
 
 ### Modifying Chart Display
 1. Update chart component in `LightweightChart.js`

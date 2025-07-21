@@ -14,6 +14,11 @@ test.describe('Bot Trading View', () => {
     // Wait for application to load
     await page.waitForLoadState('networkidle');
     
+    // The sidebar should be open by default now
+    // Click "My Bots" in the sidebar to show bot list
+    const myBotsLink = page.locator('text=🤖 My Bots');
+    await myBotsLink.click();
+    
     // Wait for bot list to be visible
     await page.waitForSelector(selectors.botList, { timeout: waitTimes.long });
   });
@@ -24,18 +29,31 @@ test.describe('Bot Trading View', () => {
     const count = await botCards.count();
     
     if (count > 0) {
-      // Select first bot
+      // Click on the Select button for the first bot
       const firstBot = botCards.first();
-      await firstBot.click();
+      const selectButton = firstBot.locator(selectors.selectBotButton);
+      await selectButton.click();
+      
+      // Wait for bot selection to process
+      await page.waitForTimeout(1000);
       
       // Check trading interface is visible
       await expect(page.locator(selectors.tradingInterface)).toBeVisible();
       
-      // Check all trading components are present
+      // Check chart is visible
       await expect(page.locator(selectors.chartContainer)).toBeVisible();
-      await expect(page.locator(selectors.orderbookDisplay)).toBeVisible();
-      await expect(page.locator(selectors.tradesDisplay)).toBeVisible();
-      await expect(page.locator(selectors.liquidationsDisplay)).toBeVisible();
+      
+      // Check tabbed trading display is present
+      const tabbedDisplay = page.locator('.orderfox-tabbed-trading-display');
+      await expect(tabbedDisplay).toBeVisible();
+      
+      // Check all three tabs are available
+      await expect(page.getByRole('radio', { name: 'Order Book' })).toBeVisible();
+      await expect(page.getByRole('radio', { name: 'Trades' })).toBeVisible();
+      await expect(page.getByRole('radio', { name: 'Liquidations' })).toBeVisible();
+      
+      // Order Book should be selected by default
+      await expect(page.getByRole('radio', { name: 'Order Book' })).toBeChecked();
     } else {
       // Create a bot first if none exist
       await page.click(selectors.newBotButton);
@@ -50,7 +68,11 @@ test.describe('Bot Trading View', () => {
       
       // Select the newly created bot
       const newBot = page.locator(selectors.botCard).filter({ hasText: 'Trading Test Bot' });
-      await newBot.click();
+      const selectButton = newBot.locator(selectors.selectBotButton);
+      await selectButton.click();
+      
+      // Wait for bot selection to process
+      await page.waitForTimeout(1000);
       
       // Check trading interface is visible
       await expect(page.locator(selectors.tradingInterface)).toBeVisible();
@@ -79,23 +101,28 @@ test.describe('Bot Trading View', () => {
     // Ensure we have a bot selected
     await ensureBotSelected(page);
     
-    // Check orderbook display is visible
-    await expect(page.locator(selectors.orderbookDisplay)).toBeVisible();
+    // Ensure Order Book tab is selected (should be by default)
+    const orderBookTab = page.getByRole('radio', { name: 'Order Book' });
+    await expect(orderBookTab).toBeChecked();
     
     // Wait for orderbook data to load
     await page.waitForTimeout(waitTimes.webSocket);
     
+    // Check orderbook component is rendered within the tabbed display
+    const orderbookDisplay = page.locator('.orderfox-tabbed-trading-display .orderfox-order-book-display');
+    await expect(orderbookDisplay).toBeVisible();
+    
     // Check orderbook has headers
-    const orderbookHeaders = page.locator(`${selectors.orderbookDisplay} .display-header`);
+    const orderbookHeaders = orderbookDisplay.locator('.display-header');
     await expect(orderbookHeaders).toBeVisible();
     
     // Check orderbook has content
-    const orderbookContent = page.locator(`${selectors.orderbookDisplay} .display-content`);
+    const orderbookContent = orderbookDisplay.locator('.display-content');
     await expect(orderbookContent).toBeVisible();
     
     // Check for bid and ask prices (if data is available)
-    const bidPrices = page.locator(`${selectors.orderbookDisplay} .bid-price`);
-    const askPrices = page.locator(`${selectors.orderbookDisplay} .ask-price`);
+    const bidPrices = orderbookDisplay.locator('.bid-price');
+    const askPrices = orderbookDisplay.locator('.ask-price');
     
     // At least one should be visible if data is loading
     const bidCount = await bidPrices.count();
@@ -107,22 +134,28 @@ test.describe('Bot Trading View', () => {
     // Ensure we have a bot selected
     await ensureBotSelected(page);
     
-    // Check trades display is visible
-    await expect(page.locator(selectors.tradesDisplay)).toBeVisible();
+    // Switch to Trades tab
+    const tradesTab = page.getByRole('radio', { name: 'Trades' });
+    await tradesTab.click();
+    await expect(tradesTab).toBeChecked();
     
     // Wait for trades data to load
     await page.waitForTimeout(waitTimes.webSocket);
     
+    // Check trades component is rendered within the tabbed display
+    const tradesDisplay = page.locator('.orderfox-tabbed-trading-display .orderfox-last-trades-display');
+    await expect(tradesDisplay).toBeVisible();
+    
     // Check trades has headers
-    const tradesHeaders = page.locator(`${selectors.tradesDisplay} .display-header`);
+    const tradesHeaders = tradesDisplay.locator('.display-header');
     await expect(tradesHeaders).toBeVisible();
     
     // Check trades has content
-    const tradesContent = page.locator(`${selectors.tradesDisplay} .display-content`);
+    const tradesContent = tradesDisplay.locator('.display-content');
     await expect(tradesContent).toBeVisible();
     
     // Check for trade rows (if data is available)
-    const tradeRows = page.locator(`${selectors.tradesDisplay} .trade-row`);
+    const tradeRows = tradesDisplay.locator('.trade-level');
     const tradeCount = await tradeRows.count();
     
     // Should have at least some trades or be showing loading state
@@ -137,22 +170,28 @@ test.describe('Bot Trading View', () => {
     // Ensure we have a bot selected
     await ensureBotSelected(page);
     
-    // Check liquidations display is visible
-    await expect(page.locator(selectors.liquidationsDisplay)).toBeVisible();
+    // Switch to Liquidations tab
+    const liquidationsTab = page.getByRole('radio', { name: 'Liquidations' });
+    await liquidationsTab.click();
+    await expect(liquidationsTab).toBeChecked();
     
     // Wait for liquidations data to load
     await page.waitForTimeout(waitTimes.webSocket);
     
+    // Check liquidations component is rendered within the tabbed display
+    const liquidationsDisplay = page.locator('.orderfox-tabbed-trading-display .orderfox-liquidation-display');
+    await expect(liquidationsDisplay).toBeVisible();
+    
     // Check liquidations has headers
-    const liquidationsHeaders = page.locator(`${selectors.liquidationsDisplay} .display-header`);
+    const liquidationsHeaders = liquidationsDisplay.locator('.display-header');
     await expect(liquidationsHeaders).toBeVisible();
     
     // Check liquidations has content
-    const liquidationsContent = page.locator(`${selectors.liquidationsDisplay} .display-content`);
+    const liquidationsContent = liquidationsDisplay.locator('.display-content');
     await expect(liquidationsContent).toBeVisible();
     
     // Check for liquidation rows (if data is available)
-    const liquidationRows = page.locator(`${selectors.liquidationsDisplay} .liquidation-row`);
+    const liquidationRows = liquidationsDisplay.locator('.liquidation-item');
     const liquidationCount = await liquidationRows.count();
     
     // Should have at least some liquidations or be showing loading state
@@ -285,20 +324,37 @@ test.describe('Bot Trading View', () => {
     // Test desktop view
     await page.setViewportSize({ width: 1200, height: 800 });
     await expect(page.locator(selectors.tradingInterface)).toBeVisible();
+    await expect(page.locator('.orderfox-tabbed-trading-display')).toBeVisible();
     
     // Test tablet view
     await page.setViewportSize({ width: 768, height: 1024 });
     await expect(page.locator(selectors.tradingInterface)).toBeVisible();
     await expect(page.locator(selectors.chartContainer)).toBeVisible();
+    await expect(page.locator('.orderfox-tabbed-trading-display')).toBeVisible();
     
     // Test mobile view
     await page.setViewportSize({ width: 375, height: 667 });
     await expect(page.locator(selectors.tradingInterface)).toBeVisible();
     await expect(page.locator(selectors.chartContainer)).toBeVisible();
     
-    // Check that components are still accessible in mobile view
-    await expect(page.locator(selectors.orderbookDisplay)).toBeVisible();
-    await expect(page.locator(selectors.tradesDisplay)).toBeVisible();
+    // Check that tabbed interface is still accessible in mobile view
+    await expect(page.locator('.orderfox-tabbed-trading-display')).toBeVisible();
+    
+    // Verify tabs are still functional in mobile
+    const orderBookTab = page.getByRole('radio', { name: 'Order Book' });
+    const tradesTab = page.getByRole('radio', { name: 'Trades' });
+    const liquidationsTab = page.getByRole('radio', { name: 'Liquidations' });
+    
+    await expect(orderBookTab).toBeVisible();
+    await expect(tradesTab).toBeVisible();
+    await expect(liquidationsTab).toBeVisible();
+    
+    // Test tab switching in mobile view
+    await tradesTab.click();
+    await expect(tradesTab).toBeChecked();
+    
+    await liquidationsTab.click();
+    await expect(liquidationsTab).toBeChecked();
   });
 
   test('should handle bot status changes during trading', async ({ page }) => {
@@ -335,11 +391,26 @@ test.describe('Bot Trading View', () => {
     // Wait for components to load
     await page.waitForTimeout(waitTimes.webSocket);
     
-    // Check that components don't crash on error
+    // Check that main components don't crash on error
     await expect(page.locator(selectors.chartContainer)).toBeVisible();
-    await expect(page.locator(selectors.orderbookDisplay)).toBeVisible();
-    await expect(page.locator(selectors.tradesDisplay)).toBeVisible();
-    await expect(page.locator(selectors.liquidationsDisplay)).toBeVisible();
+    await expect(page.locator('.orderfox-tabbed-trading-display')).toBeVisible();
+    
+    // Test all three tabs for error handling
+    const orderBookTab = page.getByRole('radio', { name: 'Order Book' });
+    const tradesTab = page.getByRole('radio', { name: 'Trades' });
+    const liquidationsTab = page.getByRole('radio', { name: 'Liquidations' });
+    
+    // Test Order Book tab
+    await orderBookTab.click();
+    await expect(page.locator('.orderfox-tabbed-trading-display .orderfox-order-book-display')).toBeVisible();
+    
+    // Test Trades tab
+    await tradesTab.click();
+    await expect(page.locator('.orderfox-tabbed-trading-display .orderfox-last-trades-display')).toBeVisible();
+    
+    // Test Liquidations tab
+    await liquidationsTab.click();
+    await expect(page.locator('.orderfox-tabbed-trading-display .orderfox-liquidation-display')).toBeVisible();
     
     // Check for error messages if any
     const errorMessages = page.locator('[data-testid="error-message"]');
@@ -361,6 +432,10 @@ async function ensureBotSelected(page) {
   const isVisible = await tradingInterface.isVisible();
   
   if (!isVisible) {
+    // Navigate to My Bots first 
+    const myBotsLink = page.locator('text=🤖 My Bots');
+    await myBotsLink.click();
+    
     // Wait for bot list to load
     await page.waitForSelector(selectors.botList, { timeout: waitTimes.long });
     
@@ -369,9 +444,13 @@ async function ensureBotSelected(page) {
     const count = await botCards.count();
     
     if (count > 0) {
-      // Select first bot
+      // Click on the Select button for the first bot
       const firstBot = botCards.first();
-      await firstBot.click();
+      const selectButton = firstBot.locator(selectors.selectBotButton);
+      await selectButton.click();
+      
+      // Wait for bot selection to process
+      await page.waitForTimeout(1000);
     } else {
       // Create a bot if none exist
       await page.click(selectors.newBotButton);
@@ -386,7 +465,11 @@ async function ensureBotSelected(page) {
       
       // Select the newly created bot
       const newBot = page.locator(selectors.botCard).filter({ hasText: 'Test Trading Bot' });
-      await newBot.click();
+      const selectButton = newBot.locator(selectors.selectBotButton);
+      await selectButton.click();
+      
+      // Wait for bot selection to process
+      await page.waitForTimeout(1000);
     }
     
     // Wait for trading interface to become visible

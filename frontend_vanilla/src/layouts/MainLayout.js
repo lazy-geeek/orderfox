@@ -91,37 +91,32 @@ export function createMainLayout() {
   botListPlaceholder.textContent = 'BotList will be inserted here';
   botManagementSection.appendChild(botListPlaceholder);
   
-  // Chart Section - Full Width (part of trading interface)
-  const chartSection = document.createElement('div');
-  chartSection.className = 'chart-section w-full mb-4';
+  // Main trading content with side-by-side layout
+  const tradingContentWrapper = document.createElement('div');
+  tradingContentWrapper.className = 'trading-content-wrapper flex flex-col lg:flex-row gap-4 h-full';
+  
+  // Left Section - Chart (flexible width)
+  const leftSection = document.createElement('div');
+  leftSection.className = 'left-section flex-1 min-w-0'; // min-w-0 prevents flex overflow issues
   
   const candlestickChartPlaceholder = document.createElement('div');
   candlestickChartPlaceholder.id = 'candlestick-chart-placeholder';
   candlestickChartPlaceholder.textContent = 'CandlestickChart';
-  chartSection.appendChild(candlestickChartPlaceholder);
+  leftSection.appendChild(candlestickChartPlaceholder);
   
-  // Bottom Section - OrderBook, Trades, and Liquidations Side by Side
-  const bottomSection = document.createElement('div');
-  bottomSection.className = 'bottom-section grid grid-cols-1 lg:grid-cols-3 gap-4 w-full';
+  // Right Section - Tabbed Trading Tables (fixed/min width)
+  const rightSection = document.createElement('div');
+  rightSection.className = 'right-section w-full lg:w-96 flex-shrink-0';
   
-  const orderBookPlaceholder = document.createElement('div');
-  orderBookPlaceholder.id = 'order-book-placeholder';
-  orderBookPlaceholder.textContent = 'OrderBookDisplay';
+  const tabbedTradingPlaceholder = document.createElement('div');
+  tabbedTradingPlaceholder.id = 'tabbed-trading-placeholder';
+  tabbedTradingPlaceholder.textContent = 'TabbedTradingDisplay';
+  rightSection.appendChild(tabbedTradingPlaceholder);
   
-  const lastTradesPlaceholder = document.createElement('div');
-  lastTradesPlaceholder.id = 'last-trades-container';
-  lastTradesPlaceholder.textContent = 'LastTradesDisplay';
+  tradingContentWrapper.appendChild(leftSection);
+  tradingContentWrapper.appendChild(rightSection);
   
-  const liquidationPlaceholder = document.createElement('div');
-  liquidationPlaceholder.id = 'liquidation-container';
-  liquidationPlaceholder.textContent = 'LiquidationDisplay';
-  
-  bottomSection.appendChild(orderBookPlaceholder);
-  bottomSection.appendChild(lastTradesPlaceholder);
-  bottomSection.appendChild(liquidationPlaceholder);
-  
-  mainContent.appendChild(chartSection);
-  mainContent.appendChild(bottomSection);
+  mainContent.appendChild(tradingContentWrapper);
   
   drawerContent.appendChild(botSelectionPrompt);
   drawerContent.appendChild(botManagementSection);

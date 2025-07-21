@@ -3,9 +3,8 @@ import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
 import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButton, updateCandlestickChart, updateLatestCandle, updateLiquidationVolume, toggleLiquidationVolume, resetZoomState, resetChartData } from './components/LightweightChart.js';
-import { createOrderBookDisplay, updateOrderBookDisplay } from './components/OrderBookDisplay.js';
-import { createLastTradesDisplay, updateLastTradesDisplay, updateTradesHeaders } from './components/LastTradesDisplay.js';
-import { LiquidationDisplay } from './components/LiquidationDisplay.js';
+import { updateTradesHeaders } from './components/LastTradesDisplay.js';
+import { createTabbedTradingDisplay } from './components/TabbedTradingDisplay.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 import { createBotNavigation, addNavigationEventListeners, showSelectedBotInfo } from './components/BotNavigation.js';
 import { createBotList, updateBotList, addBotListEventListeners } from './components/BotList.js';
@@ -15,8 +14,6 @@ import {
   state,
   subscribe,
   fetchSymbols,
-  setSelectedRounding,
-  setDisplayDepth,
   notify,
   fetchBots,
   createBot,
@@ -32,7 +29,6 @@ import {
 
 import {
   disconnectAllWebSockets,
-  updateOrderBookParameters,
 } from './services/websocketService.js';
 
 import { WebSocketManager } from './services/websocketManager.js';
@@ -49,9 +45,7 @@ app.appendChild(mainLayout);
 
 // Get references to the component placeholders in the main layout
 const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
-const orderBookPlaceholder = document.querySelector('#order-book-placeholder');
-const lastTradesPlaceholder = document.querySelector('#last-trades-container');
-const liquidationPlaceholder = document.querySelector('#liquidation-container');
+const tabbedTradingPlaceholder = document.querySelector('#tabbed-trading-placeholder');
 const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 const botNavigationPlaceholder = document.querySelector('#bot-navigation-placeholder');
 const botListPlaceholder = document.querySelector('#bot-list-placeholder');
@@ -63,14 +57,9 @@ createCandlestickChart(candlestickChartContainer);
 
 // Volume toggle button will be created later with controls
 
-const orderBookDisplay = createOrderBookDisplay();
-orderBookPlaceholder.replaceWith(orderBookDisplay);
-
-const lastTradesDisplay = createLastTradesDisplay();
-lastTradesPlaceholder.replaceWith(lastTradesDisplay);
-
-// Initialize liquidation display
-const liquidationDisplay = new LiquidationDisplay(liquidationPlaceholder); // eslint-disable-line no-unused-vars
+// Create and insert tabbed trading display
+const tabbedTradingDisplay = createTabbedTradingDisplay();
+tabbedTradingPlaceholder.replaceWith(tabbedTradingDisplay.element);
 
 
 const themeSwitcher = createThemeSwitcher();
@@ -275,8 +264,7 @@ window.showTradingInterface = () => {
 
 // Initial renders
 updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
-updateOrderBookDisplay(orderBookDisplay, state);
-updateLastTradesDisplay(lastTradesDisplay, state);
+// Order book and trades displays are now managed by TabbedTradingDisplay
 
 // Subscribe to state changes and update UI
 subscribe((key) => {
@@ -319,19 +307,18 @@ subscribe((key) => {
       resetZoomState();
       updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
       break;
+    // Order book and trades state updates are now handled by TabbedTradingDisplay components
     case 'currentOrderBook':
     case 'orderBookWsConnected':
     case 'selectedRounding':
     case 'availableRoundingOptions':
     case 'displayDepth':
     case 'orderBookLoading':
-      updateOrderBookDisplay(orderBookDisplay, state);
-      break;
     case 'currentTrades':
     case 'tradesWsConnected':
     case 'tradesLoading':
     case 'tradesError':
-      updateLastTradesDisplay(lastTradesDisplay, state);
+      // These will be handled by individual components within TabbedTradingDisplay
       break;
     case 'tradingMode':
       break;
@@ -361,33 +348,7 @@ chartControls.appendChild(volumeToggleButton);
 
 candlestickChartContainer.prepend(chartControls);
 
-orderBookDisplay.querySelector('#depth-select').addEventListener('change', (e) => {
-  const newDepth = Number(e.target.value);
-  
-  // Send parameter update via WebSocket first
-  const success = updateOrderBookParameters(state.selectedSymbol, newDepth, state.selectedRounding);
-  if (success) {
-    setDisplayDepth(newDepth);
-  } else {
-    console.error('Failed to update orderbook depth - WebSocket not connected');
-    // Reset selector to previous value
-    e.target.value = state.displayDepth;
-  }
-});
-
-orderBookDisplay.querySelector('#rounding-select').addEventListener('change', (e) => {
-  const newRounding = Number(e.target.value);
-  
-  // Send parameter update via WebSocket first  
-  const success = updateOrderBookParameters(state.selectedSymbol, state.displayDepth, newRounding);
-  if (success) {
-    setSelectedRounding(newRounding);
-  } else {
-    console.error('Failed to update orderbook rounding - WebSocket not connected');
-    // Reset selector to previous value
-    e.target.value = state.selectedRounding;
-  }
-});
+// OrderBook event listeners are now managed within TabbedTradingDisplay
 
 
 // Trading mode toggle removed - now a per-bot setting

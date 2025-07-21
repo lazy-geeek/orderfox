@@ -719,19 +719,11 @@ main {
   margin-bottom: 1rem;
 }
 
-.bottom-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  width: 100%;
-}
+/* Bottom-section styles removed - layout now uses side-by-side design */
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .bottom-section {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
+  /* Bottom-section grid styles no longer needed */
   
   .chart-container {
     height: 50vh;
@@ -740,9 +732,7 @@ main {
 }
 
 @media (max-width: 768px) {
-  .bottom-section {
-    grid-template-columns: 1fr;
-  }
+  /* Bottom-section grid styles no longer needed */
   
   .chart-container {
     height: 40vh;
@@ -866,31 +856,10 @@ body {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
-/* Update grid layout for three components */
-@media (min-width: 1200px) {
-  .bottom-section {
-    grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr) minmax(350px, 1fr);
-    gap: 10px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-  .bottom-section {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
-    gap: 10px;
-  }
-  
-  #liquidation-container {
-    grid-column: 1 / -1;
-  }
-}
+/* Grid layout styles for three components removed - now using tabbed interface */
 
 @media (max-width: 767px) {
-  .bottom-section {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
+  /* Bottom-section grid styles no longer needed */
   
   /* Hide time column on mobile for liquidations */
   .liquidation-header .time-header,
@@ -933,4 +902,230 @@ body {
   font-weight: 600;
   font-size: 12px;
   text-align: left;
+}
+
+/* === TABBED TRADING DISPLAY STYLES === */
+
+/* Base tabbed display component */
+.orderfox-tabbed-trading-display {
+  /* Inherits from orderfox-display-base */
+  margin: 0; /* Remove margin for tight layout integration */
+  height: 100%; /* Fill available space */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tab container styles */
+.orderfox-tabbed-trading-display .tabs {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  padding: 0;
+  margin: 0;
+  border-radius: 8px 8px 0 0; /* Round top corners only */
+}
+
+/* Individual tab styles */
+.orderfox-tabbed-trading-display .tab {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+/* Tab hover state */
+.orderfox-tabbed-trading-display .tab:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+/* Active/checked tab state */
+.orderfox-tabbed-trading-display .tab:checked {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom-color: var(--color-info);
+  font-weight: 600;
+}
+
+/* Tab content area */
+.orderfox-tabbed-trading-display .tab-content {
+  flex: 1;
+  padding: 0;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  border-radius: 0 0 8px 8px; /* Round bottom corners only */
+}
+
+/* Component placeholder styles during lazy loading */
+.component-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: var(--text-tertiary);
+  gap: 12px;
+}
+
+/* Ensure individual components within tabs don't have extra margins */
+.orderfox-tabbed-trading-display .orderfox-display-base {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  height: 100%;
+}
+
+/* === LAYOUT STYLES === */
+
+/* Trading content wrapper for side-by-side layout */
+.trading-content-wrapper {
+  height: calc(100vh - 80px); /* Subtract navbar height */
+  min-height: 600px;
+}
+
+/* Left section - chart area */
+.left-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+/* Right section - tabbed tables */
+.right-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+/* === RESPONSIVE DESIGN UPDATES === */
+
+/* Desktop layout - side by side */
+@media (min-width: 1024px) {
+  .trading-content-wrapper {
+    flex-direction: row;
+  }
+  
+  .left-section {
+    flex: 1;
+    margin-right: 1rem;
+  }
+  
+  .right-section {
+    width: 384px; /* 96 * 4 = 384px */
+    flex-shrink: 0;
+  }
+}
+
+/* Tablet layout - adjust spacing, maintain side-by-side */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .trading-content-wrapper {
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+  
+  .left-section {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .right-section {
+    width: 320px;
+    flex-shrink: 0;
+  }
+  
+  .chart-container {
+    height: 50vh;
+    min-height: 350px;
+  }
+}
+
+/* Mobile layout - vertical stacking */
+@media (max-width: 767px) {
+  .trading-content-wrapper {
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+  
+  .left-section {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .right-section {
+    width: 100%;
+  }
+  
+  .chart-container {
+    height: 40vh;
+    min-height: 300px;
+  }
+  
+  /* Adjust tab interface for small screens */
+  .orderfox-tabbed-trading-display .tab {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+
+/* Small mobile - ensure tab interface remains usable */
+@media (max-width: 480px) {
+  .chart-container {
+    height: 35vh;
+    min-height: 250px;
+  }
+  
+  .orderfox-tabbed-trading-display .tab {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  
+  .component-placeholder {
+    height: 300px;
+  }
+}
+
+/* TabbedTradingDisplay styles */
+.orderfox-tabbed-trading-display {
+  height: 100%;
+  overflow: hidden;
+}
+
+.orderfox-tabbed-trading-display .tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.orderfox-tabbed-trading-display .tab-content {
+  flex: 1;
+  overflow-y: auto;
+  height: 100%;
+  display: none;
+}
+
+.orderfox-tabbed-trading-display input[type="radio"]:checked + .tab-content {
+  display: block;
+}
+
+.orderfox-tabbed-trading-display .component-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
+/* Ensure child components fill their containers */
+.orderfox-tabbed-trading-display .orderfox-order-book-display,
+.orderfox-tabbed-trading-display .orderfox-last-trades-display,
+.orderfox-tabbed-trading-display .orderfox-liquidation-display {
+  height: 100%;
+  margin: 0;
 }
