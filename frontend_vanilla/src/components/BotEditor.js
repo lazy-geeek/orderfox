@@ -207,6 +207,8 @@ export function hideBotEditor(modal) {
   modal.classList.remove('modal-open');
   clearFormErrors(modal);
   resetBotForm(modal);
+  // Reset loading state as safety measure
+  setFormLoading(modal, false);
 }
 
 /**

@@ -19,7 +19,13 @@ test.describe('Smoke Tests', () => {
     
     // Check that main elements are visible
     await expect(page.locator('body')).toBeVisible();
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#app')).toBeVisible();
+    
+    // Wait a bit for the app to initialize
+    await page.waitForTimeout(1000);
+    
+    // Check that the drawer layout is created
+    await expect(page.locator('.drawer')).toBeVisible();
   });
 
   test('should have working navigation', async ({ page }) => {

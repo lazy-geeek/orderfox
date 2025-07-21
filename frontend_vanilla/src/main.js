@@ -203,7 +203,8 @@ addBotEditorEventListeners(botEditor, {
         console.log('Bot created successfully');
       }
       
-      // Success - close modal and refresh list
+      // Success - reset loading state before closing modal
+      setFormLoading(botEditor, false);
       hideBotEditor(botEditor);
       await fetchBots();
       

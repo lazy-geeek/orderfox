@@ -10,6 +10,9 @@ test.describe('Bot Paper Trading Toggle', () => {
   });
 
   test('should create bot with paper trading enabled by default', async ({ page }) => {
+    const timestamp = Date.now();
+    const botName = `Test Paper Bot ${timestamp}`;
+    
     // Navigate to bot management
     await page.click('text=Bot Management');
     
@@ -23,7 +26,7 @@ test.describe('Bot Paper Trading Toggle', () => {
     await page.waitForSelector('#bot-editor-modal.modal-open');
     
     // Fill form
-    await page.fill('#bot-name', 'Test Paper Bot');
+    await page.fill('#bot-name', botName);
     await page.selectOption('#bot-symbol', 'BTCUSDT');
     
     // Verify paper trading toggle is checked by default
@@ -41,11 +44,14 @@ test.describe('Bot Paper Trading Toggle', () => {
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Verify bot card shows paper trading badge
-    await expect(page.locator('text=Test Paper Bot')).toBeVisible();
-    await expect(page.locator('[data-testid="bot-card"]:has-text("Test Paper Bot") .badge:has-text("📝 Paper")')).toBeVisible();
+    await expect(page.locator(`text=${botName}`)).toBeVisible();
+    await expect(page.locator(`[data-testid="bot-card"]:has-text("${botName}") .badge:has-text("📝 Paper")`)).toBeVisible();
   });
 
   test('should create bot with live trading mode', async ({ page }) => {
+    const timestamp = Date.now();
+    const botName = `Test Live Bot ${timestamp}`;
+    
     // Navigate to bot management
     await page.click('text=Bot Management');
     
@@ -59,7 +65,7 @@ test.describe('Bot Paper Trading Toggle', () => {
     await page.waitForSelector('#bot-editor-modal.modal-open');
     
     // Fill form
-    await page.fill('#bot-name', 'Test Live Bot');
+    await page.fill('#bot-name', botName);
     await page.selectOption('#bot-symbol', 'ETHUSDT');
     
     // Uncheck paper trading toggle
@@ -77,24 +83,27 @@ test.describe('Bot Paper Trading Toggle', () => {
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Verify bot card shows live trading badge
-    await expect(page.locator('text=Test Live Bot')).toBeVisible();
-    await expect(page.locator('[data-testid="bot-card"]:has-text("Test Live Bot") .badge:has-text("💰 Live")')).toBeVisible();
+    await expect(page.locator(`text=${botName}`)).toBeVisible();
+    await expect(page.locator(`[data-testid="bot-card"]:has-text("${botName}") .badge:has-text("💰 Live")`)).toBeVisible();
   });
 
   test('should toggle paper trading mode when editing bot', async ({ page }) => {
+    const timestamp = Date.now();
+    const botName = `Toggle Test Bot ${timestamp}`;
+    
     // First create a bot
     await page.click('text=Bot Management');
     await page.waitForSelector('#bot-management-section', { state: 'visible' });
     await page.click('text=Create Bot');
     await page.waitForSelector('#bot-editor-modal.modal-open');
     
-    await page.fill('#bot-name', 'Toggle Test Bot');
+    await page.fill('#bot-name', botName);
     await page.selectOption('#bot-symbol', 'BTCUSDT');
     await page.click('button[type="submit"]');
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Find the bot card
-    const botCard = page.locator('[data-testid="bot-card"]:has-text("Toggle Test Bot")');
+    const botCard = page.locator(`[data-testid="bot-card"]:has-text("${botName}")`);
     await expect(botCard).toBeVisible();
     
     // Verify initial state is paper trading
@@ -148,13 +157,17 @@ test.describe('Bot Paper Trading Toggle', () => {
   });
 
   test('should maintain paper trading state when updating other fields', async ({ page }) => {
+    const timestamp = Date.now();
+    const botName = `Persistence Test Bot ${timestamp}`;
+    const updatedBotName = `Updated Persistence Bot ${timestamp}`;
+    
     // Create a bot with live trading
     await page.click('text=Bot Management');
     await page.waitForSelector('#bot-management-section', { state: 'visible' });
     await page.click('text=Create Bot');
     await page.waitForSelector('#bot-editor-modal.modal-open');
     
-    await page.fill('#bot-name', 'Persistence Test Bot');
+    await page.fill('#bot-name', botName);
     await page.selectOption('#bot-symbol', 'ADAUSDT');
     
     // Set to live trading
@@ -165,7 +178,7 @@ test.describe('Bot Paper Trading Toggle', () => {
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Find the bot card
-    const botCard = page.locator('[data-testid="bot-card"]:has-text("Persistence Test Bot")');
+    const botCard = page.locator(`[data-testid="bot-card"]:has-text("${botName}")`);
     await expect(botCard).toBeVisible();
     await expect(botCard.locator('.badge:has-text("💰 Live")')).toBeVisible();
     
@@ -178,19 +191,24 @@ test.describe('Bot Paper Trading Toggle', () => {
     await expect(paperToggle).not.toBeChecked();
     
     // Change only the name
-    await page.fill('#bot-name', 'Updated Persistence Bot');
+    await page.fill('#bot-name', updatedBotName);
     
     // Save without touching the paper trading toggle
     await page.click('button[type="submit"]');
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Verify bot still shows live trading
-    const updatedBotCard = page.locator('[data-testid="bot-card"]:has-text("Updated Persistence Bot")');
+    const updatedBotCard = page.locator(`[data-testid="bot-card"]:has-text("${updatedBotName}")`);
     await expect(updatedBotCard).toBeVisible();
     await expect(updatedBotCard.locator('.badge:has-text("💰 Live")')).toBeVisible();
   });
 
   test('should show correct paper trading status for multiple bots', async ({ page }) => {
+    const timestamp = Date.now();
+    const paperBot1Name = `Paper Bot 1 ${timestamp}`;
+    const liveBot1Name = `Live Bot 1 ${timestamp}`;  
+    const paperBot2Name = `Paper Bot 2 ${timestamp}`;
+    
     // Navigate to bot management
     await page.click('text=Bot Management');
     await page.waitForSelector('#bot-management-section', { state: 'visible' });
@@ -198,7 +216,7 @@ test.describe('Bot Paper Trading Toggle', () => {
     // Create first bot (paper trading)
     await page.click('text=Create Bot');
     await page.waitForSelector('#bot-editor-modal.modal-open');
-    await page.fill('#bot-name', 'Paper Bot 1');
+    await page.fill('#bot-name', paperBot1Name);
     await page.selectOption('#bot-symbol', 'BTCUSDT');
     await page.click('button[type="submit"]');
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
@@ -206,7 +224,7 @@ test.describe('Bot Paper Trading Toggle', () => {
     // Create second bot (live trading)
     await page.click('text=Create Bot');
     await page.waitForSelector('#bot-editor-modal.modal-open');
-    await page.fill('#bot-name', 'Live Bot 1');
+    await page.fill('#bot-name', liveBot1Name);
     await page.selectOption('#bot-symbol', 'ETHUSDT');
     await page.locator('#bot-paper-trading').uncheck();
     await page.click('button[type="submit"]');
@@ -215,14 +233,14 @@ test.describe('Bot Paper Trading Toggle', () => {
     // Create third bot (paper trading)
     await page.click('text=Create Bot');
     await page.waitForSelector('#bot-editor-modal.modal-open');
-    await page.fill('#bot-name', 'Paper Bot 2');
+    await page.fill('#bot-name', paperBot2Name);
     await page.selectOption('#bot-symbol', 'ADAUSDT');
     await page.click('button[type="submit"]');
     await page.waitForSelector('#bot-editor-modal.modal-open', { state: 'hidden' });
     
     // Verify all bots show correct trading mode
-    await expect(page.locator('[data-testid="bot-card"]:has-text("Paper Bot 1") .badge:has-text("📝 Paper")')).toBeVisible();
-    await expect(page.locator('[data-testid="bot-card"]:has-text("Live Bot 1") .badge:has-text("💰 Live")')).toBeVisible();
-    await expect(page.locator('[data-testid="bot-card"]:has-text("Paper Bot 2") .badge:has-text("📝 Paper")')).toBeVisible();
+    await expect(page.locator(`[data-testid="bot-card"]:has-text("${paperBot1Name}") .badge:has-text("📝 Paper")`)).toBeVisible();
+    await expect(page.locator(`[data-testid="bot-card"]:has-text("${liveBot1Name}") .badge:has-text("💰 Live")`)).toBeVisible();
+    await expect(page.locator(`[data-testid="bot-card"]:has-text("${paperBot2Name}") .badge:has-text("📝 Paper")`)).toBeVisible();
   });
 });
