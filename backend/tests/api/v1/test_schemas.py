@@ -6,6 +6,9 @@ of all schema models defined in schemas.py.
 """
 
 import pytest
+
+# Chunk 5: REST API endpoints - Schema, bot, market data APIs
+pytestmark = pytest.mark.chunk5
 from datetime import datetime
 from pydantic import ValidationError
 from app.api.v1.schemas import SymbolInfo, OrderBookLevel, OrderBook, Candle
@@ -17,70 +20,78 @@ class TestSymbolInfo:
     def test_symbol_info_valid_creation(self):
         """Test expected use: creating a valid SymbolInfo instance."""
         symbol_data = {
-            "symbol": "BTC/USDT",
+            "id": "BTCUSDT",
+            "symbol": "BTC/USDT:USDT",
             "baseAsset": "BTC",
             "quoteAsset": "USDT",
-            "exchange": "binance",
+            "uiName": "BTC/USDT",
             "pricePrecision": 8,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
 
-        assert symbol_info.symbol == "BTC/USDT"
-        assert symbol_info.baseAsset == "BTC"
-        assert symbol_info.quoteAsset == "USDT"
-        assert symbol_info.exchange == "binance"
+        assert symbol_info.id == "BTCUSDT"
+        assert symbol_info.symbol == "BTC/USDT:USDT"
+        assert symbol_info.base_asset == "BTC"
+        assert symbol_info.quote_asset == "USDT"
+        assert symbol_info.ui_name == "BTC/USDT"
         assert symbol_info.pricePrecision == 8
         assert isinstance(symbol_info.pricePrecision, int)
 
     def test_symbol_info_with_optional_fields_none(self):
-        """Test valid creation when pricePrecision is not provided."""
+        """Test valid creation when optional fields are not provided."""
         symbol_data = {
-            "symbol": "ETH/USDT",
+            "id": "ETHUSDT",
+            "symbol": "ETH/USDT:USDT",
             "baseAsset": "ETH",
             "quoteAsset": "USDT",
-            "exchange": "coinbase",
+            "uiName": "ETH/USDT",
         }
         symbol_info = SymbolInfo(**symbol_data)
         assert symbol_info.pricePrecision is None
+        assert symbol_info.volume24h is None
 
     def test_symbol_info_edge_case_long_names(self):
         """Test edge case: symbols with very long names and new fields."""
         symbol_data = {
-            "symbol": "VERYLONGCRYPTOCURRENCYNAME/USDT",
+            "id": "VERYLONGCRYPTOCURRENCYNAMEUSDT",
+            "symbol": "VERYLONGCRYPTOCURRENCYNAME/USDT:USDT",
             "baseAsset": "VERYLONGCRYPTOCURRENCYNAME",
             "quoteAsset": "USDT",
-            "exchange": "LONGCURRENCYEXCHANGE",
+            "uiName": "VERYLONGCRYPTOCURRENCYNAME/USDT",
             "pricePrecision": 2,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
 
-        assert symbol_info.symbol == "VERYLONGCRYPTOCURRENCYNAME/USDT"
-        assert symbol_info.baseAsset == "VERYLONGCRYPTOCURRENCYNAME"
+        assert symbol_info.id == "VERYLONGCRYPTOCURRENCYNAMEUSDT"
+        assert symbol_info.symbol == "VERYLONGCRYPTOCURRENCYNAME/USDT:USDT"
+        assert symbol_info.base_asset == "VERYLONGCRYPTOCURRENCYNAME"
+        assert symbol_info.ui_name == "VERYLONGCRYPTOCURRENCYNAME/USDT"
         assert symbol_info.pricePrecision == 2
 
     def test_symbol_info_missing_required_field(self):
         """Test failure case: missing required field."""
         symbol_data = {
-            "symbol": "BTC/USDT",
+            "symbol": "BTC/USDT:USDT",
             "baseAsset": "BTC",
-            "exchange": "binance",
-            # Missing quoteAsset
+            "quoteAsset": "USDT",
+            # Missing id and uiName (required fields)
         }
 
         with pytest.raises(ValidationError) as exc_info:
             SymbolInfo(**symbol_data)
 
-        assert "quoteAsset" in str(exc_info.value)
+        assert "id" in str(exc_info.value) or "ui_name" in str(exc_info.value)
 
     def test_symbol_info_invalid_price_precision_type(self):
         """Test failure case: pricePrecision with incorrect type."""
         symbol_data = {
-            "symbol": "LTC/USDT",
+            "id": "LTCUSDT",
+            "symbol": "LTC/USDT:USDT",
             "baseAsset": "LTC",
             "quoteAsset": "USDT",
-            "exchange": "binance",
+            "uiName": "LTC/USDT",
             "pricePrecision": "invalid",  # Incorrect type
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -275,24 +286,26 @@ class TestSchemasSerialization:
     def test_symbol_info_json_serialization(self):
         """Test that SymbolInfo can be serialized to and from JSON."""
         symbol_data = {
-            "symbol": "BTC/USDT",
+            "id": "BTCUSDT",
+            "symbol": "BTC/USDT:USDT",
             "baseAsset": "BTC",
             "quoteAsset": "USDT",
-            "exchange": "binance",
+            "uiName": "BTC/USDT",
             "pricePrecision": 8,
-            "tickSize": 0.00000001,
+            "volume24h": 1234567.89,
         }
 
         symbol_info = SymbolInfo(**symbol_data)
         json_data = symbol_info.model_dump(by_alias=True)
 
         # Verify JSON structure
+        assert json_data["id"] == symbol_data["id"]
         assert json_data["symbol"] == symbol_data["symbol"]
         assert json_data["baseAsset"] == symbol_data["baseAsset"]
         assert json_data["quoteAsset"] == symbol_data["quoteAsset"]
-        assert json_data["exchange"] == symbol_data["exchange"]
+        assert json_data["uiName"] == symbol_data["uiName"]
         assert json_data["pricePrecision"] == symbol_data["pricePrecision"]
-        assert json_data["tickSize"] == symbol_data["tickSize"]
+        assert json_data["volume24h"] == symbol_data["volume24h"]
 
         # Verify round-trip
         symbol_info_restored = SymbolInfo(**json_data)

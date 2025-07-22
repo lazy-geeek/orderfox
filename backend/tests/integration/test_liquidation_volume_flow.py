@@ -6,6 +6,9 @@ symbol switching, timeframe changes, and extended runtime scenarios.
 """
 
 import pytest
+
+# Chunk 7b: Data Flow Integration tests - E2E formatting, liquidation volume flows
+pytestmark = pytest.mark.chunk7b
 import asyncio
 import json
 from unittest.mock import AsyncMock, Mock, patch

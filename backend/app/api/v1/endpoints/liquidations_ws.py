@@ -13,7 +13,7 @@ from app.models.liquidation import LiquidationVolumeUpdate, LiquidationVolume
 from typing import List, Dict, Optional
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ async def liquidation_stream(
             error_msg = {
                 "type": "error",
                 "message": f"Invalid symbol: {display_symbol}",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
             await websocket.send_json(error_msg)
             return
@@ -122,7 +122,7 @@ async def liquidation_stream(
             "symbol": display_symbol,
             "data": list(liquidations_cache[display_symbol]),
             "initial": True,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         await websocket.send_json(initial_data)
         
@@ -137,7 +137,7 @@ async def liquidation_stream(
                 error_msg = {
                     "type": "error",
                     "message": f"Invalid timeframe. Must be one of: {', '.join(valid_timeframes)}",
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
                 await websocket.send_json(error_msg)
                 return
@@ -192,7 +192,7 @@ async def liquidation_stream(
                                 symbol=display_symbol,
                                 timeframe=timeframe,
                                 data=volume_data,
-                                timestamp=datetime.utcnow().isoformat(),
+                                timestamp=datetime.now(timezone.utc).isoformat(),
                                 is_update=False  # Historical data, not real-time update
                             )
                             await websocket.send_json(volume_update.dict())
@@ -225,7 +225,7 @@ async def liquidation_stream(
                         "type": "liquidation_order",  # Changed from "liquidation" for clarity
                         "symbol": display_symbol,
                         "data": liquidation,
-                        "timestamp": datetime.utcnow().isoformat()
+                        "timestamp": datetime.now(timezone.utc).isoformat()
                     }
                     await websocket.send_json(update)
                     
@@ -239,7 +239,7 @@ async def liquidation_stream(
                     heartbeat = {
                         "type": "heartbeat",
                         "symbol": display_symbol,
-                        "timestamp": datetime.utcnow().isoformat()
+                        "timestamp": datetime.now(timezone.utc).isoformat()
                     }
                     await websocket.send_json(heartbeat)
                 except Exception as e:
@@ -272,7 +272,7 @@ async def liquidation_stream(
                         symbol=display_symbol,
                         timeframe=timeframe,
                         data=volume_data,
-                        timestamp=datetime.utcnow().isoformat(),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
                         is_update=is_realtime_update  # True for real-time, False for historical batches
                     )
                     await websocket.send_json(volume_update.dict())
@@ -304,7 +304,7 @@ async def liquidation_stream(
         error_msg = {
             "type": "error",
             "message": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         try:
             await websocket.send_json(error_msg)

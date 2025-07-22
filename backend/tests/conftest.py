@@ -56,6 +56,10 @@ async def test_session_factory(test_engine):
 async def test_session(test_session_factory) -> AsyncGenerator[AsyncSession, None]:
     """Create a test database session."""
     async with test_session_factory() as session:
+        # Clear bot service cache before each test to prevent cache pollution
+        from app.services.bot_service import bot_service
+        bot_service._clear_caches()
+        
         yield session
         # Clean up all bots after each test
         await session.execute(text("DELETE FROM bots"))
@@ -105,6 +109,10 @@ async def inactive_bot(test_session: AsyncSession) -> Bot:
 @pytest_asyncio.fixture
 async def multiple_bots(test_session: AsyncSession) -> list[Bot]:
     """Create multiple bots for testing."""
+    # Clean up any existing bots first to ensure consistent state
+    await test_session.execute(text("DELETE FROM bots"))
+    await test_session.commit()
+    
     bots = [
         Bot(name="Bot 1", symbol="BTCUSDT", is_active=True),
         Bot(name="Bot 2", symbol="ETHUSDT", is_active=True),
@@ -119,6 +127,11 @@ async def multiple_bots(test_session: AsyncSession) -> list[Bot]:
     
     for bot in bots:
         await test_session.refresh(bot)
+    
+    # Verify bots were created
+    result = await test_session.execute(text("SELECT COUNT(*) FROM bots"))
+    count = result.scalar()
+    assert count == 4, f"Expected 4 bots, but found {count} in database"
     
     return bots
 

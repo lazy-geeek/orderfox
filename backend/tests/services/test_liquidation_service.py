@@ -6,6 +6,9 @@ data formatting, error handling, and reconnection logic.
 """
 
 import pytest
+
+# Chunk 4: Advanced services - Liquidation, trade, trading engine
+pytestmark = pytest.mark.chunk4
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 import aiohttp

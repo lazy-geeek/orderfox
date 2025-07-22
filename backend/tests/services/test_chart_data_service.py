@@ -6,7 +6,10 @@ Lightweight Charts integration.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+
+# Chunk 3: Business services - Bot, orderbook, chart data
+pytestmark = pytest.mark.chunk3
+from unittest.mock import AsyncMock, MagicMock, Mock
 from app.services.chart_data_service import ChartDataService
 
 
@@ -113,6 +116,7 @@ class TestChartDataService:
             'symbol': 'BTCUSDT',
             'timeframe': '1m',
             'timestamp': 1640995200000,
+            'time': 1640995200,  # timestamp // 1000
             'open': 50000.0,
             'high': 50500.0,
             'low': 49500.0,
@@ -180,14 +184,14 @@ class TestChartDataService:
     async def test_get_initial_chart_data_success(self):
         """Test successful retrieval of initial chart data."""
         # Mock the exchange service
-        mock_exchange = AsyncMock()
+        mock_exchange = Mock()
         mock_exchange.fetch_ohlcv.return_value = [
             [1640995200000, 50000.0, 50500.0, 49500.0, 50250.0, 100.0],
             [1640995260000, 50250.0, 50750.0, 50000.0, 50500.0, 150.0],
         ]
         
         self.chart_service.exchange_service = AsyncMock()
-        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        self.chart_service.exchange_service.get_exchange = Mock(return_value=mock_exchange)
         
         result = await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', 100)
         
@@ -210,11 +214,11 @@ class TestChartDataService:
     async def test_get_initial_chart_data_no_data(self):
         """Test handling when no data is available."""
         # Mock the exchange service to return empty data
-        mock_exchange = AsyncMock()
+        mock_exchange = Mock()
         mock_exchange.fetch_ohlcv.return_value = []
         
         self.chart_service.exchange_service = AsyncMock()
-        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        self.chart_service.exchange_service.get_exchange = Mock(return_value=mock_exchange)
         
         result = await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', 100)
         
@@ -227,11 +231,11 @@ class TestChartDataService:
     async def test_get_initial_chart_data_exchange_error(self):
         """Test handling exchange service errors."""
         # Mock the exchange service to raise an error
-        mock_exchange = AsyncMock()
+        mock_exchange = Mock()
         mock_exchange.fetch_ohlcv.side_effect = Exception("Exchange connection failed")
         
         self.chart_service.exchange_service = AsyncMock()
-        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        self.chart_service.exchange_service.get_exchange = Mock(return_value=mock_exchange)
         
         with pytest.raises(Exception, match="Failed to fetch chart data"):
             await self.chart_service.get_initial_chart_data('BTC/USDT', '1m', 100)
@@ -255,9 +259,9 @@ class TestChartDataService:
     def test_calculate_optimal_candle_count_edge_cases(self):
         """Test optimal candle count calculation for edge cases."""
         # Invalid inputs - should use default
-        assert self.chart_service.calculate_optimal_candle_count(0) == 600  # default fallback
-        assert self.chart_service.calculate_optimal_candle_count(-100) == 600  # default fallback
-        assert self.chart_service.calculate_optimal_candle_count(None) == 600  # default fallback
+        assert self.chart_service.calculate_optimal_candle_count(0) == 400  # default fallback uses 800px: (800/6)*3=400
+        assert self.chart_service.calculate_optimal_candle_count(-100) == 400  # default fallback uses 800px: (800/6)*3=400
+        assert self.chart_service.calculate_optimal_candle_count(None) == 400  # default fallback uses 800px: (800/6)*3=400
         
         # Very small valid width
         assert self.chart_service.calculate_optimal_candle_count(300) == 200  # min threshold
@@ -290,14 +294,14 @@ class TestChartDataService:
     async def test_get_initial_chart_data_with_container_width(self):
         """Test initial chart data uses container width for optimal count calculation."""
         # Mock the exchange service
-        mock_exchange = AsyncMock()
+        mock_exchange = Mock()
         mock_exchange.fetch_ohlcv.return_value = [
             [1640995200000, 50000.0, 50500.0, 49500.0, 50250.0, 100.0],
             [1640995260000, 50250.0, 50750.0, 50000.0, 50500.0, 150.0],
         ]
         
         self.chart_service.exchange_service = AsyncMock()
-        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        self.chart_service.exchange_service.get_exchange = Mock(return_value=mock_exchange)
         
         # Test with specific container width
         container_width = 1200  # Should result in limit of 600
@@ -315,17 +319,17 @@ class TestChartDataService:
     async def test_get_initial_chart_data_includes_symbol_data(self):
         """Test initial chart data includes symbolData with priceFormat."""
         # Mock the exchange service
-        mock_exchange = AsyncMock()
+        mock_exchange = Mock()
         mock_exchange.fetch_ohlcv.return_value = [
             [1640995200000, 50000.0, 50500.0, 49500.0, 50250.0, 100.0],
         ]
         
         self.chart_service.exchange_service = AsyncMock()
-        self.chart_service.exchange_service.get_exchange.return_value = mock_exchange
+        self.chart_service.exchange_service.get_exchange = Mock(return_value=mock_exchange)
         
         # Mock symbol service to return symbol info with priceFormat
         from unittest.mock import patch
-        with patch('app.services.chart_data_service.symbol_service') as mock_symbol_service:
+        with patch('app.services.symbol_service.symbol_service') as mock_symbol_service:
             mock_symbol_service.get_symbol_info.return_value = {
                 'priceFormat': {
                     'type': 'price',

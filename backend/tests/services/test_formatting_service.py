@@ -6,6 +6,9 @@ different amount ranges, and various symbol precision configurations.
 """
 
 import pytest
+
+# Chunk 2: Core services - Symbol, exchange, formatting, caching
+pytestmark = pytest.mark.chunk2
 from unittest.mock import patch
 from app.services.formatting_service import FormattingService, formatting_service
 

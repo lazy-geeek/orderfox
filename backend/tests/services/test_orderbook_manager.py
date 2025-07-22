@@ -1,4 +1,8 @@
 import pytest
+
+# Chunk 3: Business services - Bot, orderbook, chart data
+pytestmark = pytest.mark.chunk3
+import pytest_asyncio
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,16 +17,16 @@ class TestOrderBookManager:
     Tests singleton pattern, connection lifecycle, and memory management.
     """
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def manager(self):
         """Create a fresh manager instance for each test."""
         # Create a new instance for testing (bypass singleton for testing)
-        manager = OrderBookManager.__new__(OrderBookManager)
-        manager._initialized = False
-        manager.__init__()
-        yield manager
+        manager_instance = OrderBookManager.__new__(OrderBookManager)
+        manager_instance._initialized = False
+        manager_instance.__init__()
+        yield manager_instance
         # Cleanup after test
-        await manager.shutdown()
+        await manager_instance.shutdown()
 
     @pytest.fixture
     def mock_orderbook(self):

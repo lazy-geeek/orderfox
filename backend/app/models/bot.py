@@ -2,7 +2,7 @@
 Bot models for SQLModel database integration.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship, Index, Column, String, Boolean, DateTime
 from pydantic import field_validator, ConfigDict
@@ -17,8 +17,8 @@ class BotBase(SQLModel):
     symbol: str = Field(min_length=1, max_length=20, description="Trading symbol (e.g., BTCUSDT)")
     is_active: bool = Field(default=True, description="Whether the bot is active")
     is_paper_trading: bool = Field(default=True, description="Trading mode: True for paper, False for live")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Last update timestamp")
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.utcnow(), description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(default_factory=lambda: datetime.utcnow(), description="Last update timestamp")
     
     model_config = ConfigDict(
         # Use camelCase for API responses
@@ -30,7 +30,7 @@ class BotBase(SQLModel):
         from_attributes=True
     )
     
-    @field_validator('symbol', mode='before')
+    @field_validator('symbol')
     @classmethod
     def validate_symbol(cls, v):
         """Validate symbol format."""
@@ -39,7 +39,7 @@ class BotBase(SQLModel):
         # Convert to uppercase
         return v.upper()
     
-    @field_validator('name', mode='before') 
+    @field_validator('name') 
     @classmethod
     def validate_name(cls, v):
         """Validate bot name."""
@@ -61,11 +61,11 @@ class Bot(BotBase, table=True):
     
     # Override datetime fields to be non-optional for database
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.utcnow(),
         sa_column=Column(DateTime, nullable=False)
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.utcnow(),
         sa_column=Column(DateTime, nullable=False)
     )
     
@@ -98,7 +98,7 @@ class BotUpdate(SQLModel):
     symbol: Optional[str] = Field(None, min_length=1, max_length=20, description="Trading symbol")
     is_active: Optional[bool] = Field(None, description="Whether the bot is active")
     is_paper_trading: Optional[bool] = Field(default=None, description="Trading mode")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Update timestamp")
+    updated_at: Optional[datetime] = Field(default_factory=lambda: datetime.utcnow(), description="Update timestamp")
     
     model_config = ConfigDict(
         # Use camelCase for API responses
@@ -110,7 +110,7 @@ class BotUpdate(SQLModel):
         from_attributes=True
     )
     
-    @field_validator('symbol', mode='before')
+    @field_validator('symbol')
     @classmethod
     def validate_symbol(cls, v):
         """Validate symbol format."""
@@ -120,7 +120,7 @@ class BotUpdate(SQLModel):
             return v.upper()
         return v
     
-    @field_validator('name', mode='before')
+    @field_validator('name')
     @classmethod
     def validate_name(cls, v):
         """Validate bot name."""

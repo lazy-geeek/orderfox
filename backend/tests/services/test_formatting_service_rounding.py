@@ -1,6 +1,9 @@
 """Tests for formatting service rounding-aware formatting."""
 
 import pytest
+
+# Chunk 2: Core services - Symbol, exchange, formatting, caching
+pytestmark = pytest.mark.chunk2
 from app.services.formatting_service import FormattingService
 
 

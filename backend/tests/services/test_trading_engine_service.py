@@ -6,6 +6,9 @@ including signal determination, trade execution, position management, and mode s
 """
 
 import pytest
+
+# Chunk 4: Advanced services - Liquidation, trade, trading engine
+pytestmark = pytest.mark.chunk4
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
 

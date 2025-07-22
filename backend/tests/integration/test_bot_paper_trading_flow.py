@@ -4,6 +4,9 @@ Tests the complete CRUD flow with paper trading field.
 """
 
 import pytest
+
+# Chunk 7a: Bot Integration tests - Bot paper trading flows
+pytestmark = pytest.mark.chunk7a
 import pytest_asyncio
 from uuid import uuid4
 from app.models.bot import BotCreate, BotUpdate

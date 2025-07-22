@@ -3,11 +3,15 @@ Database tests for PostgreSQL with SQLModel.
 """
 
 import pytest
+
+# Chunk 1: Foundation tests - Database, config, utilities
+pytestmark = pytest.mark.chunk1
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlmodel import SQLModel, Session, select
 from uuid import uuid4
 
 from app.models.bot import Bot, BotCreate, BotUpdate, BotPublic
+from pydantic import ValidationError
 from app.core.database import get_session, init_db, test_connection
 
 
@@ -86,21 +90,21 @@ class TestBotModel:
     
     def test_invalid_name_validation(self):
         """Test that empty names raise validation error."""
-        with pytest.raises(ValueError, match="String should have at least 1 character"):
-            Bot(
-                name="",
-                symbol="BTCUSDT",
-                is_active=True
-            )
+        with pytest.raises(ValidationError, match="String should have at least 1 character"):
+            Bot.model_validate({
+                "name": "",
+                "symbol": "BTCUSDT",
+                "is_active": True
+            })
     
     def test_invalid_symbol_validation(self):
         """Test that empty symbols raise validation error."""
-        with pytest.raises(ValueError, match="String should have at least 1 character"):
-            Bot(
-                name="Test Bot",
-                symbol="",
-                is_active=True
-            )
+        with pytest.raises(ValidationError, match="String should have at least 1 character"):
+            Bot.model_validate({
+                "name": "Test Bot",
+                "symbol": "",
+                "is_active": True
+            })
 
 
 class TestDatabaseConfiguration:
@@ -262,15 +266,15 @@ class TestEdgeCases:
     
     def test_whitespace_name_validation(self):
         """Test that whitespace-only names are rejected."""
-        with pytest.raises(ValueError, match="Bot name cannot be empty"):
-            Bot(name="   ", symbol="BTCUSDT", is_active=True)
+        with pytest.raises(ValidationError, match="Bot name cannot be empty"):
+            Bot.model_validate({"name": "   ", "symbol": "BTCUSDT", "is_active": True})
     
     def test_case_insensitive_symbol_validation(self):
         """Test that symbols are converted to uppercase."""
-        bot = Bot(name="Test Bot", symbol="btcusdt", is_active=True)
+        bot = Bot.model_validate({"name": "Test Bot", "symbol": "btcusdt", "is_active": True})
         assert bot.symbol == "BTCUSDT"
         
-        bot_create = BotCreate(name="Test Bot", symbol="ethusdt", is_active=True)
+        bot_create = BotCreate.model_validate({"name": "Test Bot", "symbol": "ethusdt", "is_active": True})
         assert bot_create.symbol == "ETHUSDT"
     
     def test_none_symbol_in_update(self):
@@ -280,18 +284,18 @@ class TestEdgeCases:
     
     def test_empty_string_symbol_in_update(self):
         """Test that empty string symbol in update raises error."""
-        with pytest.raises(ValueError, match="Symbol cannot be empty"):
-            BotUpdate(symbol="")
+        with pytest.raises(ValidationError, match="String should have at least 1 character"):
+            BotUpdate.model_validate({"symbol": ""})
     
     def test_empty_string_name_in_update(self):
         """Test that empty string name in update raises error."""
-        with pytest.raises(ValueError, match="Bot name cannot be empty"):
-            BotUpdate(name="")
+        with pytest.raises(ValidationError, match="String should have at least 1 character"):
+            BotUpdate.model_validate({"name": ""})
     
     def test_whitespace_name_in_update(self):
         """Test that whitespace-only name in update raises error."""
-        with pytest.raises(ValueError, match="Bot name cannot be empty"):
-            BotUpdate(name="   ")
+        with pytest.raises(ValidationError, match="Bot name cannot be empty"):
+            BotUpdate.model_validate({"name": "   "})
     
     def test_valid_whitespace_trimming_in_update(self):
         """Test that valid names with whitespace are trimmed in update."""

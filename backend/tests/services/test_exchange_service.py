@@ -6,6 +6,9 @@ including initialization, connection testing, and error handling.
 """
 
 import pytest
+
+# Chunk 2: Core services - Symbol, exchange, formatting, caching
+pytestmark = pytest.mark.chunk2
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 import ccxt

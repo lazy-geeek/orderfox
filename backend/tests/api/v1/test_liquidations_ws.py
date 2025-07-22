@@ -6,6 +6,9 @@ symbol validation, data streaming, error handling, and disconnection cleanup.
 """
 
 import pytest
+
+# Chunk 6: WebSocket API endpoints - Connection manager, market data, liquidations WS
+pytestmark = pytest.mark.chunk6
 import json
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch

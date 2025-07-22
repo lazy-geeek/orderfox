@@ -6,6 +6,9 @@ including connection handling, broadcasting, and streaming.
 """
 
 import pytest
+
+# Chunk 6: WebSocket API endpoints - Connection manager, market data, liquidations WS
+pytestmark = pytest.mark.chunk6
 from unittest.mock import AsyncMock, patch, MagicMock
 import asyncio
 import json

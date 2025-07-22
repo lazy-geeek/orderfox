@@ -3,6 +3,9 @@ Tests for the Data Stream Manager service.
 """
 
 import pytest
+
+# Chunk 4: Advanced services - Liquidation, trade, trading engine
+pytestmark = pytest.mark.chunk4
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4

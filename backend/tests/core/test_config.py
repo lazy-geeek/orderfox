@@ -5,6 +5,9 @@ This module contains tests for the Settings class and configuration loading.
 """
 
 import pytest
+
+# Chunk 1: Foundation tests - Database, config, utilities
+pytestmark = pytest.mark.chunk1
 from unittest.mock import patch, MagicMock
 import os
 
@@ -21,7 +24,7 @@ class TestSettingsClass:
         # Test that all expected attributes exist
         assert hasattr(test_settings, "BINANCE_API_KEY")
         assert hasattr(test_settings, "BINANCE_SECRET_KEY")
-        assert hasattr(test_settings, "FIREBASE_CONFIG_JSON")
+        assert hasattr(test_settings, "LIQUIDATION_API_BASE_URL")
         assert hasattr(test_settings, "API_V1_STR")
         assert hasattr(test_settings, "PROJECT_NAME")
         assert hasattr(test_settings, "DEBUG")
@@ -48,14 +51,14 @@ class TestSettingsClass:
         assert test_settings.BINANCE_SECRET_KEY is None or isinstance(
             test_settings.BINANCE_SECRET_KEY, str
         )
-        assert test_settings.FIREBASE_CONFIG_JSON is None or isinstance(
-            test_settings.FIREBASE_CONFIG_JSON, str
+        assert test_settings.LIQUIDATION_API_BASE_URL is None or isinstance(
+            test_settings.LIQUIDATION_API_BASE_URL, str
         )
 
-    @patch("app.core.config.os.getenv")  # Patch os.getenv within the config module
-    @patch("builtins.print")
-    def test_settings_initialization_warnings(self, mock_print, mock_getenv):
-        """Test that warnings are printed when required environment variables are missing."""
+    @patch("app.core.config.logging.warning")
+    @patch("app.core.config.os.getenv")
+    def test_settings_initialization_warnings(self, mock_getenv, mock_warning):
+        """Test that warnings are logged when required environment variables are missing."""
         # Configure mock_getenv to simulate missing API keys
         mock_getenv.side_effect = lambda key, default=None: {
             "API_V1_STR": "/api/v1",
@@ -63,25 +66,25 @@ class TestSettingsClass:
             "DEBUG": "False",
             "BINANCE_API_KEY": None,
             "BINANCE_SECRET_KEY": None,
-            "FIREBASE_CONFIG_JSON": None,
+            "LIQUIDATION_API_BASE_URL": "",
         }.get(key, default)
 
         # Instantiate Settings after patching os.getenv
         test_settings = Settings()
 
-        # Check if any warning messages were printed
-        assert mock_print.call_args_list  # Ensure print was called at least once
+        # Check if warning messages were logged
+        assert mock_warning.call_args_list  # Ensure warning was called at least once
 
-        print_calls = [call[0][0] for call in mock_print.call_args_list]
+        warning_calls = [str(call) for call in mock_warning.call_args_list]
 
         # Assert that specific warning messages are present
         assert any(
-            "Warning: BINANCE_API_KEY not found in environment variables" in call
-            for call in print_calls
+            "BINANCE_API_KEY not found in environment variables" in call
+            for call in warning_calls
         )
         assert any(
-            "Warning: BINANCE_SECRET_KEY not found in environment variables" in call
-            for call in print_calls
+            "BINANCE_SECRET_KEY not found in environment variables" in call
+            for call in warning_calls
         )
 
     def test_settings_class_can_be_instantiated_multiple_times(self):
@@ -129,7 +132,7 @@ class TestGlobalSettingsInstance:
         # Test that all expected attributes exist
         assert hasattr(settings, "BINANCE_API_KEY")
         assert hasattr(settings, "BINANCE_SECRET_KEY")
-        assert hasattr(settings, "FIREBASE_CONFIG_JSON")
+        assert hasattr(settings, "LIQUIDATION_API_BASE_URL")
         assert hasattr(settings, "API_V1_STR")
         assert hasattr(settings, "PROJECT_NAME")
         assert hasattr(settings, "DEBUG")
@@ -164,12 +167,12 @@ class TestEnvironmentVariableHandling:
         # Test that we can access the current environment values
         current_api_key = os.getenv("BINANCE_API_KEY")
         current_secret_key = os.getenv("BINANCE_SECRET_KEY")
-        current_firebase_config = os.getenv("FIREBASE_CONFIG_JSON")
+        current_liquidation_api_url = os.getenv("LIQUIDATION_API_BASE_URL", "")
 
         # Settings should match current environment
         assert test_settings.BINANCE_API_KEY == current_api_key
         assert test_settings.BINANCE_SECRET_KEY == current_secret_key
-        assert test_settings.FIREBASE_CONFIG_JSON == current_firebase_config
+        assert test_settings.LIQUIDATION_API_BASE_URL == current_liquidation_api_url
 
 
 class TestSettingsEdgeCases:
@@ -210,8 +213,8 @@ class TestSettingsEdgeCases:
         assert test_settings.BINANCE_SECRET_KEY is None or isinstance(
             test_settings.BINANCE_SECRET_KEY, str
         )
-        assert test_settings.FIREBASE_CONFIG_JSON is None or isinstance(
-            test_settings.FIREBASE_CONFIG_JSON, str
+        assert test_settings.LIQUIDATION_API_BASE_URL is None or isinstance(
+            test_settings.LIQUIDATION_API_BASE_URL, str
         )
 
     def test_settings_string_lengths(self):
@@ -228,9 +231,9 @@ class TestSettingsEdgeCases:
                 len(test_settings.BINANCE_SECRET_KEY) < 1000
             )  # Reasonable upper bound
 
-        if test_settings.FIREBASE_CONFIG_JSON:
-            assert len(test_settings.FIREBASE_CONFIG_JSON) > 0
-            assert len(test_settings.FIREBASE_CONFIG_JSON) < 10000  # JSON can be longer
+        if test_settings.LIQUIDATION_API_BASE_URL:
+            assert len(test_settings.LIQUIDATION_API_BASE_URL) > 0
+            assert len(test_settings.LIQUIDATION_API_BASE_URL) < 1000  # URL length limit
 
     def test_settings_debug_values(self):
         """Test various DEBUG environment values."""
@@ -267,11 +270,13 @@ class TestSettingsIntegration:
         for attr_name in [
             "BINANCE_API_KEY",
             "BINANCE_SECRET_KEY",
-            "FIREBASE_CONFIG_JSON",
         ]:
             setting_value = getattr(test_settings, attr_name)
             env_value = os.getenv(attr_name)
             assert setting_value == env_value
+        
+        # LIQUIDATION_API_BASE_URL has a default value
+        assert test_settings.LIQUIDATION_API_BASE_URL == os.getenv("LIQUIDATION_API_BASE_URL", "")
 
     def test_settings_boolean_conversion(self):
         """Test boolean conversion logic."""

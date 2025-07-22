@@ -3,6 +3,9 @@ Tests for the Bot Service.
 """
 
 import pytest
+
+# Chunk 3: Business services - Bot, orderbook, chart data
+pytestmark = pytest.mark.chunk3
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4, UUID

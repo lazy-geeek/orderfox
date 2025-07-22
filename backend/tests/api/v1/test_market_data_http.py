@@ -6,6 +6,9 @@ symbols, order book, and candles endpoints.
 """
 
 import pytest
+
+# Chunk 5: REST API endpoints - Schema, bot, market data APIs
+pytestmark = pytest.mark.chunk5
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 import sys
@@ -262,7 +265,7 @@ class TestOrderBookEndpoint:
 
     def test_get_orderbook_invalid_limit_too_high(self):
         """Test error handling for limit exceeding maximum."""
-        response = client.get("/api/v1/orderbook/BTCUSDT?limit=2000")
+        response = client.get("/api/v1/orderbook/BTCUSDT?limit=501")
 
         assert response.status_code == 422  # Validation error
 

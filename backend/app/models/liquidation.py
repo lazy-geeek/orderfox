@@ -2,7 +2,7 @@
 Liquidation models for API responses and data structures
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional, Literal
 from decimal import Decimal
 
@@ -22,10 +22,11 @@ class LiquidationVolume(BaseModel):
     count: int = Field(..., description="Number of liquidations in this bucket")
     timestamp_ms: int = Field(..., description="Timestamp in milliseconds")
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             Decimal: str
         }
+    )
 
 
 class LiquidationVolumeResponse(BaseModel):
@@ -37,7 +38,8 @@ class LiquidationVolumeResponse(BaseModel):
     start_time: Optional[int] = Field(None, description="Start timestamp in milliseconds")
     end_time: Optional[int] = Field(None, description="End timestamp in milliseconds")
     
-    @validator('timeframe')
+    @field_validator('timeframe')
+    @classmethod
     def validate_timeframe(cls, v):
         valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
         if v not in valid_timeframes:

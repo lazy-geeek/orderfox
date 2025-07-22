@@ -5,6 +5,9 @@ Tests the REST API endpoints for fetching aggregated liquidation volume data.
 """
 
 import pytest
+
+# Chunk 5: REST API endpoints - Schema, bot, market data APIs
+pytestmark = pytest.mark.chunk5
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
@@ -219,7 +222,7 @@ class TestLiquidationVolumeWebSocket:
         
     def test_websocket_volume_update_structure(self):
         """Test the structure of volume updates that would be sent via WebSocket"""
-        from datetime import datetime
+        from datetime import datetime, timezone
         
         # Test data structure that would be sent when aggregation occurs
         volume_update = {
@@ -241,7 +244,7 @@ class TestLiquidationVolumeWebSocket:
                     "timestamp_ms": 1609459200000
                 }
             ],
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }
         
         # Verify the structure matches expected format

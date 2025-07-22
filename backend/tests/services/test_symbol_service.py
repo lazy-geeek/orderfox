@@ -5,6 +5,9 @@ Tests symbol format conversion, validation, and suggestion functionality.
 """
 
 import pytest
+
+# Chunk 2: Core services - Symbol, exchange, formatting, caching
+pytestmark = pytest.mark.chunk2
 import time
 from unittest.mock import Mock, patch
 from app.services.symbol_service import SymbolService

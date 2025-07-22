@@ -64,7 +64,7 @@ class Settings:
     PROJECT_NAME: str = "Trading Bot API"
 
     # Market Data Configuration
-    MAX_ORDERBOOK_LIMIT: int = int(os.getenv("MAX_ORDERBOOK_LIMIT", "5000"))
+    MAX_ORDERBOOK_LIMIT: int = int(os.getenv("MAX_ORDERBOOK_LIMIT", "500"))
 
     # Development settings
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"

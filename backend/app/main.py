@@ -2,6 +2,7 @@ import json
 import time
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -41,13 +42,57 @@ if DEVCONTAINER_MODE:
     except Exception as e:
         logger.warning(f"Failed to configure debugpy: {e}")
 
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown events."""
+    # Startup
+    logger.info("Trading Bot API starting up...")
+    logger.info(f"Debug mode: {settings.DEBUG}")
+    logger.info(f"Development mode: {DEVELOPMENT}")
+    logger.info(f"Container mode: {DEVCONTAINER_MODE}")
+    logger.info(f"Server binding to: {settings.HOST}:{settings.PORT}")
+
+    # Initialize database
+    try:
+        logger.info("Initializing database...")
+        await init_db()
+        logger.info("Database initialization completed")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't fail startup - allow the app to run without database for development
+        logger.warning("Application will continue without database initialization")
+
+    # Mount static files in development
+    if settings.SERVE_STATIC_FILES:
+        static_path = Path(settings.STATIC_FILES_PATH)
+        if static_path.exists():
+            app.mount(
+                "/static",
+                StaticFiles(
+                    directory=str(static_path)),
+                name="static")
+            logger.info(f"Serving static files from: {static_path}")
+        else:
+            logger.warning(f"Static files directory not found: {static_path}")
+
+    logger.info("Application startup completed")
+    
+    yield  # Application is running
+    
+    # Shutdown
+    logger.info("Trading Bot API shutting down...")
+    logger.info("Application shutdown completed")
+
+
 # Create FastAPI app instance
 app = FastAPI(
     title="Trading Bot API",
     version="1.0.0",
     debug=settings.DEBUG,
     docs_url="/docs" if DEVELOPMENT else None,  # Disable docs in production
-    redoc_url="/redoc" if DEVELOPMENT else None  # Disable redoc in production
+    redoc_url="/redoc" if DEVELOPMENT else None,  # Disable redoc in production
+    lifespan=lifespan
 )
 
 
@@ -133,49 +178,6 @@ class DevelopmentMiddleware(BaseHTTPMiddleware):
         else:
             return await call_next(request)
 
-# Application Events
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Application startup event."""
-    logger.info("Trading Bot API starting up...")
-    logger.info(f"Debug mode: {settings.DEBUG}")
-    logger.info(f"Development mode: {DEVELOPMENT}")
-    logger.info(f"Container mode: {DEVCONTAINER_MODE}")
-    logger.info(f"Server binding to: {settings.HOST}:{settings.PORT}")
-
-    # Initialize database
-    try:
-        logger.info("Initializing database...")
-        await init_db()
-        logger.info("Database initialization completed")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        # Don't fail startup - allow the app to run without database for development
-        logger.warning("Application will continue without database initialization")
-
-    # Mount static files in development
-    if settings.SERVE_STATIC_FILES:
-        static_path = Path(settings.STATIC_FILES_PATH)
-        if static_path.exists():
-            app.mount(
-                "/static",
-                StaticFiles(
-                    directory=str(static_path)),
-                name="static")
-            logger.info(f"Serving static files from: {static_path}")
-        else:
-            logger.warning(f"Static files directory not found: {static_path}")
-
-    logger.info("Application startup completed")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Application shutdown event."""
-    logger.info("Trading Bot API shutting down...")
-    logger.info("Application shutdown completed")
 
 
 # Add development middleware

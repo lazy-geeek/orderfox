@@ -6,6 +6,9 @@ testing trade fetching, formatting, and error handling functionality.
 """
 
 import pytest
+
+# Chunk 4: Advanced services - Liquidation, trade, trading engine
+pytestmark = pytest.mark.chunk4
 import time
 from unittest.mock import Mock, patch
 from fastapi import HTTPException

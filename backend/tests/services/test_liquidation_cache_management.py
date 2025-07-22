@@ -5,11 +5,14 @@ Tests cache clearing, volume aggregation, and message type separation.
 """
 
 import pytest
+
+# Chunk 4: Advanced services - Liquidation, trade, trading engine
+pytestmark = pytest.mark.chunk4
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from decimal import Decimal
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.liquidation_service import LiquidationService
 from app.api.v1.endpoints import liquidations_ws
@@ -153,7 +156,7 @@ class TestLiquidationCacheManagement:
             symbol="BTCUSDT",
             timeframe="1m",
             data=[],
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             is_update=True
         )
         

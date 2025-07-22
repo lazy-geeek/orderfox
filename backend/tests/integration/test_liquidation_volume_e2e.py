@@ -6,6 +6,9 @@ work together correctly for the liquidation volume visualization feature.
 """
 
 import pytest
+
+# Chunk 8: Performance and load tests - Volume, load, advanced integration
+pytestmark = pytest.mark.chunk8
 import asyncio
 import json
 from fastapi.testclient import TestClient

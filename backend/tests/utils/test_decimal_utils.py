@@ -1,6 +1,9 @@
 """Tests for decimal utilities."""
 
 import pytest
+
+# Chunk 1: Foundation tests - Database, config, utilities
+pytestmark = pytest.mark.chunk1
 from app.utils.decimal_utils import DecimalUtils
 
 

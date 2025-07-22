@@ -3,6 +3,9 @@ Integration tests for database functionality with real PostgreSQL.
 """
 
 import pytest
+
+# Chunk 1: Foundation tests - Database, config, utilities
+pytestmark = pytest.mark.chunk1
 from sqlmodel import select
 from uuid import uuid4
 

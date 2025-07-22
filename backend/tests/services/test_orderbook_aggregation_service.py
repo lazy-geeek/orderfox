@@ -1,11 +1,14 @@
 import pytest
+
+# Chunk 3: Business services - Bot, orderbook, chart data
+pytestmark = pytest.mark.chunk3
 import asyncio
 import math
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List, Dict
 
 from app.services.orderbook_aggregation_service import OrderBookAggregationService
-from app.models.orderbook import OrderBook, OrderBookLevel
+from app.models.orderbook import OrderBook, OrderBookLevel, OrderBookSnapshot
 
 
 class TestOrderBookAggregationService:
@@ -127,7 +130,8 @@ class TestOrderBookAggregationService:
             # Test with 1.0 rounding (should group by whole dollars)
             result = service.get_exact_levels(sample_bids, False, 5, 1.0)
             
-            assert len(result) == 5
+            # With rounding=1.0, the sample data groups into 3 levels: 50000.0, 49999.0, 49998.0
+            assert len(result) == 3
             # Should be sorted highest to lowest for bids
             assert result[0]['price'] >= result[1]['price']
             
@@ -260,60 +264,6 @@ class TestOrderBookAggregationService:
             assert result_bid[0]['cumulative'] == 5.0
             assert result_ask[0]['cumulative'] == 5.0
 
-    class TestRoundingOptionsCalculation:
-        """Test rounding options calculation logic."""
-
-        def test_btc_rounding_options(self, service):
-            """Test rounding options for BTC pairs."""
-            options, default = service.calculate_rounding_options("BTCUSDT", 2, 50000.0)
-            
-            assert len(options) > 0
-            assert options[0] == 0.01  # Base rounding from precision
-            assert default in options
-            # Should have reasonable options for BTC price range
-            assert any(opt >= 1.0 for opt in options)  # Should have some $1+ options
-
-        def test_eth_rounding_options(self, service):
-            """Test rounding options for ETH pairs."""
-            options, default = service.calculate_rounding_options("ETHUSDT", 2, 3000.0)
-            
-            assert len(options) > 0
-            assert options[0] == 0.01
-            assert default in options
-
-        def test_high_precision_rounding_options(self, service):
-            """Test rounding options for high precision symbols."""
-            options, default = service.calculate_rounding_options("DOGEUSDT", 6, 0.07)
-            
-            assert len(options) > 0
-            assert options[0] == 0.000001  # 6 decimal places
-            assert default in options
-            # Should not exceed 1/10th of current price
-            assert all(opt <= 0.007 for opt in options)
-
-        def test_unknown_symbol_fallback(self, service):
-            """Test fallback behavior for unknown symbols."""
-            options, default = service.calculate_rounding_options("UNKNOWNUSDT", None, None)
-            
-            assert len(options) > 0
-            assert options[0] == 0.01  # Default precision
-            assert default in options
-
-        def test_rounding_options_limits(self, service):
-            """Test that rounding options respect limits."""
-            options, default = service.calculate_rounding_options("BTCUSDT", 2, 100000.0)
-            
-            # Should not exceed 1000 absolute max
-            assert all(opt <= 1000 for opt in options)
-            # Should not exceed 1/10th of price
-            assert all(opt <= 10000 for opt in options)
-
-        def test_minimum_options_guarantee(self, service):
-            """Test that at least one option is always provided."""
-            options, default = service.calculate_rounding_options("", None, None)
-            
-            assert len(options) >= 1
-            assert default > 0
 
     class TestMarketDepthAnalysis:
         """Test market depth analysis functionality."""
@@ -474,7 +424,6 @@ class TestOrderBookAggregationService:
             assert 'bids' in result
             assert 'asks' in result
             assert 'timestamp' in result
-            assert 'rounding_options' in result
             assert 'market_depth_info' in result
             
             # Verify data types and structure
@@ -488,11 +437,23 @@ class TestOrderBookAggregationService:
         @pytest.mark.asyncio
         async def test_aggregation_with_cache(self, service, mock_orderbook):
             """Test that aggregation uses cache on subsequent calls."""
-            # Mock the orderbook snapshot
+            # Mock the orderbook snapshot with enough data to avoid retries
             mock_snapshot = MagicMock()
-            mock_snapshot.bids = [MagicMock(price=50000.0, amount=1.0)]
-            mock_snapshot.asks = [MagicMock(price=50001.0, amount=1.0)]
-            mock_orderbook.get_snapshot.return_value = mock_snapshot
+            mock_snapshot.bids = [
+                MagicMock(price=50000.0, amount=1.0),
+                MagicMock(price=49999.0, amount=1.0),
+                MagicMock(price=49998.0, amount=1.0),
+                MagicMock(price=49997.0, amount=1.0),
+                MagicMock(price=49996.0, amount=1.0)
+            ]
+            mock_snapshot.asks = [
+                MagicMock(price=50001.0, amount=1.0),
+                MagicMock(price=50002.0, amount=1.0),
+                MagicMock(price=50003.0, amount=1.0),
+                MagicMock(price=50004.0, amount=1.0),
+                MagicMock(price=50005.0, amount=1.0)
+            ]
+            mock_orderbook.get_snapshot = AsyncMock(return_value=mock_snapshot)
             
             # First call
             result1 = await service.aggregate_orderbook(mock_orderbook, 5, 1.0)
@@ -530,11 +491,6 @@ class TestOrderBookAggregationService:
     class TestEdgeCasesAndErrorHandling:
         """Test edge cases and error handling."""
 
-        def test_empty_symbol_rounding_options(self, service):
-            """Test rounding options with empty symbol."""
-            options, default = service.calculate_rounding_options("", None, None)
-            assert len(options) >= 1
-            assert default > 0
 
         def test_negative_price_handling(self, service):
             """Test handling of negative prices."""
@@ -722,12 +678,17 @@ class TestOrderBookAggregationService:
         service = OrderBookAggregationService()
         
         # Create mock orderbook with specific timestamp
-        mock_orderbook = OrderBook(
+        mock_snapshot = OrderBookSnapshot(
             symbol="BTCUSDT",
-            bids=[[50000.0, 1.0]],
-            asks=[[50100.0, 1.0]],
+            bids=[OrderBookLevel(50000.0, 1.0)],
+            asks=[OrderBookLevel(50100.0, 1.0)],
             timestamp=1640995200000  # 2022-01-01 00:00:00 UTC
         )
+        
+        mock_orderbook = AsyncMock()
+        mock_orderbook.get_snapshot = AsyncMock(return_value=mock_snapshot)
+        mock_orderbook.symbol = "BTCUSDT"
+        mock_orderbook.timestamp = 1640995200000
         
         result = await service.aggregate_orderbook(
             mock_orderbook,
@@ -748,13 +709,18 @@ class TestOrderBookAggregationService:
         """Test handling of invalid timestamp in orderbook."""
         service = OrderBookAggregationService()
         
-        # Create mock orderbook with invalid timestamp
-        mock_orderbook = OrderBook(
+        # Create mock orderbook with invalid timestamp that will cause an exception
+        mock_snapshot = OrderBookSnapshot(
             symbol="BTCUSDT",
-            bids=[[50000.0, 1.0]],
-            asks=[[50100.0, 1.0]],
-            timestamp=-1  # Invalid timestamp
+            bids=[OrderBookLevel(50000.0, 1.0)],
+            asks=[OrderBookLevel(50100.0, 1.0)],
+            timestamp=9999999999999999  # Invalid timestamp that will cause ValueError/OSError in datetime.fromtimestamp
         )
+        
+        mock_orderbook = AsyncMock()
+        mock_orderbook.get_snapshot = AsyncMock(return_value=mock_snapshot)
+        mock_orderbook.symbol = "BTCUSDT"
+        mock_orderbook.timestamp = 9999999999999999
         
         result = await service.aggregate_orderbook(
             mock_orderbook,

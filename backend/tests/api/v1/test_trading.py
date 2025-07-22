@@ -6,6 +6,9 @@ trade execution, position management, and trading mode settings.
 """
 
 import pytest
+
+# Chunk 5: REST API endpoints - Schema, bot, market data APIs
+pytestmark = pytest.mark.chunk5
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 import sys

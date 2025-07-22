@@ -5,11 +5,14 @@ Tests high-volume scenarios, memory usage, and data retention under load.
 """
 
 import pytest
+
+# Chunk 8: Performance and load tests - Volume, load, advanced integration
+pytestmark = pytest.mark.chunk8
 import asyncio
 import time
 import psutil
 import gc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import deque
 from unittest.mock import AsyncMock, Mock, patch
@@ -303,7 +306,7 @@ class TestLiquidationVolumeLoad:
                 "type": "liquidation_order",
                 "symbol": symbol,
                 "data": [liq],
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
         
         # Performance metrics

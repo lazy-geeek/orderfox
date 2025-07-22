@@ -5,7 +5,7 @@ Bot service for managing bot CRUD operations and business logic.
 import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 from sqlmodel import Session, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,7 +47,8 @@ class BotService:
             bot = Bot(
                 name=bot_data.name,
                 symbol=bot_data.symbol,
-                is_active=bot_data.is_active
+                is_active=bot_data.is_active,
+                is_paper_trading=bot_data.is_paper_trading
             )
             
             # Add to session

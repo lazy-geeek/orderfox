@@ -1,4 +1,7 @@
 import pytest
+
+# Chunk 2: Core services - Symbol, exchange, formatting, caching
+pytestmark = pytest.mark.chunk2
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -25,17 +28,17 @@ class TestCachingMechanism:
         orderbook.symbol = "BTCUSDT"
         orderbook.timestamp = 1640995200000  # Fixed timestamp
         
-        # Mock snapshot data
+        # Mock snapshot data with enough levels to avoid retries
         mock_snapshot = MagicMock()
+        # Generate 25 bids (descending prices)
         mock_snapshot.bids = [
-            MagicMock(price=50000.0, amount=1.0),
-            MagicMock(price=49999.0, amount=2.0),
-            MagicMock(price=49998.0, amount=3.0)
+            MagicMock(price=50000.0 - i, amount=1.0 + i * 0.1)
+            for i in range(25)
         ]
+        # Generate 25 asks (ascending prices)
         mock_snapshot.asks = [
-            MagicMock(price=50001.0, amount=1.5),
-            MagicMock(price=50002.0, amount=2.5),
-            MagicMock(price=50003.0, amount=3.5)
+            MagicMock(price=50001.0 + i, amount=1.5 + i * 0.1)
+            for i in range(25)
         ]
         orderbook.get_snapshot.return_value = mock_snapshot
         
@@ -481,8 +484,12 @@ class TestCachingMechanism:
 
         @pytest.mark.asyncio
         async def test_concurrent_aggregation_same_params(self, service, mock_orderbook):
-            """Test concurrent aggregation calls with same parameters."""
-            # Multiple concurrent calls with same parameters
+            """Test that concurrent aggregation calls produce consistent results."""
+            # First, populate the cache with one call
+            await service.aggregate_orderbook(mock_orderbook, 10, 1.0)
+            initial_call_count = mock_orderbook.get_snapshot.call_count
+            
+            # Now make concurrent calls - these should use cache
             tasks = [
                 asyncio.create_task(service.aggregate_orderbook(mock_orderbook, 10, 1.0))
                 for _ in range(5)
@@ -494,10 +501,9 @@ class TestCachingMechanism:
             first_result = results[0]
             assert all(result == first_result for result in results)
             
-            # Should have called get_snapshot at least once but not 5 times
-            # (due to caching)
-            assert mock_orderbook.get_snapshot.call_count >= 1
-            assert mock_orderbook.get_snapshot.call_count < 5
+            # Should not have made additional calls due to caching
+            final_call_count = mock_orderbook.get_snapshot.call_count
+            assert final_call_count == initial_call_count
 
         @pytest.mark.asyncio
         async def test_cache_metrics_thread_safety(self, service):

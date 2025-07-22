@@ -96,6 +96,48 @@ async def get_bots(
         )
 
 
+@router.get("/health", response_model=dict)
+async def health_check(
+    session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Health check endpoint for bot management.
+    
+    Args:
+        session: Database session
+        
+    Returns:
+        dict: Health check results
+    """
+    try:
+        # Check bot service health
+        bot_stats = await bot_service.get_bot_stats_by_symbol(session)
+        cache_stats = bot_service.get_cache_stats()
+        
+        # Check data stream manager health
+        stream_health = await data_stream_manager.health_check()
+        
+        health = {
+            "status": "healthy",
+            "bot_service": {
+                "symbols_count": len(bot_stats),
+                "cache_hits": cache_stats.get("hits", 0),
+                "cache_misses": cache_stats.get("misses", 0)
+            },
+            "data_stream": stream_health
+        }
+        
+        logger.info(f"Health check completed: {health}")
+        return health
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Health check failed: {str(e)}"
+        )
+
+
 @router.get("/{bot_id}", response_model=BotPublic)
 async def get_bot(
     bot_id: UUID,
@@ -388,44 +430,3 @@ async def update_bot_status(
         )
 
 
-@router.get("/health", response_model=dict)
-async def health_check(
-    session: AsyncSession = Depends(get_session)
-) -> dict:
-    """
-    Health check endpoint for bot management.
-    
-    Args:
-        session: Database session
-        
-    Returns:
-        dict: Health check results
-    """
-    try:
-        # Check bot service health
-        bot_stats = await bot_service.get_bot_stats_by_symbol(session)
-        cache_stats = bot_service.get_cache_stats()
-        
-        # Check data stream manager health
-        stream_health = await data_stream_manager.health_check()
-        
-        health = {
-            "status": "healthy",
-            "bot_service": {
-                "symbols_tracked": len(bot_stats),
-                "cache_stats": cache_stats
-            },
-            "data_stream_manager": stream_health,
-            "timestamp": stream_health.get("timestamp")
-        }
-        
-        logger.debug(f"Health check successful: {health}")
-        return health
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": None
-        }

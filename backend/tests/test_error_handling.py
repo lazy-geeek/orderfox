@@ -3,6 +3,9 @@ Unit tests for error handling and logging functionality.
 """
 
 import pytest
+
+# Chunk 1: Foundation tests - Database, config, utilities
+pytestmark = pytest.mark.chunk1
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
@@ -92,7 +95,7 @@ class TestExchangeServiceErrorHandling:
         mock_exchange = MagicMock()
         import ccxt
 
-        mock_exchange.fetch_status = AsyncMock(
+        mock_exchange.fetch_status = MagicMock(
             side_effect=ccxt.NetworkError("Network error")
         )
 

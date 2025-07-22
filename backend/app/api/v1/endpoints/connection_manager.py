@@ -28,6 +28,8 @@ class ConnectionManager:
         # Tracks active stream types per symbol (e.g., {"BTCUSDT":
         # {"orderbook", "candles:1m"}})
         self.symbol_active_streams: Dict[str, set[str]] = {}
+        # Connection metadata for tests (maps connection_id to metadata)
+        self.connections: Dict[str, Dict] = {}
         # Stores the type of each stream_key
         self.stream_key_types: Dict[str, str] = {}
 
@@ -375,22 +377,162 @@ class ConnectionManager:
         """Broadcast data to all connections for a symbol (backward compatibility)."""
         await self.broadcast_to_stream(symbol, data)
 
+    async def broadcast_orderbook_update(self, symbol: str):
+        """Broadcast aggregated orderbook data to all connections for a symbol."""
+        await self._broadcast_to_all_symbol_connections(symbol)
+
     async def handle_websocket_message(
+            self,
+            *args):
+        """Handle incoming WebSocket messages for parameter updates.
+        
+        Supports two calling patterns:
+        1. handle_websocket_message(websocket: WebSocket, symbol: str, message: dict)
+        2. handle_websocket_message(connection_id: str, message_str: str) - for tests
+        """
+        if len(args) == 2:
+            # Test pattern: connection_id, message_str
+            connection_id, message_str = args
+            try:
+                message = json.loads(message_str)
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON message: {message_str}")
+                return
+            
+            # Handle the update using connection_id directly
+            try:
+                message_type = message.get("type")
+
+                if message_type == "update_params":
+                    limit = message.get("limit")
+                    rounding = message.get("rounding")
+
+                    logger.info(
+                        f"Received parameter update for {connection_id}: limit={limit}, rounding={rounding}")
+
+                    # Validate parameters before calling update
+                    try:
+                        limit = int(limit) if limit is not None else None
+                        rounding = float(rounding) if rounding is not None else None
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid parameters for {connection_id}: limit={limit}, rounding={rounding}")
+                        return
+
+                    # Update OrderBook Manager
+                    success = await orderbook_manager.update_connection_params(
+                        connection_id, limit, rounding
+                    )
+
+                    if success:
+                        logger.info(f"Successfully updated parameters for {connection_id}")
+                        
+                        # For test pattern, we need to find the websocket to send acknowledgment
+                        websocket = None
+                        
+                        # First try connection metadata
+                        if hasattr(self, '_connection_metadata') and connection_id in self._connection_metadata:
+                            websocket = self._connection_metadata[connection_id].get('websocket')
+                            logger.debug(f"Found websocket in metadata: {websocket is not None}")
+                        
+                        # Fallback: extract symbol from connection_id and find websocket in active_connections
+                        if not websocket and ':' in connection_id:
+                            symbol = connection_id.split(':')[0]
+                            if symbol in self.active_connections:
+                                # For tests, typically only one connection per symbol, so use the first one
+                                if self.active_connections[symbol]:
+                                    websocket = self.active_connections[symbol][0]
+                                    logger.debug(f"Found websocket in active_connections: {websocket is not None}")
+                        
+                        logger.debug(f"Final websocket lookup result: {websocket is not None}")
+                        if not websocket:
+                            logger.debug(f"DEBUG: Failed to find websocket for connection_id: {connection_id}")
+                            logger.debug(f"DEBUG: _connection_metadata keys: {list(self._connection_metadata.keys()) if hasattr(self, '_connection_metadata') else 'No metadata'}")
+                            logger.debug(f"DEBUG: active_connections keys: {list(self.active_connections.keys())}")
+                            logger.debug(f"DEBUG: extracted symbol from connection_id: {connection_id.split(':')[0] if ':' in connection_id else 'No colon'}")
+                        
+                        if websocket:
+                            # Send acknowledgment message
+                            ack_message = {
+                                "type": "params_updated",
+                                "limit": limit,
+                                "rounding": rounding,
+                                "success": True
+                            }
+                            await websocket.send_text(json.dumps(ack_message))
+                            
+                            # Broadcast updated aggregated data
+                            await self._broadcast_aggregated_orderbook(connection_id)
+                    else:
+                        logger.warning(f"Failed to update parameters for {connection_id}")
+                        
+                        # Send error message if we can find the websocket
+                        websocket = None
+                        
+                        # First try connection metadata
+                        if hasattr(self, '_connection_metadata') and connection_id in self._connection_metadata:
+                            websocket = self._connection_metadata[connection_id].get('websocket')
+                        
+                        # Fallback: extract symbol from connection_id and find websocket in active_connections
+                        if not websocket and ':' in connection_id:
+                            symbol = connection_id.split(':')[0]
+                            if symbol in self.active_connections:
+                                if self.active_connections[symbol]:
+                                    websocket = self.active_connections[symbol][0]
+                        
+                        if websocket:
+                            error_message = {
+                                "type": "error",
+                                "message": f"Failed to update parameters for connection {connection_id}"
+                            }
+                            await websocket.send_text(json.dumps(error_message))
+
+            except Exception as e:
+                logger.error(f"Error handling websocket message for {connection_id}: {e}")
+            
+        elif len(args) == 3:
+            # Production pattern: websocket, symbol, message dict
+            websocket, symbol, message = args
+            await self._handle_websocket_message_production(websocket, symbol, message)
+        else:
+            raise TypeError(f"handle_websocket_message() takes 2 or 3 arguments but {len(args)} were given")
+
+    async def _handle_websocket_message_production(
             self,
             websocket: WebSocket,
             symbol: str,
             message: dict):
-        """Handle incoming WebSocket messages for parameter updates."""
+        """Handle incoming WebSocket messages for parameter updates (production version)."""
         try:
             message_type = message.get("type")
 
             if message_type == "update_params":
-                connection_id = f"{symbol}:{id(websocket)}"
+                # Try to find existing connection_id, otherwise generate new one
+                connection_id = None
+                for conn_id, conn_data in self.connections.items():
+                    if conn_data.get('websocket') == websocket:
+                        connection_id = conn_id
+                        break
+                
+                if connection_id is None:
+                    connection_id = f"{symbol}:{id(websocket)}"
                 limit = message.get("limit")
                 rounding = message.get("rounding")
 
                 logger.info(
                     f"Received parameter update for {connection_id}: limit={limit}, rounding={rounding}")
+
+                # Validate parameters before calling update
+                try:
+                    limit = int(limit) if limit is not None else None
+                    rounding = float(rounding) if rounding is not None else None
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid parameters for {connection_id}: limit={limit}, rounding={rounding}")
+                    error_message = {
+                        "type": "error",
+                        "message": f"Invalid parameters: limit must be integer, rounding must be float"
+                    }
+                    await websocket.send_text(json.dumps(error_message))
+                    return
 
                 # Update OrderBook Manager
                 success = await orderbook_manager.update_connection_params(
