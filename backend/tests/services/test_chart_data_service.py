@@ -261,13 +261,13 @@ class TestChartDataService:
         # Invalid inputs - should use default
         assert self.chart_service.calculate_optimal_candle_count(0) == 400  # default fallback uses 800px: (800/6)*3=400
         assert self.chart_service.calculate_optimal_candle_count(-100) == 400  # default fallback uses 800px: (800/6)*3=400
-        assert self.chart_service.calculate_optimal_candle_count(None) == 400  # default fallback uses 800px: (800/6)*3=400
+        assert self.chart_service.calculate_optimal_candle_count(None) == 400  # type: ignore  # default fallback uses 800px: (800/6)*3=400
         
         # Very small valid width
         assert self.chart_service.calculate_optimal_candle_count(300) == 200  # min threshold
         
         # Float input should work
-        assert self.chart_service.calculate_optimal_candle_count(800.5) == 400  # rounded down
+        assert self.chart_service.calculate_optimal_candle_count(800.5) == 400  # type: ignore  # rounded down
 
     @pytest.mark.asyncio
     async def test_format_realtime_update_with_time_field(self):

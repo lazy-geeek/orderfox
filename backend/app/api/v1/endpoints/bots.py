@@ -216,6 +216,14 @@ async def update_bot(
         # Update bot
         updated_bot = await bot_service.update_bot(bot_id, bot_data, session)
         
+        # Ensure update was successful
+        if not updated_bot:
+            logger.error(f"Bot update failed for ID: {bot_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Bot update failed"
+            )
+        
         # Update data streams if active status changed
         if bot_data.is_active is not None:
             await data_stream_manager.update_active_streams(session)

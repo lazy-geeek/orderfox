@@ -6,8 +6,8 @@ Tests high-volume scenarios, memory usage, and data retention under load.
 
 import pytest
 
-# Chunk 8: Performance and load tests - Volume, load, advanced integration
-pytestmark = pytest.mark.chunk8
+# Chunk 8g: Extended Load Tests - High-volume scenarios, extended runtime
+pytestmark = pytest.mark.chunk8g
 import asyncio
 import time
 import psutil

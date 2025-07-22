@@ -571,7 +571,7 @@ class TestSymbolServiceIntegration:
         """Test volume formatting edge cases."""
         assert self.symbol_service.format_volume(None) == ""
         assert self.symbol_service.format_volume(0) == ""
-        assert self.symbol_service.format_volume("invalid") == ""
+        assert self.symbol_service.format_volume("invalid") == ""  # type: ignore
 
     def test_generate_price_format_normal_precision(self):
         """Test priceFormat generation for normal precision values."""

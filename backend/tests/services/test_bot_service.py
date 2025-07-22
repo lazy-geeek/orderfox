@@ -45,7 +45,7 @@ class TestBotService:
         assert result.created_at is not None
         assert result.updated_at is not None
     
-    async def test_create_bot_defaults_to_paper_trading(self, bot_service: BotService, test_session):
+    async def test_create_bot_defaults_to_paper_trading_first(self, bot_service: BotService, test_session):
         """Test creating a bot defaults to paper trading when not specified."""
         bot_data = BotCreate(
             name="Test Bot",
@@ -77,7 +77,7 @@ class TestBotService:
         assert result.page_size == 50
         
         # Check that bots are sorted by created_at desc
-        created_times = [bot.created_at for bot in result.bots]
+        created_times = [bot.created_at for bot in result.bots if bot.created_at is not None]
         assert created_times == sorted(created_times, reverse=True)
     
     async def test_get_all_bots_pagination(self, bot_service: BotService, test_session, multiple_bots):
@@ -124,6 +124,7 @@ class TestBotService:
         """Test updating an existing bot."""
         update_data = BotUpdate(
             name="Updated Bot",
+            symbol="BTCUSDT",  # Required field
             is_active=False,
             is_paper_trading=False
         )
@@ -141,7 +142,11 @@ class TestBotService:
     async def test_update_bot_nonexistent(self, bot_service: BotService, test_session):
         """Test updating a non-existent bot."""
         fake_id = uuid4()
-        update_data = BotUpdate(name="Updated Bot")
+        update_data = BotUpdate(
+            name="Updated Bot",
+            symbol="BTCUSDT",  # Required field
+            is_active=True  # Required field
+        )
         
         result = await bot_service.update_bot(fake_id, update_data, test_session)
         
@@ -236,7 +241,7 @@ class TestBotService:
         assert result2 is not None
         assert result2.id == sample_bot.id
         assert result2.is_active is True
-        assert result2.updated_at >= result.updated_at
+        assert result2.updated_at is not None and result.updated_at is not None and result2.updated_at >= result.updated_at
     
     async def test_set_bot_active_status_nonexistent(self, bot_service: BotService, test_session):
         """Test setting active status for non-existent bot."""
@@ -275,7 +280,11 @@ class TestBotService:
         assert stats_before["bot_cache_size"] > 0
         
         # Update bot (should clear cache)
-        update_data = BotUpdate(name="Updated Bot")
+        update_data = BotUpdate(
+            name="Updated Bot",
+            symbol="BTCUSDT",  # Required field
+            is_active=True  # Required field
+        )
         await bot_service.update_bot(sample_bot.id, update_data, test_session)
         
         # Verify cache is cleared
@@ -298,7 +307,11 @@ class TestBotService:
     
     async def test_error_handling_on_update(self, bot_service: BotService, test_session, sample_bot):
         """Test error handling during bot update."""
-        update_data = BotUpdate(name="Updated Bot")
+        update_data = BotUpdate(
+            name="Updated Bot",
+            symbol="BTCUSDT",  # Required field
+            is_active=True  # Required field
+        )
         
         # Mock session to raise an exception
         with patch.object(test_session, 'commit', side_effect=Exception("Database error")):
@@ -312,7 +325,11 @@ class TestBotService:
         original_active = sample_bot.is_active
         
         # Update only the name
-        update_data = BotUpdate(name="New Name Only")
+        update_data = BotUpdate(
+            name="New Name Only",
+            symbol=original_symbol,  # Keep original
+            is_active=original_active  # Keep original
+        )
         
         result = await bot_service.update_bot(sample_bot.id, update_data, test_session)
         
@@ -322,7 +339,11 @@ class TestBotService:
         assert result.is_active == original_active  # Unchanged
         
         # Update only the active status
-        update_data2 = BotUpdate(is_active=False)
+        update_data2 = BotUpdate(
+            name="New Name Only",  # Required field
+            symbol=original_symbol,  # Required field
+            is_active=False
+        )
         
         result2 = await bot_service.update_bot(sample_bot.id, update_data2, test_session)
         

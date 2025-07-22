@@ -36,6 +36,7 @@ def mock_trading_service_fixture():
 class TestTradeEndpoint:
     """Test cases for the /api/v1/trading/trade endpoint."""
 
+    @pytest.mark.asyncio
     async def test_execute_trade_success_market_order(self, mock_trading_service):
         """Test successful market order execution."""
         mock_trading_service.execute_trade.return_value = {
@@ -71,6 +72,7 @@ class TestTradeEndpoint:
             symbol="BTCUSDT", side="long", amount=0.1, trade_type="market", price=None
         )
 
+    @pytest.mark.asyncio
     async def test_execute_trade_success_limit_order(self, mock_trading_service):
         """Test successful limit order execution."""
         mock_trading_service.execute_trade.return_value = {
@@ -139,6 +141,7 @@ class TestTradeEndpoint:
 
         assert response.status_code == 422  # Validation error
 
+    @pytest.mark.asyncio
     async def test_execute_trade_service_error(self, mock_trading_service):
         """Test trade execution when service raises an exception."""
         mock_trading_service.execute_trade.side_effect = Exception("Service error")
@@ -160,6 +163,7 @@ class TestTradeEndpoint:
 class TestPositionsEndpoint:
     """Test cases for the /api/v1/trading/positions endpoint."""
 
+    @pytest.mark.asyncio
     async def test_get_positions_success(self, mock_trading_service):
         """Test successful retrieval of positions."""
         mock_trading_service.get_open_positions.return_value = [
@@ -191,6 +195,7 @@ class TestPositionsEndpoint:
 
         mock_trading_service.get_open_positions.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_get_positions_empty(self, mock_trading_service):
         """Test retrieval when no positions exist."""
         mock_trading_service.get_open_positions.return_value = []
@@ -201,6 +206,7 @@ class TestPositionsEndpoint:
         data = response.json()
         assert len(data) == 0
 
+    @pytest.mark.asyncio
     async def test_get_positions_service_error(self, mock_trading_service):
         """Test positions endpoint when service raises an exception."""
         mock_trading_service.get_open_positions.side_effect = Exception(
@@ -216,6 +222,7 @@ class TestPositionsEndpoint:
 class TestSetTradingModeEndpoint:
     """Test cases for the /api/v1/trading/set_trading_mode endpoint."""
 
+    @pytest.mark.asyncio
     async def test_set_trading_mode_success_paper(self, mock_trading_service):
         """Test successful setting of paper trading mode."""
         mock_trading_service.set_trading_mode.return_value = {
@@ -232,6 +239,7 @@ class TestSetTradingModeEndpoint:
 
         mock_trading_service.set_trading_mode.assert_called_once_with("paper")
 
+    @pytest.mark.asyncio
     async def test_set_trading_mode_success_live(self, mock_trading_service):
         """Test successful setting of live trading mode."""
         mock_trading_service.set_trading_mode.return_value = {
@@ -276,6 +284,7 @@ class TestSetTradingModeEndpoint:
         assert response.status_code == 400
         assert "Invalid trading mode" in response.json()["detail"]
 
+    @pytest.mark.asyncio
     async def test_set_trading_mode_service_exception(self, mock_trading_service):
         """Test setting trading mode when service raises an exception."""
         mock_trading_service.set_trading_mode.side_effect = Exception("Service error")
@@ -289,6 +298,7 @@ class TestSetTradingModeEndpoint:
 class TestTradingEndpointIntegration:
     """Integration tests for trading endpoints."""
 
+    @pytest.mark.asyncio
     async def test_trading_workflow_paper_mode(self, mock_trading_service):
         """Test complete trading workflow in paper mode."""
         # Set up mock responses

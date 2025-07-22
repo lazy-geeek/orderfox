@@ -3,7 +3,7 @@ Data Stream Manager for optimizing WebSocket connections based on active bots.
 """
 
 import logging
-from typing import Set, Dict, List, Optional
+from typing import Set, Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from cachetools import TTLCache
 import asyncio
@@ -217,7 +217,7 @@ class DataStreamManager:
                 'symbols_with_references': len(self._stream_references)
             }
     
-    async def optimize_streams(self, session: AsyncSession) -> Dict[str, any]:
+    async def optimize_streams(self, session: AsyncSession) -> Dict[str, Any]:
         """
         Perform stream optimization based on current bot states.
         
@@ -271,7 +271,7 @@ class DataStreamManager:
         bot_service._clear_caches()
         logger.debug("Cleared data stream manager cache and bot service cache")
     
-    async def health_check(self) -> Dict[str, any]:
+    async def health_check(self) -> Dict[str, Any]:
         """
         Perform health check on the data stream manager.
         

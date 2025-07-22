@@ -21,7 +21,7 @@ OrderFox is a cryptocurrency trading application with bot management capabilitie
 
 **Enhanced Backend Test Execution System:**
 ```bash
-# 🚀 COMPREHENSIVE TEST SUITE (617 tests across 9 chunks)
+# 🚀 COMPREHENSIVE TEST SUITE (617 tests across 15 chunks)
 cd backend && ./scripts/run-backend-tests.sh           # Full test suite with warning detection
 cd backend && ./scripts/analyze-test-results.sh        # Intelligent failure analysis
 cd backend && cat logs/test-results/chunk*-warnings.txt # LLM-actionable warning insights
@@ -182,6 +182,11 @@ npm run dev:restart            # Stop servers, clean logs, and restart
 npm run lint                   # Frontend linting
 npm run lint:fix              # Auto-fix frontend linting issues
 npm run typecheck              # Backend type checking (Pylance)
+
+# 🎯 CRITICAL: ACCURATE PYTHON TYPE CHECKING
+# Use pyright CLI for exact Pylance error detection (matches VS Code IDE)
+cd /home/bail/github/orderfox/backend && pyright app/                    # Check all Python files
+cd /home/bail/github/orderfox/backend && pyright app/core/database.py    # Check specific file
 
 # 📦 DEPENDENCY MANAGEMENT
 cd /home/bail/github/orderfox/backend && pip install -r requirements.txt           # Backend dependencies

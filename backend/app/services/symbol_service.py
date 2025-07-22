@@ -160,7 +160,9 @@ class SymbolService:
             exchange = exchange_service.get_exchange()
             
             # Try to explicitly set the market type to futures
-            exchange.options["defaultType"] = "future"
+            if exchange.options is None:
+                exchange.options = {}
+            exchange.options["defaultType"] = "future"  # type: ignore
             
             # Fetch ticker data (uses caching)
             tickers = self._fetch_tickers()

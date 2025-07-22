@@ -152,6 +152,11 @@ class ExchangeService:
         """
         if self.exchange is None:
             self.initialize_exchange()
+        
+        # Ensure exchange is not None after initialization
+        if self.exchange is None:
+            raise RuntimeError("Failed to initialize exchange")
+            
         if not self._exchange_wrapped:
             self._wrap_exchange_for_monitoring(self.exchange)
             self._exchange_wrapped = True
@@ -167,11 +172,11 @@ class ExchangeService:
         # Store original method
         original_load_markets = exchange.load_markets
         
-        def monitored_load_markets(reload=False):
+        def monitored_load_markets(reload=False, params={}):
             """Wrapped load_markets method with monitoring."""
             self._load_markets_call_count += 1
             logger.info(f"load_markets() called - total calls: {self._load_markets_call_count}")
-            return original_load_markets(reload)
+            return original_load_markets(reload, params)
         
         # Replace with monitored version
         exchange.load_markets = monitored_load_markets

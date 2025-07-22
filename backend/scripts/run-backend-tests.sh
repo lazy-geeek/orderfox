@@ -41,7 +41,12 @@ CHUNKS[6]="chunk6:WebSocket API endpoints - Connection manager, market data, liq
 CHUNKS[7]="chunk7a:Bot Integration tests - Bot paper trading flows:45"
 CHUNKS[8]="chunk7b:Data Flow Integration tests - E2E formatting, liquidation volume flows:60"
 CHUNKS[9]="chunk7c:WebSocket Integration tests - Real WebSocket orderbook tests:90"
-CHUNKS[10]="chunk8:Performance and load tests - Volume, load, advanced integration:90"
+CHUNKS[10]="chunk8a:Integration & E2E Tests - End-to-end data flow validation:30"
+CHUNKS[11]="chunk8b:Performance Tests - Response times, throughput, memory efficiency:45"
+CHUNKS[12]="chunk8d:Basic Load Tests - Aggregation latency, throughput, cache performance:45"
+CHUNKS[13]="chunk8e:Connection & Memory Tests - Connection performance, memory scaling:60"
+CHUNKS[14]="chunk8f:Scalability & Concurrency Tests - System limits, sustained load:90"
+CHUNKS[15]="chunk8g:Extended Load Tests - High-volume scenarios, extended runtime:120"
 
 # Initialize result tracking
 TOTAL_PASSED=0
@@ -111,7 +116,9 @@ EOF
     local start_time=$(date +%s)
     local success=false
     
-    # Run pytest with timeout and capture ALL warnings, runtime errors, and logging issues
+    # Run pytest with timeout and comprehensive warning capture for proactive maintenance
+    # Use explicit warning flags to ensure ALL warnings are captured for analysis,
+    # then filter intelligently in the analysis phase
     if timeout ${TIMEOUT_PER_CHUNK}s python -m pytest -m "$chunk_name" \
         --tb=short --no-header --quiet -v \
         -W default::DeprecationWarning \
@@ -319,13 +326,59 @@ EOF
         fi
         
         echo "" >> "$warnings_file"
+        echo "INTELLIGENT WARNING ANALYSIS:" >> "$warnings_file"
+        echo "$(echo "INTELLIGENT WARNING ANALYSIS:" | sed 's/./=/g')" >> "$warnings_file"
+        
+        # Categorize warnings intelligently
+        local actionable_deprecations=0
+        local external_deprecations=0
+        local actionable_warnings=0
+        local external_warnings=0
+        
+        if [ "$deprecation_count" -gt 0 ]; then
+            # Count actionable vs external deprecation warnings
+            actionable_deprecations=$(grep -E "(DeprecationWarning|PendingDeprecationWarning)" "$temp_output" | \
+                grep -v -E "(httpx/_models|aiohttp/connector|site-packages)" | wc -l 2>/dev/null || echo 0)
+            external_deprecations=$(grep -E "(DeprecationWarning|PendingDeprecationWarning)" "$temp_output" | \
+                grep -E "(httpx/_models|aiohttp/connector|site-packages)" | wc -l 2>/dev/null || echo 0)
+        fi
+        
+        if [ "$warning_count" -gt 0 ]; then
+            # Count actionable vs external other warnings
+            actionable_warnings=$(grep -E "(UserWarning|RuntimeWarning|FutureWarning)" "$temp_output" | \
+                grep -v -E "(site-packages|contextlib|pycares)" | wc -l 2>/dev/null || echo 0)
+            external_warnings=$(grep -E "(UserWarning|RuntimeWarning|FutureWarning)" "$temp_output" | \
+                grep -E "(site-packages|contextlib|pycares)" | wc -l 2>/dev/null || echo 0)
+        fi
+        
+        echo "🔴 ACTIONABLE DEPRECATIONS: $actionable_deprecations (require immediate fixes)" >> "$warnings_file"
+        echo "🟡 EXTERNAL DEPRECATIONS: $external_deprecations (library issues, monitor only)" >> "$warnings_file"
+        echo "🔵 ACTIONABLE WARNINGS: $actionable_warnings (code quality improvements)" >> "$warnings_file"
+        echo "🟢 EXTERNAL WARNINGS: $external_warnings (library issues, can be filtered)" >> "$warnings_file"
+        
+        echo "" >> "$warnings_file"
         echo "DEPRECATION WARNINGS (Priority: HIGH):" >> "$warnings_file"
         echo "$(echo "DEPRECATION WARNINGS (Priority: HIGH):" | sed 's/./=/g')" >> "$warnings_file"
         
-        # Extract deprecation warnings
+        # Extract deprecation warnings with intelligent categorization
         if [ "$deprecation_count" -gt 0 ]; then
-            grep -E "(DeprecationWarning|PendingDeprecationWarning)" "$temp_output" | \
-                sed 's/^/  → /' >> "$warnings_file" 2>/dev/null || echo "  No deprecation details available" >> "$warnings_file"
+            echo "  🔴 ACTIONABLE DEPRECATIONS ($actionable_deprecations found):" >> "$warnings_file"
+            if [ "$actionable_deprecations" -gt 0 ]; then
+                grep -E "(DeprecationWarning|PendingDeprecationWarning)" "$temp_output" | \
+                    grep -v -E "(httpx/_models|aiohttp/connector|site-packages)" | \
+                    sed 's/^/    → /' >> "$warnings_file" 2>/dev/null || echo "    No actionable deprecation details available" >> "$warnings_file"
+            else
+                echo "    ✓ No actionable deprecations found" >> "$warnings_file"
+            fi
+            echo "" >> "$warnings_file"
+            echo "  🟡 EXTERNAL DEPRECATIONS ($external_deprecations found):" >> "$warnings_file"
+            if [ "$external_deprecations" -gt 0 ]; then
+                grep -E "(DeprecationWarning|PendingDeprecationWarning)" "$temp_output" | \
+                    grep -E "(httpx/_models|aiohttp/connector|site-packages)" | \
+                    sed 's/^/    → /' >> "$warnings_file" 2>/dev/null || echo "    No external deprecation details available" >> "$warnings_file"
+            else
+                echo "    ✓ No external deprecations found" >> "$warnings_file"
+            fi
         else
             echo "  ✓ No deprecation warnings found" >> "$warnings_file"
         fi
@@ -334,10 +387,25 @@ EOF
         echo "OTHER WARNINGS (Priority: MEDIUM):" >> "$warnings_file"
         echo "$(echo "OTHER WARNINGS (Priority: MEDIUM):" | sed 's/./=/g')" >> "$warnings_file"
         
-        # Extract other warnings
+        # Extract other warnings with intelligent categorization
         if [ "$warning_count" -gt 0 ]; then
-            grep -E "(UserWarning|RuntimeWarning|FutureWarning)" "$temp_output" | \
-                sed 's/^/  → /' >> "$warnings_file" 2>/dev/null || echo "  No warning details available" >> "$warnings_file"
+            echo "  🔵 ACTIONABLE WARNINGS ($actionable_warnings found):" >> "$warnings_file"
+            if [ "$actionable_warnings" -gt 0 ]; then
+                grep -E "(UserWarning|RuntimeWarning|FutureWarning)" "$temp_output" | \
+                    grep -v -E "(site-packages|contextlib|pycares)" | \
+                    sed 's/^/    → /' >> "$warnings_file" 2>/dev/null || echo "    No actionable warning details available" >> "$warnings_file"
+            else
+                echo "    ✓ No actionable warnings found" >> "$warnings_file"
+            fi
+            echo "" >> "$warnings_file"
+            echo "  🟢 EXTERNAL WARNINGS ($external_warnings found):" >> "$warnings_file"
+            if [ "$external_warnings" -gt 0 ]; then
+                grep -E "(UserWarning|RuntimeWarning|FutureWarning)" "$temp_output" | \
+                    grep -E "(site-packages|contextlib|pycares)" | \
+                    sed 's/^/    → /' >> "$warnings_file" 2>/dev/null || echo "    No external warning details available" >> "$warnings_file"
+            else
+                echo "    ✓ No external warnings found" >> "$warnings_file"
+            fi
         else
             echo "  ✓ No other warnings found" >> "$warnings_file"
         fi
@@ -389,13 +457,22 @@ EOF
             ((action_num++))
         fi
         
-        if [ "$deprecation_count" -gt 0 ]; then
-            echo "$action_num. 🟡 URGENT: Fix $deprecation_count deprecation warnings to prevent future breaks" >> "$warnings_file"
+        if [ "$actionable_deprecations" -gt 0 ]; then
+            echo "$action_num. 🔴 URGENT: Fix $actionable_deprecations actionable deprecation warnings to prevent future breaks" >> "$warnings_file"
+            echo "   - Focus on code in our project (not external libraries)" >> "$warnings_file"
             ((action_num++))
         fi
         
-        if [ "$warning_count" -gt 0 ]; then
-            echo "$action_num. 🔵 QUALITY: Address $warning_count code quality warnings" >> "$warnings_file"
+        if [ "$actionable_warnings" -gt 0 ]; then
+            echo "$action_num. 🔵 QUALITY: Address $actionable_warnings actionable code quality warnings" >> "$warnings_file"
+            echo "   - Focus on code in our project (not external libraries)" >> "$warnings_file"
+            ((action_num++))
+        fi
+        
+        if [ "$external_deprecations" -gt 0 ] || [ "$external_warnings" -gt 0 ]; then
+            echo "$action_num. 🟢 MONITOR: $external_deprecations external deprecations and $external_warnings external warnings detected" >> "$warnings_file"
+            echo "   - These are from external libraries and can be filtered in pytest.ini if needed" >> "$warnings_file"
+            echo "   - No immediate action required, but monitor for library updates" >> "$warnings_file"
             ((action_num++))
         fi
         
@@ -570,7 +647,7 @@ parse_chunk_arguments() {
     
     if [ $# -eq 0 ]; then
         # No arguments - run all chunks
-        chunks_to_run=(1 2 3 4 5 6 7 8 9 10)
+        chunks_to_run=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
     else
         # Parse chunk arguments (e.g., "7a", "7b", "7c", "8")
         for arg in "$@"; do
@@ -585,9 +662,16 @@ parse_chunk_arguments() {
                 7b) chunks_to_run+=(8) ;;
                 7c) chunks_to_run+=(9) ;;
                 8) chunks_to_run+=(10) ;;
+                8a) chunks_to_run+=(10) ;;
+                8b) chunks_to_run+=(11) ;;
+                8c) chunks_to_run+=(12 13 14 15) ;;  # Legacy: run all 8c sub-chunks
+                8d) chunks_to_run+=(12) ;;
+                8e) chunks_to_run+=(13) ;;
+                8f) chunks_to_run+=(14) ;;
+                8g) chunks_to_run+=(15) ;;
                 *)
                     echo -e "${RED}❌ Invalid chunk: $arg${NC}"
-                    echo "Valid chunks: 1, 2, 3, 4, 5, 6, 7a, 7b, 7c, 8"
+                    echo "Valid chunks: 1, 2, 3, 4, 5, 6, 7a, 7b, 7c, 8a, 8b, 8c, 8d, 8e, 8f, 8g"
                     exit 1
                     ;;
             esac
@@ -643,8 +727,8 @@ main() {
     # Store start time after directory is created
     date +%s > "$RESULTS_DIR/.start_time"
     
-    if [ $total_chunks -eq 10 ]; then
-        log "Executing all 10 chunks in logical dependency order..."
+    if [ $total_chunks -eq 15 ]; then
+        log "Executing all 15 chunks in logical dependency order..."
     else
         log "Executing $total_chunks selected chunks..."
         chunk_names=()

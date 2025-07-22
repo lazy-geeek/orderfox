@@ -7,8 +7,8 @@ work together correctly for the liquidation volume visualization feature.
 
 import pytest
 
-# Chunk 8: Performance and load tests - Volume, load, advanced integration
-pytestmark = pytest.mark.chunk8
+# Chunk 8a: Integration & E2E Tests - End-to-end data flow validation
+pytestmark = pytest.mark.chunk8a
 import asyncio
 import json
 from fastapi.testclient import TestClient
@@ -137,7 +137,7 @@ class TestLiquidationVolumeE2E:
         from app.services.liquidation_service import liquidation_service
         
         # Mock initial state
-        liquidation_service.aggregation_buffers = {}
+        liquidation_service.aggregation_buffers = {}  # type: ignore
         
         # Simulate incoming liquidation
         test_liquidation = {
@@ -153,10 +153,10 @@ class TestLiquidationVolumeE2E:
         symbol = "BTCUSDT"
         
         # Initialize buffer if needed
-        if symbol not in liquidation_service.aggregation_buffers:
-            liquidation_service.aggregation_buffers[symbol] = {}
-        if timeframe not in liquidation_service.aggregation_buffers[symbol]:
-            liquidation_service.aggregation_buffers[symbol][timeframe] = {
+        if symbol not in liquidation_service.aggregation_buffers:  # type: ignore
+            liquidation_service.aggregation_buffers[symbol] = {}  # type: ignore
+        if timeframe not in liquidation_service.aggregation_buffers[symbol]:  # type: ignore
+            liquidation_service.aggregation_buffers[symbol][timeframe] = {  # type: ignore
                 "buy_volume": Decimal("0"),
                 "sell_volume": Decimal("0"),
                 "count": 0,
@@ -164,7 +164,7 @@ class TestLiquidationVolumeE2E:
             }
         
         # Update aggregation
-        buffer = liquidation_service.aggregation_buffers[symbol][timeframe]
+        buffer = liquidation_service.aggregation_buffers[symbol][timeframe]  # type: ignore
         volume = Decimal(test_liquidation["quantity"]) * Decimal(test_liquidation["priceUsdt"])
         
         if test_liquidation["side"].lower() == "buy":

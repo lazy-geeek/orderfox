@@ -38,7 +38,7 @@ class ConnectionManager:
         websocket: WebSocket,
         stream_key: str,
         stream_type: str = "orderbook",
-        display_symbol: str = None,
+        display_symbol: str | None = None,
     ):
         """Accept a new WebSocket connection for a stream."""
         logger.info(
@@ -299,6 +299,12 @@ class ConnectionManager:
                 if not task.cancelled():
                     task.cancel()
                     logger.debug(f"Task for {stream_key} cancelled successfully")
+                    # Schedule task cleanup to prevent pending task warnings
+                    try:
+                        asyncio.create_task(self._cleanup_cancelled_task(task))
+                    except RuntimeError:
+                        # No event loop running (e.g., during shutdown) - ignore
+                        pass
             except Exception as e:  # Catch potential errors during cancellation
                 logger.error(f"Error cancelling task for {stream_key}: {e}")
             del self.streaming_tasks[stream_key]
@@ -315,9 +321,20 @@ class ConnectionManager:
             logger.debug(
                 f"Attempted to stop streaming task for {stream_key}, but it was not found in streaming_tasks (possibly already stopped).")
 
+    async def _cleanup_cancelled_task(self, task):
+        """Helper method to properly clean up cancelled tasks to prevent pending task warnings."""
+        try:
+            await asyncio.wait_for(task, timeout=0.1)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            # Expected - task was cancelled or timed out, which is fine
+            pass
+        except Exception as e:
+            # Unexpected error, but don't propagate it
+            logger.debug(f"Unexpected error during task cleanup: {e}")
+
     # Enhanced orderbook connection with aggregation support
     async def connect_orderbook(
-        self, websocket: WebSocket, symbol: str, display_symbol: str = None,
+        self, websocket: WebSocket, symbol: str, display_symbol: str | None = None,
         limit: int = 20, rounding: float = 0.01
     ):
         """Accept a new WebSocket connection for orderbook with aggregation parameters."""

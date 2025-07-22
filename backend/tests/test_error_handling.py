@@ -79,7 +79,7 @@ class TestExchangeServiceErrorHandling:
     async def test_test_connection_success(self):
         """Test successful connection test."""
         mock_exchange = MagicMock()
-        mock_exchange.fetch_status = AsyncMock(return_value={"status": "ok"})
+        mock_exchange.fetch_status = MagicMock(return_value={"status": "ok"})
 
         with patch.object(
             self.exchange_service, "get_exchange", return_value=mock_exchange
@@ -209,7 +209,7 @@ class TestTradingEngineServiceErrorHandling:
         signal = await self.trading_engine.determine_signal("BTCUSDT", {})
         assert signal is None
 
-        signal = await self.trading_engine.determine_signal("BTCUSDT", None)
+        signal = await self.trading_engine.determine_signal("BTCUSDT", None)  # type: ignore
         assert signal is None
 
     @pytest.mark.asyncio

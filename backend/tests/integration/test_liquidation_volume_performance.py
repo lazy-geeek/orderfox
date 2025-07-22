@@ -7,8 +7,8 @@ feature maintains acceptable response times and resource usage.
 
 import pytest
 
-# Chunk 8: Performance and load tests - Volume, load, advanced integration
-pytestmark = pytest.mark.chunk8
+# Chunk 8b: Performance Tests - Response times, throughput, memory efficiency
+pytestmark = pytest.mark.chunk8b
 import asyncio
 import time
 import json

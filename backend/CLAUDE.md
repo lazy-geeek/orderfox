@@ -22,6 +22,38 @@ OrderFox backend is built with FastAPI and Python, providing real-time market da
 - **No flake8 or autopep8**: Pylance is the only linting tool used
 - **Type Hints**: All functions should have proper type annotations
 
+### Critical: Pyright CLI for Accurate Type Checking
+**🚨 IMPORTANT DISCOVERY**: The VS Code IDE diagnostic tools may not catch all Pylance errors that users see in their IDE. Always use pyright CLI for comprehensive type checking.
+
+**Recommended Pylance Validation Workflow:**
+```bash
+# 🎯 PRIMARY TYPE CHECKING METHOD - Matches VS Code Pylance exactly
+pyright app/                                    # Check entire app directory
+pyright app/core/database.py                    # Check specific file
+pyright --pythonversion 3.11 app/              # Check with specific Python version
+
+# 📊 Expected output for clean code:
+# "0 errors, 0 warnings, 0 informations"
+```
+
+**Why Use Pyright CLI:**
+- **Exact Match**: Reproduces the same errors users see in VS Code Pylance
+- **Real Error Detection**: Catches `reportArgumentType`, `reportGeneralTypeIssues`, and other Pylance diagnostics
+- **Comprehensive**: More thorough than IDE diagnostic tools
+- **CI/CD Ready**: Can be integrated into automated workflows
+
+**Common Error Types Caught:**
+- `reportArgumentType`: Type mismatches in function arguments (e.g., `None` passed to `str` parameter)
+- `reportGeneralTypeIssues`: Async/await mismatches (e.g., awaiting non-awaitable objects)
+- Import errors and missing type annotations
+- Type compatibility issues across the codebase
+
+**Integration Pattern:**
+```bash
+# Before committing any Python changes:
+pyright app/ && echo "✅ All Python files pass Pylance validation"
+```
+
 ## Testing
 
 ### Recommended Test Execution Approach
@@ -66,7 +98,12 @@ python -m pytest tests/integration/test_orderbook_websocket_real.py -v
 - **chunk7a**: Bot Integration (Paper trading flows) - 2 tests
 - **chunk7b**: Data Flow Integration (E2E formatting, liquidation volume) - 11 tests  
 - **chunk7c**: WebSocket Integration (Real WebSocket tests) - 25 tests
-- **chunk8**: Performance & Load Tests (28 tests)
+- **chunk8a**: Integration & E2E Tests (End-to-end data flow validation) - 6 tests
+- **chunk8b**: Performance Tests (Response times, throughput, memory efficiency) - 6 tests
+- **chunk8d**: Basic Load Tests (Aggregation latency, throughput, cache performance) - 4 tests
+- **chunk8e**: Connection & Memory Tests (Connection performance, memory scaling) - 4 tests
+- **chunk8f**: Scalability & Concurrency Tests (System limits, sustained load) - 3 tests
+- **chunk8g**: Extended Load Tests (High-volume scenarios, extended runtime) - 5 tests
 
 **Total: 617 tests across 37 test files**
 

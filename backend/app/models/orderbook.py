@@ -64,9 +64,8 @@ class OrderBook:
         """
         if snapshot.symbol != self.symbol:
             raise ValueError(
-                f"Symbol mismatch: expected {
-                    self.symbol}, got {
-                    snapshot.symbol}")
+                f"Symbol mismatch: expected {self.symbol}, got {snapshot.symbol}"
+            )
 
         async with self._lock:
             # Clear existing data

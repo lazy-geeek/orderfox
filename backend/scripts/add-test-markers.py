@@ -78,13 +78,40 @@ TEST_CHUNKS = {
             'integration/test_liquidation_volume_flow.py'
         ]
     },
-    'chunk8': {
-        'description': 'Performance and load tests - Volume, load, advanced integration',
+    'chunk8a': {
+        'description': 'Integration & E2E Tests - End-to-end data flow validation',
         'files': [
-            'integration/test_liquidation_volume_e2e.py',
-            'integration/test_liquidation_volume_performance.py',
-            'load/test_liquidation_volume_load.py',
+            'integration/test_liquidation_volume_e2e.py'
+        ]
+    },
+    'chunk8b': {
+        'description': 'Performance Tests - Response times, throughput, memory efficiency',
+        'files': [
+            'integration/test_liquidation_volume_performance.py'
+        ]
+    },
+    'chunk8d': {
+        'description': 'Basic Load Tests - Aggregation latency, throughput, cache performance',
+        'files': [
             'load/test_orderbook_performance.py'
+        ]
+    },
+    'chunk8e': {
+        'description': 'Connection & Memory Tests - Connection performance, memory scaling',
+        'files': [
+            'load/test_orderbook_performance.py'
+        ]
+    },
+    'chunk8f': {
+        'description': 'Scalability & Concurrency Tests - System limits, sustained load',
+        'files': [
+            'load/test_orderbook_performance.py'
+        ]
+    },
+    'chunk8g': {
+        'description': 'Extended Load Tests - High-volume scenarios, extended runtime',
+        'files': [
+            'load/test_liquidation_volume_load.py'
         ]
     }
 }

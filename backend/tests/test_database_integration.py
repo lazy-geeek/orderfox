@@ -10,7 +10,7 @@ from sqlmodel import select
 from uuid import uuid4
 
 from app.models.bot import Bot, BotCreate, BotUpdate
-from app.core.database import init_db, test_connection
+from app.core.database import init_db, check_database_connection
 
 
 @pytest.mark.database
@@ -126,7 +126,7 @@ class TestDatabaseIntegration:
         from sqlalchemy import func
         
         result = await test_session.execute(
-            select(func.count(Bot.id))
+            select(func.count()).select_from(Bot)
         )
         count = result.scalar()
         

@@ -159,6 +159,7 @@ async def liquidation_stream(
                     max_wait = 10  # seconds
                     wait_interval = 0.1  # 100ms
                     waited = 0
+                    time_range = None
                     
                     while waited < max_wait:
                         time_range = chart_data_service.time_range_cache.get(cache_key)

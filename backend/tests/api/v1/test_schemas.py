@@ -47,7 +47,7 @@ class TestSymbolInfo:
             "quoteAsset": "USDT",
             "uiName": "ETH/USDT",
         }
-        symbol_info = SymbolInfo(**symbol_data)
+        symbol_info = SymbolInfo(**symbol_data)  # type: ignore
         assert symbol_info.pricePrecision is None
         assert symbol_info.volume24h is None
 
@@ -80,7 +80,7 @@ class TestSymbolInfo:
         }
 
         with pytest.raises(ValidationError) as exc_info:
-            SymbolInfo(**symbol_data)
+            SymbolInfo(**symbol_data)  # type: ignore
 
         assert "id" in str(exc_info.value) or "ui_name" in str(exc_info.value)
 
@@ -95,7 +95,7 @@ class TestSymbolInfo:
             "pricePrecision": "invalid",  # Incorrect type
         }
         with pytest.raises(ValidationError) as exc_info:
-            SymbolInfo(**symbol_data)
+            SymbolInfo(**symbol_data)  # type: ignore
         assert "Input should be a valid integer" in str(exc_info.value)
 
 

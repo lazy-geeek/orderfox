@@ -32,7 +32,7 @@ logger = get_logger("main")
 # Configure debugpy for container debugging
 if DEVCONTAINER_MODE:
     try:
-        import debugpy
+        import debugpy  # type: ignore
         if not debugpy.is_client_connected():
             debugpy.listen(("0.0.0.0", 5678))
             logger.info("Debugpy listening on 0.0.0.0:5678")

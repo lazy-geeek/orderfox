@@ -61,6 +61,9 @@ class TestBotPaperTradingFlow:
         
         # Test 3: Update bot to toggle paper trading mode
         update_data = BotUpdate(
+            name="Paper Trading Bot",  # Required field
+            symbol="BTCUSDT",  # Required field
+            is_active=True,  # Required field
             is_paper_trading=False  # Switch to live trading
         )
         
@@ -74,6 +77,9 @@ class TestBotPaperTradingFlow:
         
         # Test 4: Toggle back to paper trading
         update_data2 = BotUpdate(
+            name="Paper Trading Bot",  # Required field
+            symbol="BTCUSDT",  # Required field
+            is_active=True,  # Required field
             is_paper_trading=True  # Switch back to paper trading
         )
         
@@ -86,8 +92,9 @@ class TestBotPaperTradingFlow:
         # Test 5: Verify field persists across bot updates
         update_data3 = BotUpdate(
             name="Updated Bot Name",
-            is_active=False
-            # Note: is_paper_trading not specified, should remain unchanged
+            symbol="BTCUSDT",  # Required field
+            is_active=False,
+            is_paper_trading=True  # Keep previous value
         )
         
         updated_bot3 = await bot_service.update_bot(bot_id, update_data3, test_session)
@@ -127,12 +134,16 @@ class TestBotPaperTradingFlow:
         
         # Update only the paper trading field
         update_data = BotUpdate(
+            name="Edge Case Bot",  # Required field
+            symbol="ADAUSDT",  # Required field
+            is_active=True,  # Required field
             is_paper_trading=False
         )
         
         updated_bot = await bot_service.update_bot(bot.id, update_data, test_session)
         
         # All other fields should remain unchanged
+        assert updated_bot is not None
         assert updated_bot.name == bot.name
         assert updated_bot.symbol == bot.symbol
         assert updated_bot.is_active == bot.is_active

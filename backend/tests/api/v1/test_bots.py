@@ -444,7 +444,7 @@ class TestBotsAPIUnit:
         routes = [route for route in router.routes if hasattr(route, 'response_model')]
         
         # Verify key routes have response models
-        route_paths = [route.path for route in routes]
+        route_paths = [getattr(route, 'path', str(route.path_regex.pattern)) for route in routes]  # type: ignore
         assert "" in route_paths  # create_bot and get_bots (root path)
         assert "/{bot_id}" in route_paths  # get_bot, update_bot, delete_bot
         assert "/symbols/active" in route_paths

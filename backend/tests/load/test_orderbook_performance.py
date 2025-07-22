@@ -1,7 +1,6 @@
 import pytest
 
-# Chunk 8: Performance and load tests - Volume, load, advanced integration
-pytestmark = pytest.mark.chunk8
+# Chunk 8d/8e/8f: Split across multiple chunks based on test complexity
 import asyncio
 import time
 import statistics
@@ -34,7 +33,7 @@ class TestOrderBookPerformance:
             orderbook_manager._aggregation_service = aggregation_service
             
             connection_manager = ConnectionManager()
-            connection_manager.orderbook_manager = orderbook_manager
+            connection_manager.orderbook_manager = orderbook_manager  # type: ignore
             
             return {
                 'aggregation_service': aggregation_service,
@@ -88,6 +87,7 @@ class TestOrderBookPerformance:
         """Test aggregation performance under various conditions."""
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8d
         async def test_aggregation_latency_single_request(self, performance_setup, large_orderbook_data):
             """Test aggregation latency for single requests."""
             setup = await performance_setup
@@ -133,6 +133,7 @@ class TestOrderBookPerformance:
             assert max_latency < 100, f"Max latency too high: {max_latency}ms"
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8d
         async def test_aggregation_throughput(self, performance_setup, large_orderbook_data):
             """Test aggregation throughput under concurrent load."""
             setup = await performance_setup
@@ -175,6 +176,7 @@ class TestOrderBookPerformance:
             assert throughput >= 100, f"Throughput too low: {throughput:.2f} req/s"
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8d
         async def test_cache_performance_impact(self, performance_setup, large_orderbook_data):
             """Test performance impact of caching."""
             setup = await performance_setup
@@ -210,6 +212,7 @@ class TestOrderBookPerformance:
             assert speedup >= 10, f"Cache speedup insufficient: {speedup:.1f}x"
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8d
         async def test_rounding_performance_scaling(self, performance_setup, large_orderbook_data):
             """Test how performance scales with different rounding values."""
             setup = await performance_setup
@@ -248,6 +251,7 @@ class TestOrderBookPerformance:
         """Test connection manager performance."""
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8e
         async def test_multiple_connections_performance(self, performance_setup, large_orderbook_data):
             """Test performance with multiple concurrent connections."""
             setup = await performance_setup
@@ -308,6 +312,7 @@ class TestOrderBookPerformance:
                 assert broadcast_time < 0.5, f"Broadcast too slow: {broadcast_time}s"
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8e
         async def test_parameter_update_performance(self, performance_setup, large_orderbook_data):
             """Test parameter update performance under load."""
             setup = await performance_setup
@@ -361,6 +366,7 @@ class TestOrderBookPerformance:
         """Test memory usage and cleanup performance."""
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8e
         async def test_memory_scaling_with_connections(self, performance_setup, large_orderbook_data):
             """Test memory scaling with number of connections."""
             setup = await performance_setup
@@ -412,6 +418,7 @@ class TestOrderBookPerformance:
                     assert ratio <= conn_ratio * 2, f"Memory scaling too aggressive: {ratio}x for {conn_ratio}x connections"
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8e
         async def test_cache_memory_bounds(self, performance_setup, large_orderbook_data):
             """Test that cache memory usage is bounded."""
             setup = await performance_setup
@@ -442,6 +449,7 @@ class TestOrderBookPerformance:
         """Test system behavior at scalability limits."""
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8f
         async def test_maximum_symbols_handling(self, performance_setup, large_orderbook_data):
             """Test handling maximum number of symbols."""
             setup = await performance_setup
@@ -478,6 +486,7 @@ class TestOrderBookPerformance:
                 assert stats['active_orderbooks'] == num_symbols
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8f
         async def test_sustained_load_stability(self, performance_setup, large_orderbook_data):
             """Test system stability under sustained load."""
             setup = await performance_setup
@@ -550,6 +559,7 @@ class TestOrderBookPerformance:
         """Test performance under high concurrency."""
 
         @pytest.mark.asyncio
+        @pytest.mark.chunk8f
         async def test_high_concurrency_aggregation(self, performance_setup, large_orderbook_data):
             """Test aggregation performance under high concurrency."""
             setup = await performance_setup

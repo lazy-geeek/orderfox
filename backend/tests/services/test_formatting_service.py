@@ -57,7 +57,7 @@ class TestFormattingService:
         """Test price formatting edge cases."""
         # Zero and None
         assert self.service.format_price(0) == "0.00"
-        assert self.service.format_price(None) == "0.00"
+        assert self.service.format_price(None) == "0.00"  # type: ignore
         
         # Very large numbers - prices should NOT use compact notation
         assert self.service.format_price(1500000) == "1500000.00"
@@ -103,7 +103,7 @@ class TestFormattingService:
         """Test amount formatting edge cases."""
         # Zero and None
         assert self.service.format_amount(0) == "0.00"
-        assert self.service.format_amount(None) == "0.00"
+        assert self.service.format_amount(None) == "0.00"  # type: ignore
         
         # No symbol info
         assert self.service.format_amount(123.456) == "123.46"
@@ -130,7 +130,7 @@ class TestFormattingService:
         """Test total formatting edge cases."""
         # Zero and None
         assert self.service.format_total(0) == "0.00"
-        assert self.service.format_total(None) == "0.00"
+        assert self.service.format_total(None) == "0.00"  # type: ignore
         
         # Negative totals
         assert self.service.format_total(-100.25) == "-100.25"
@@ -196,14 +196,14 @@ class TestFormattingService:
         # Invalid values should not crash
         with patch('app.services.formatting_service.logger') as mock_logger:
             # Test with invalid types
-            result = self.service.format_price("invalid")
+            result = self.service.format_price("invalid")  # type: ignore
             assert result == "invalid"
             mock_logger.warning.assert_called()
             
-            result = self.service.format_amount("invalid")
+            result = self.service.format_amount("invalid")  # type: ignore
             assert result == "invalid"
             
-            result = self.service.format_total("invalid")
+            result = self.service.format_total("invalid")  # type: ignore
             assert result == "invalid"
     
     def test_scientific_notation_thresholds(self):

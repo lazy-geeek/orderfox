@@ -137,7 +137,7 @@ async def multiple_bots(test_session: AsyncSession) -> list[Bot]:
 
 
 # Marker for tests that require database
-pytest.mark.database = pytest.mark.asyncio
+pytest.mark.database = pytest.mark.asyncio  # type: ignore
 
 
 # Marker for tests that require Docker (PostgreSQL)

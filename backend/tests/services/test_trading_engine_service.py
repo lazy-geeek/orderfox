@@ -77,7 +77,7 @@ class TestSignalDetermination:
     @pytest.mark.asyncio
     async def test_determine_signal_invalid_data_none(self):
         """Test signal determination with None data."""
-        signal = await self.trading_engine.determine_signal("BTCUSDT", None)
+        signal = await self.trading_engine.determine_signal("BTCUSDT", None)  # type: ignore
 
         assert signal is None
 
@@ -175,7 +175,7 @@ class TestTradeExecution:
         """Test trade execution with None symbol."""
         with pytest.raises(HTTPException) as exc_info:
             await self.trading_engine.execute_trade(
-                symbol=None, side="buy", amount=0.1, trade_type="market"
+                symbol=None, side="buy", amount=0.1, trade_type="market"  # type: ignore
             )
 
         assert exc_info.value.status_code == 400
@@ -429,7 +429,7 @@ class TestTradingModeManagement:
     async def test_set_trading_mode_none(self):
         """Test setting None trading mode."""
         with pytest.raises(HTTPException) as exc_info:
-            await self.trading_engine.set_trading_mode(None)
+            await self.trading_engine.set_trading_mode(None)  # type: ignore
 
         assert exc_info.value.status_code == 400
         assert "non-empty string" in exc_info.value.detail.lower()
@@ -438,7 +438,7 @@ class TestTradingModeManagement:
     async def test_set_trading_mode_non_string(self):
         """Test setting non-string trading mode."""
         with pytest.raises(HTTPException) as exc_info:
-            await self.trading_engine.set_trading_mode(123)
+            await self.trading_engine.set_trading_mode(123)  # type: ignore
 
         assert exc_info.value.status_code == 400
         assert "non-empty string" in exc_info.value.detail.lower()

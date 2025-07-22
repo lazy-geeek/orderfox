@@ -39,7 +39,7 @@ class TestOrderBookFullFlow:
     def connection_manager(self, fresh_orderbook_manager):
         """Create a connection manager with fresh orderbook manager."""
         manager = ConnectionManager()
-        manager.orderbook_manager = fresh_orderbook_manager
+        manager.orderbook_manager = fresh_orderbook_manager  # type: ignore
         yield manager
         # Cleanup will be handled by the test itself if needed
 

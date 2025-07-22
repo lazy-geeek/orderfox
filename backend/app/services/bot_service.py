@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import asyncio
 from sqlmodel import Session, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import case
+from sqlalchemy import case, desc, true
 from cachetools import TTLCache
 
 from app.models.bot import Bot, BotCreate, BotUpdate, BotPublic, BotList, BotSymbolStats
@@ -92,13 +92,13 @@ class BotService:
             offset = (page - 1) * page_size
             
             # Get total count
-            count_result = await session.execute(select(func.count(Bot.id)))
-            total = count_result.scalar()
+            count_result = await session.execute(select(func.count()).select_from(Bot))
+            total = count_result.scalar() or 0
             
             # Get bots
             result = await session.execute(
                 select(Bot)
-                .order_by(Bot.created_at.desc())
+                .order_by(desc("created_at"))
                 .offset(offset)
                 .limit(page_size)
             )
@@ -200,7 +200,7 @@ class BotService:
             # Ensure timestamp is different (add small delay)
             await asyncio.sleep(0.001)
             # Always update the timestamp (timezone-naive)
-            bot.updated_at = datetime.utcnow()
+            bot.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             
             # Commit changes
             await session.commit()
@@ -304,24 +304,33 @@ class BotService:
             result = await session.execute(
                 select(
                     Bot.symbol,
-                    func.count(Bot.id).label('total_count'),
-                    func.sum(
-                        case(
-                            (Bot.is_active == True, 1),
-                            else_=0
-                        )
-                    ).label('active_count')
+                    func.count().label('total_count')
                 )
+                .select_from(Bot)
                 .group_by(Bot.symbol)
                 .order_by(Bot.symbol)
             )
+            
+            # Query active counts separately
+            active_result = await session.execute(
+                select(
+                    Bot.symbol,
+                    func.count().label('active_count')
+                )
+                .select_from(Bot)
+                .where(Bot.is_active == True)
+                .group_by(Bot.symbol)
+            )
+            
+            # Create lookup for active counts
+            active_counts = {row.symbol: row.active_count for row in active_result}
             
             stats = []
             for row in result:
                 stat = BotSymbolStats(
                     symbol=row.symbol,
                     total_count=row.total_count,
-                    active_count=row.active_count or 0
+                    active_count=active_counts.get(row.symbol, 0)
                 )
                 stats.append(stat)
             
@@ -351,7 +360,7 @@ class BotService:
                 query = query.where(Bot.is_active == True)
             
             # Execute query
-            result = await session.execute(query.order_by(Bot.created_at.desc()))
+            result = await session.execute(query.order_by(desc("created_at")))
             bots = result.scalars().all()
             
             # Convert to public models
@@ -391,7 +400,7 @@ class BotService:
             bot.is_active = is_active
             # Ensure timestamp is different (add small delay)
             await asyncio.sleep(0.001)
-            bot.updated_at = datetime.utcnow()
+            bot.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             
             # Commit changes
             await session.commit()

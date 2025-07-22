@@ -82,7 +82,7 @@ async def init_db() -> None:
         raise
 
 
-async def test_connection() -> bool:
+async def check_database_connection() -> bool:
     """
     Test database connection.
     
@@ -93,7 +93,7 @@ async def test_connection() -> bool:
         async with async_session_factory() as session:
             # Simple query to test connection
             result = await session.execute(select(1))
-            await result.fetchone()
+            result.fetchone()
             logger.info("Database connection test successful")
             return True
     except Exception as e:

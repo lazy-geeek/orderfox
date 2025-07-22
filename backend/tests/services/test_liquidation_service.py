@@ -401,9 +401,12 @@ class TestLiquidationService:
     @pytest.mark.asyncio
     async def test_fetch_historical_liquidations_timeout(self):
         """Test handling of timeout errors"""
-        # Mock HTTP session that raises timeout
+        # Mock HTTP session with proper async context manager
         mock_session = AsyncMock()
-        mock_session.get.side_effect = asyncio.TimeoutError()
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__.side_effect = asyncio.TimeoutError()
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = MagicMock(return_value=mock_context_manager)
         
         with patch.object(liquidation_service, '_get_http_session', return_value=mock_session):
             result = await liquidation_service.fetch_historical_liquidations("HYPERUSDT")

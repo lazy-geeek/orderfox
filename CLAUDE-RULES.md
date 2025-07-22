@@ -22,7 +22,7 @@
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.
 
 ### When Implementing New Features or Changing Code  
-- All python files must pass Pylance linting and type checking and all JavaScript files must pass ESLint linting and type checking.
+- All python files must pass pyright linting and type checking and all JavaScript files must pass ESLint linting and type checking.
 - Do not git commit any changes yourself. Only commit changes when explicitly asked to do so.
 - When generating terminal outputs yourself or in the generated code, beautify the output using boxes, tables, symbols, colors and Terminal UI / ASCII-Art
 

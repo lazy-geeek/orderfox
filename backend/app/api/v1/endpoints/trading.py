@@ -88,9 +88,9 @@ async def execute_trade_endpoint(
                     symbol=str(position_info_data.get("symbol", "")),
                     side=str(position_info_data.get("side", "")),
                     size=float(position_info_data.get("amount", 0)),
-                    entryPrice=float(position_info_data.get("entry_price", 0)),
-                    markPrice=float(position_info_data.get("entry_price", 0)) * 1.0,
-                    unrealizedPnl=0.0,
+                    entryPrice=float(position_info_data.get("entryPrice", position_info_data.get("entry_price", 1))),
+                    markPrice=float(position_info_data.get("markPrice", position_info_data.get("mark_price", position_info_data.get("entryPrice", position_info_data.get("entry_price", 1))))),
+                    unrealizedPnl=float(position_info_data.get("unrealizedPnl", 0.0)),
                 )
             except Exception as e:
                 print(f"Error mapping positionInfo: {e}")
@@ -103,7 +103,7 @@ async def execute_trade_endpoint(
             positionInfo=position_info_schema,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Trade execution failed: {str(e)}")
 
 
 @router.get("/positions", response_model=List[PositionSchema])
@@ -144,13 +144,10 @@ async def get_open_positions_endpoint(
                     PositionSchema(
                         symbol=str(pos_data.get("symbol", "")),
                         side=str(pos_data.get("side", "")),
-                        size=float(pos_data.get("amount", 0)),
-                        entryPrice=float(pos_data.get("entry_price", 0)),
-                        markPrice=float(pos_data.get("entry_price", 0)) * 1.01,
-                        unrealizedPnl=(
-                            float(pos_data.get("entry_price", 0)) * 1.01
-                            - float(pos_data.get("entry_price", 0))
-                        ) * float(pos_data.get("amount", 0)),
+                        size=float(pos_data.get("size", pos_data.get("amount", 0))),
+                        entryPrice=float(pos_data.get("entryPrice", pos_data.get("entry_price", 1))),
+                        markPrice=float(pos_data.get("markPrice", pos_data.get("mark_price", pos_data.get("entryPrice", pos_data.get("entry_price", 1))))),
+                        unrealizedPnl=float(pos_data.get("unrealizedPnl", 0.0)),
                     )
                 )
             except Exception as e:
@@ -158,12 +155,12 @@ async def get_open_positions_endpoint(
                 # Skip malformed data or handle error
         return formatted_positions
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to fetch positions: {str(e)}")
 
 
 @router.post("/set_trading_mode", response_model=Dict[str, str])
 async def set_trading_mode_endpoint(
-    mode_data: Dict[str, str] = Body(..., example={"mode": "paper"}),
+    mode_data: Dict[str, str] = Body(..., examples=[{"mode": "paper"}]),
     service: TradingEngineService = Depends(get_trading_engine_service),
 ):
     """
@@ -202,4 +199,4 @@ async def set_trading_mode_endpoint(
     except HTTPException:
         raise  # Re-raise HTTPException
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to set trading mode: {str(e)}")

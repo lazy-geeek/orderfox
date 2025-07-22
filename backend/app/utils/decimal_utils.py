@@ -4,7 +4,7 @@ Avoids floating-point precision issues common in trading applications.
 """
 
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
-from typing import List
+from typing import List, Optional
 
 
 class DecimalUtils:
@@ -62,7 +62,7 @@ class DecimalUtils:
 
     @staticmethod
     def generate_power_of_10_options(base_precision: int, max_options: int = 7,
-                                     max_value: float = None) -> List[float]:
+                                     max_value: Optional[float] = None) -> List[float]:
         """
         Generate a list of rounding options based on powers of 10.
         Uses decimal arithmetic to avoid floating-point precision issues.

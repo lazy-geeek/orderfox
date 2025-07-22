@@ -307,6 +307,12 @@ class OrderBookAggregationService:
         multiplier = max(100, int(rounding * 100)) if rounding >= 1 else 100
         max_attempts = 5
         attempt = 0
+        
+        # Initialize variables to ensure they're always bound
+        raw_bids = []
+        raw_asks = []
+        aggregated_bids = []
+        aggregated_asks = []
 
         while attempt < max_attempts:
             # Get snapshot with current multiplier
