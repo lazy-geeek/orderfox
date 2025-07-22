@@ -1,4 +1,4 @@
-import { createChart } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts';
 
 // Convert UTC timestamp to local timezone for chart display
 function timeToLocal(originalTime) {
@@ -46,7 +46,7 @@ function createLightweightChart(container) {
   chartInstance = createChart(chartContainer, chartOptions);
   
   // Add candlestick series with adjusted margins
-  candlestickSeries = chartInstance.addCandlestickSeries(getCandlestickOptions());
+  candlestickSeries = chartInstance.addSeries(CandlestickSeries, getCandlestickOptions());
   
   // Adjust candlestick series to use top 60% of chart
   candlestickSeries.priceScale().applyOptions({
@@ -87,7 +87,7 @@ function getChartOptions(theme) {
   
   return {
     layout: {
-      background: { color: isDark ? '#1E2329' : '#FAFAFA' },
+      background: { type: ColorType.Solid, color: isDark ? '#1E2329' : '#FAFAFA' },
       textColor: isDark ? '#EAECEF' : '#1A1A1A',
     },
     grid: {
@@ -133,7 +133,7 @@ function createLiquidationVolumeSeries() {
   if (!chartInstance) return null;
   
   // Create histogram series as overlay
-  const series = chartInstance.addHistogramSeries({
+  const series = chartInstance.addSeries(HistogramSeries, {
     priceFormat: {
       type: 'volume',
     },

@@ -8,7 +8,7 @@ OrderFox frontend is built with vanilla JavaScript and Vite, providing a lightwe
 
 **Tech Stack:**
 - Build Tool: Vite for fast development and optimized production builds
-- Charts: TradingView Lightweight Charts for professional candlestick visualization
+- Charts: TradingView Lightweight Charts v5.0.8 for professional candlestick visualization
 - WebSocket: Real-time data streaming with automatic reconnection
 - State Management: Custom subscribe/notify pattern
 - CSS: Custom properties for theming, semantic class architecture
@@ -484,6 +484,16 @@ The liquidation volume histogram follows this pattern:
 - **Chart Initialization**: Buffer volume data in `pendingVolumeData` if chart not ready
 - **State Preservation**: Maintain `currentVolumeData` array for tooltips and state
 - **Troubleshooting**: If historical data disappears, verify `is_update` flag handling
+
+### TradingView Lightweight Charts v5.0 Patterns
+- **Version**: Using TradingView Lightweight Charts v5.0.8 (migrated from v4.2)
+- **Unified Series API**: Use `chart.addSeries(SeriesType, options)` instead of `chart.add[Type]Series()`
+- **Series Types**: Import `CandlestickSeries` and `HistogramSeries` explicitly
+- **Background Colors**: Use `{ type: ColorType.Solid, color: value }` format
+- **Import Pattern**: `import { createChart, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts';`
+- **Migration Complete**: All chart functionality verified working with v5.0 API
+- **Breaking Changes**: Series creation methods unified, ColorType required for backgrounds
+- **Compatibility**: All existing WebSocket updates, real-time data, and performance optimizations preserved
 
 ## Vite Configuration
 

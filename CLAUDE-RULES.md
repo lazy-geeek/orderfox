@@ -41,10 +41,12 @@
       """
   ```
 
+### Github CLI
+- When working with Github CLI, use a temporary file to store the issue body. This allows you to edit the issue body more easliy. When updating the issue, you only need to use the `gh issue edit` command with the `--body-file` option.
+
 ### 📚 Documentation & Explainability
 - **Update `README.md`** when new features are added, dependencies change, or setup steps are modified.
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
-- When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
 
 ### 🧠 AI Behavior Rules
 - **Never assume missing context. Ask questions if uncertain.**
