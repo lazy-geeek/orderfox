@@ -24,13 +24,13 @@ async function waitForServices() {
   while (retries < maxRetries) {
     try {
       // Check backend health
-      const backendResponse = await fetch('http://localhost:8000/health');
+      const backendResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:8000'}/health`);
       if (!backendResponse.ok) {
         throw new Error(`Backend health check failed: ${backendResponse.status}`);
       }
       
       // Check frontend
-      const frontendResponse = await fetch('http://localhost:3000');
+      const frontendResponse = await fetch(process.env.FRONTEND_URL || 'http://localhost:3000');
       if (!frontendResponse.ok) {
         throw new Error(`Frontend health check failed: ${frontendResponse.status}`);
       }
@@ -71,7 +71,7 @@ async function initializeTestDatabase() {
     
     for (const bot of testBots) {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/bots', {
+        const response = await fetch(`${process.env.BACKEND_URL || 'http://localhost:8000'}/api/v1/bots`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(bot)

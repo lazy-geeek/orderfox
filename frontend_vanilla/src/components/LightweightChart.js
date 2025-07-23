@@ -33,6 +33,7 @@ let pendingVolumeData = null; // Buffer volume data until chart is ready
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
   chartContainer.className = 'chart-container';
+  chartContainer.setAttribute('data-testid', 'chart-container');
   container.appendChild(chartContainer);
 
   // Get current theme

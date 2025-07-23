@@ -40,7 +40,7 @@ export const API_BASE_URL = getEnvVar('VITE_APP_API_BASE_URL',
   getProductionUrl('VITE_APP_API_BASE_URL', '/api/v1')
 );
 export const WS_BASE_URL = getEnvVar('VITE_APP_WS_BASE_URL', 
-  getProductionUrl('VITE_APP_WS_BASE_URL', 'ws://localhost:3000/api/v1')
+  getProductionUrl('VITE_APP_WS_BASE_URL', 'ws://localhost:8000/api/v1')
 );
 
 // Log current configuration (useful for debugging)

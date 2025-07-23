@@ -88,15 +88,64 @@ export const selectors = {
 };
 
 export const waitTimes = {
-  short: 1000,
-  medium: 3000,
-  long: 10000,  // Increased from 5000 to account for slow backend responses
-  webSocket: 10000
+  short: 500,    // Reduced for UI responsiveness
+  medium: 1000,  // Reduced for faster tests
+  long: 3000,    // Reduced for reasonable wait times
+  webSocket: 0,  // Removed - UI tests don't need to wait for WebSocket data
+  // Bot management specific timeouts (involve API calls + DB operations)
+  botOperation: 7000,  // Bot CRUD operations with API calls
+  modalClose: 5000,    // Modal close after API operations (single project)
+  modalCloseComplete: 10000,  // Extended timeout for complete suite runs
+  listRefresh: 4000    // Bot list refresh after operations
 };
 
 export const testConfig = {
-  baseURL: 'http://localhost:3000',
-  apiURL: 'http://localhost:8000/api/v1',
+  baseURL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  apiURL: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/api/v1` : 'http://localhost:8000/api/v1',
   timeout: 30000,
   retries: 2
 };
+
+/**
+ * Robust modal close waiting with retry logic for resource contention
+ * @param {Page} page - Playwright page object
+ * @param {string} modalSelector - CSS selector for the modal
+ * @returns {Promise<void>}
+ */
+export async function waitForModalClose(page, modalSelector) {
+  try {
+    // First attempt with standard timeout
+    await page.waitForSelector(modalSelector, { state: 'hidden', timeout: waitTimes.modalClose });
+  } catch (error) {
+    // If first attempt fails, try with extended timeout (for complete suite runs with resource contention)
+    console.log('Modal close timeout - retrying with extended timeout for resource contention...');
+    
+    // Add a small delay to let any pending operations complete
+    await page.waitForTimeout(waitTimes.short);
+    
+    // Extended retry with longer timeout
+    await page.waitForSelector(modalSelector, { state: 'hidden', timeout: waitTimes.modalCloseComplete });
+  }
+}
+
+/**
+ * Robust list loading waiting with retry logic for resource contention
+ * @param {Page} page - Playwright page object
+ * @param {string} loadingSelector - CSS selector for the loading indicator
+ * @returns {Promise<void>}
+ */
+export async function waitForListLoadingComplete(page, loadingSelector) {
+  try {
+    // First attempt with standard timeout
+    await page.waitForSelector(loadingSelector, { state: 'hidden', timeout: waitTimes.listRefresh });
+  } catch (error) {
+    // If first attempt fails, try with extended timeout (for complete suite runs with resource contention)
+    console.log('List loading timeout - retrying with extended timeout for resource contention...');
+    
+    // Add a small delay to let any pending operations complete
+    await page.waitForTimeout(waitTimes.short);
+    
+    // Extended retry with longer timeout (8 seconds for bot list operations)
+    await page.waitForSelector(loadingSelector, { state: 'hidden', timeout: 8000 });
+  }
+}

@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { testUserActions, selectors, waitTimes } from './fixtures/test-data.js';
+import { testUserActions, selectors, waitTimes, waitForModalClose, waitForListLoadingComplete } from './fixtures/test-data.js';
 
 test.describe('Bot Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -69,8 +69,9 @@ test.describe('Bot Management', () => {
     // Save bot
     await page.click(selectors.saveBotButton);
     
-    // Wait for modal to close
-    await page.waitForSelector(selectors.botEditorModal, { state: 'hidden', timeout: waitTimes.long });
+    // Wait for API call to complete and modal to close
+    await page.waitForLoadState('networkidle');  // Wait for API call
+    await waitForModalClose(page, selectors.botEditorModal);
     
     // Wait a moment for the bot list to update
     await page.waitForTimeout(waitTimes.short);
@@ -112,8 +113,9 @@ test.describe('Bot Management', () => {
     // Save changes
     await page.click(selectors.saveBotButton);
     
-    // Wait for modal to close
-    await page.waitForSelector(selectors.botEditorModal, { state: 'hidden', timeout: waitTimes.long });
+    // Wait for API call to complete and modal to close
+    await page.waitForLoadState('networkidle');  // Wait for API call
+    await waitForModalClose(page, selectors.botEditorModal);
     
     // Wait a moment for the bot list to update
     await page.waitForTimeout(waitTimes.short);
@@ -147,7 +149,8 @@ test.describe('Bot Management', () => {
     
     // Wait for bot list to reload after toggle
     await page.waitForSelector('#bot-list-loading', { state: 'visible' });
-    await page.waitForSelector('#bot-list-loading', { state: 'hidden', timeout: waitTimes.long });
+    await page.waitForLoadState('networkidle');  // Wait for API call
+    await waitForListLoadingComplete(page, '#bot-list-loading');
     
     // Find the bot again after reload and check its new status
     const updatedBot = page.locator(selectors.botCard).first();
@@ -165,8 +168,9 @@ test.describe('Bot Management', () => {
     await page.selectOption(selectors.botSymbolSelect, 'BTCUSDT');
     await page.click(selectors.saveBotButton);
     
-    // Wait for modal to close
-    await page.waitForSelector(selectors.botEditorModal, { state: 'hidden', timeout: waitTimes.long });
+    // Wait for API call to complete and modal to close
+    await page.waitForLoadState('networkidle');  // Wait for API call
+    await waitForModalClose(page, selectors.botEditorModal);
     
     // Find the bot we just created
     const botToDelete = page.locator(selectors.botCard).filter({ hasText: testBotName });
@@ -278,8 +282,9 @@ test.describe('Bot Management', () => {
     await page.selectOption(selectors.botSymbolSelect, 'ETHUSDT');
     await page.click(selectors.saveBotButton);
     
-    // Wait for modal to close
-    await page.waitForSelector(selectors.botEditorModal, { state: 'hidden', timeout: waitTimes.long });
+    // Wait for API call to complete and modal to close
+    await page.waitForLoadState('networkidle');  // Wait for API call
+    await waitForModalClose(page, selectors.botEditorModal);
     
     // Wait a moment for the bot list to update
     await page.waitForTimeout(waitTimes.short);
