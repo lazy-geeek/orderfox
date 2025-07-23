@@ -9,27 +9,26 @@ import { createBotNavigation } from '../../src/components/BotNavigation.js';
 
 // Mock the individual components
 vi.mock('../../src/components/OrderBookDisplay.js', () => ({
-  createOrderBookDisplay: vi.fn(() => ({
-    element: (() => {
-      const div = document.createElement('div');
-      div.className = 'order-book-display';
-      div.setAttribute('data-testid', 'order-book-display');
-      return div;
-    })(),
-    destroy: vi.fn()
-  }))
+  createOrderBookDisplay: vi.fn(() => {
+    const div = document.createElement('div');
+    div.className = 'order-book-display';
+    div.setAttribute('data-testid', 'order-book-display');
+    return div;
+  }),
+  updateOrderBookDisplay: vi.fn()
 }));
 
 vi.mock('../../src/components/LastTradesDisplay.js', () => ({
-  createLastTradesDisplay: vi.fn(() => ({
-    element: (() => {
-      const div = document.createElement('div');
-      div.className = 'last-trades-display';
-      div.setAttribute('data-testid', 'last-trades-display');
-      return div;
-    })(),
-    destroy: vi.fn()
-  }))
+  createLastTradesDisplay: vi.fn(() => {
+    const div = document.createElement('div');
+    div.className = 'last-trades-display';
+    div.setAttribute('data-testid', 'last-trades-display');
+    return div;
+  }),
+  updateLastTradesDisplay: vi.fn(),
+  updateTradesHeaders: vi.fn(),
+  updateLastTradesData: vi.fn(),
+  updateTradesConnectionStatus: vi.fn()
 }));
 
 vi.mock('../../src/components/LiquidationDisplay.js', () => ({
@@ -216,7 +215,6 @@ describe('Layout Integration Tests', () => {
 
     it('should handle content overflow properly', () => {
       const leftSection = mainLayout.querySelector('.left-section');
-      const rightSection = mainLayout.querySelector('.right-section');
       const mainContent = mainLayout.querySelector('#main-content');
       
       // Verify overflow handling

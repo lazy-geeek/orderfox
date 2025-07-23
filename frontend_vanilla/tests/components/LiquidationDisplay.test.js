@@ -17,7 +17,11 @@ vi.mock('../../src/store/store.js', () => ({
     currentLiquidations: [],
     liquidationsWsConnected: false,
     liquidationsLoading: false
-  }
+  },
+  setLiquidationsWsConnected: vi.fn(),
+  setLiquidationsLoading: vi.fn(),
+  setLiquidationsError: vi.fn(),
+  clearLiquidationsError: vi.fn()
 }));
 
 vi.mock('../../src/services/websocketService.js', () => ({
@@ -64,7 +68,8 @@ describe('LiquidationDisplay', () => {
       display = new LiquidationDisplay(container);
       
       expect(container.querySelector('.orderfox-liquidation-display')).toBeTruthy();
-      expect(container.querySelector('.display-header h3').textContent).toBe('Liquidations');
+      expect(container.querySelector('.display-header')).toBeTruthy();
+      expect(container.querySelector('.symbol-label')).toBeTruthy();
       expect(container.querySelector('.liquidation-header')).toBeTruthy();
       expect(container.querySelector('#liquidation-list')).toBeTruthy();
     });
@@ -75,7 +80,7 @@ describe('LiquidationDisplay', () => {
       const headers = container.querySelectorAll('.liquidation-header span');
       expect(headers).toHaveLength(3);
       expect(headers[0].textContent).toBe('Amount (USDT)');
-      expect(headers[1].textContent).toBe('Quantity (BTC)'); // Updated because state has BTCUSDT selected
+      expect(headers[1].textContent).toBe('Quantity (BTC)'); // Updated by state subscription on init
       expect(headers[2].textContent).toBe('Time');
     });
   });
@@ -87,11 +92,11 @@ describe('LiquidationDisplay', () => {
     
     it('should display liquidation data correctly', () => {
       const mockLiquidation = {
-        symbol: "BTCUSDT",
-        side: "SELL",
-        quantityFormatted: "0.014",
-        priceUsdtFormatted: "139",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'SELL',
+        quantityFormatted: '0.014',
+        priceUsdtFormatted: '139',
+        displayTime: '14:27:40'
       };
       
       display.addLiquidation(mockLiquidation);
@@ -109,19 +114,19 @@ describe('LiquidationDisplay', () => {
     
     it('should color code buy/sell sides correctly', () => {
       const buyLiquidation = {
-        symbol: "BTCUSDT",
-        side: "BUY",
-        quantityFormatted: "0.014",
-        priceUsdtFormatted: "139",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        quantityFormatted: '0.014',
+        priceUsdtFormatted: '139',
+        displayTime: '14:27:40'
       };
       
       const sellLiquidation = {
-        symbol: "BTCUSDT",
-        side: "SELL", 
-        quantityFormatted: "0.014",
-        priceUsdtFormatted: "138",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'SELL', 
+        quantityFormatted: '0.014',
+        priceUsdtFormatted: '138',
+        displayTime: '14:27:40'
       };
       
       display.addLiquidation(buyLiquidation);
@@ -142,8 +147,8 @@ describe('LiquidationDisplay', () => {
       // Add 10 liquidations
       for (let i = 0; i < 10; i++) {
         display.addLiquidation({
-          symbol: "BTCUSDT",
-          side: i % 2 === 0 ? "BUY" : "SELL",
+          symbol: 'BTCUSDT',
+          side: i % 2 === 0 ? 'BUY' : 'SELL',
           quantityFormatted: `${i}.000`,
           priceUsdtFormatted: `${i * 100}.00`,
           displayTime: `14:27:${i}0`
@@ -157,11 +162,11 @@ describe('LiquidationDisplay', () => {
     
     it('should display comma-formatted prices correctly', () => {
       const mockLiquidation = {
-        symbol: "BTCUSDT",
-        side: "SELL",
-        quantityFormatted: "0.5",
-        priceUsdtFormatted: "22,839",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'SELL',
+        quantityFormatted: '0.5',
+        priceUsdtFormatted: '22,839',
+        displayTime: '14:27:40'
       };
       
       display.addLiquidation(mockLiquidation);
@@ -176,11 +181,11 @@ describe('LiquidationDisplay', () => {
       expect(container.querySelector('.empty-state')).toBeTruthy();
       
       display.addLiquidation({
-        symbol: "BTCUSDT",
-        side: "BUY",
-        quantityFormatted: "0.014",
-        priceUsdtFormatted: "138.74",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        quantityFormatted: '0.014',
+        priceUsdtFormatted: '138.74',
+        displayTime: '14:27:40'
       });
       
       expect(container.querySelector('.empty-state')).toBeFalsy();
@@ -226,11 +231,11 @@ describe('LiquidationDisplay', () => {
         initial: true,
         data: [
           {
-            symbol: "BTCUSDT",
-            side: "SELL",
-            quantityFormatted: "0.014",
-            priceUsdtFormatted: "138.74",
-            displayTime: "14:27:40"
+            symbol: 'BTCUSDT',
+            side: 'SELL',
+            quantityFormatted: '0.014',
+            priceUsdtFormatted: '138.74',
+            displayTime: '14:27:40'
           }
         ]
       };
@@ -248,11 +253,11 @@ describe('LiquidationDisplay', () => {
       const updateData = {
         type: 'liquidation',
         data: {
-          symbol: "BTCUSDT",
-          side: "BUY",
-          quantityFormatted: "0.014",
-          priceUsdtFormatted: "138.74",
-          displayTime: "14:27:40"
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          quantityFormatted: '0.014',
+          priceUsdtFormatted: '138.74',
+          displayTime: '14:27:40'
         }
       };
       
@@ -315,12 +320,12 @@ describe('LiquidationDisplay', () => {
       const updateData = {
         type: 'liquidation',
         data: {
-          symbol: "XRPUSDT",
-          side: "BUY",
-          quantityFormatted: "100.000",
-          priceUsdtFormatted: "50",
-          displayTime: "14:27:40",
-          baseAsset: "XRP"
+          symbol: 'XRPUSDT',
+          side: 'BUY',
+          quantityFormatted: '100.000',
+          priceUsdtFormatted: '50',
+          displayTime: '14:27:40',
+          baseAsset: 'XRP'
         }
       };
       
@@ -352,11 +357,11 @@ describe('LiquidationDisplay', () => {
     
     it('should render liquidation items with 3 columns', () => {
       const mockLiquidation = {
-        symbol: "BTCUSDT",
-        side: "SELL",
-        quantityFormatted: "0.014",
-        priceUsdtFormatted: "139",
-        displayTime: "14:27:40"
+        symbol: 'BTCUSDT',
+        side: 'SELL',
+        quantityFormatted: '0.014',
+        priceUsdtFormatted: '139',
+        displayTime: '14:27:40'
       };
       
       display.addLiquidation(mockLiquidation);

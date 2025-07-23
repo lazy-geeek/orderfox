@@ -7,17 +7,24 @@ import { createTabbedTradingDisplay } from '../../src/components/TabbedTradingDi
 
 // Mock the individual components
 vi.mock('../../src/components/OrderBookDisplay.js', () => ({
-  createOrderBookDisplay: vi.fn(() => ({
-    element: document.createElement('div'),
-    destroy: vi.fn()
-  }))
+  createOrderBookDisplay: vi.fn(() => {
+    const div = document.createElement('div');
+    div.className = 'order-book-display';
+    return div;
+  }),
+  updateOrderBookDisplay: vi.fn()
 }));
 
 vi.mock('../../src/components/LastTradesDisplay.js', () => ({
-  createLastTradesDisplay: vi.fn(() => ({
-    element: document.createElement('div'),
-    destroy: vi.fn()
-  }))
+  createLastTradesDisplay: vi.fn(() => {
+    const div = document.createElement('div');
+    div.className = 'last-trades-display';
+    return div;
+  }),
+  updateLastTradesDisplay: vi.fn(),
+  updateTradesHeaders: vi.fn(),
+  updateLastTradesData: vi.fn(),
+  updateTradesConnectionStatus: vi.fn()
 }));
 
 vi.mock('../../src/components/LiquidationDisplay.js', () => ({

@@ -9,8 +9,7 @@ import {
   setState,
   setSelectedBotId,
   getSelectedBot,
-  setSelectedSymbol,
-  setSelectedTimeframe
+  setSelectedSymbol
 } from '../../src/store/store.js';
 import { resetZoomState } from '../../src/components/LightweightChart.js';
 import { 

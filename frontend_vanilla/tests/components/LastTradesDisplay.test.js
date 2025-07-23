@@ -31,7 +31,7 @@ describe('LastTradesDisplay', () => {
       // Check header structure
       const header = container.querySelector('.display-header');
       expect(header).toBeTruthy();
-      expect(header.querySelector('h3').textContent).toBe('Trades');
+      expect(header.querySelector('.symbol-label')).toBeTruthy();
       
       // Check connection status elements
       const statusIndicator = container.querySelector('.status-indicator');

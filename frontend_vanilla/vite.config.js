@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [
@@ -38,4 +38,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['lightweight-charts']
   }
-})
+});

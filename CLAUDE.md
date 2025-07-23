@@ -179,8 +179,8 @@ npm run dev                    # Smart server management (see Server Management 
 npm run dev:bg                 # Claude Code: Start servers in background
 npm run dev:status             # Check server status
 npm run dev:restart            # Stop servers, clean logs, and restart
-npm run lint                   # Frontend linting
-npm run lint:fix              # Auto-fix frontend linting issues
+npm run lint                   # Frontend ESLint (source, tests, config files)
+npm run lint:fix              # Auto-fix ESLint issues across all JavaScript files
 npm run typecheck              # Backend type checking (Pylance)
 
 # 🎯 CRITICAL: ACCURATE PYTHON TYPE CHECKING

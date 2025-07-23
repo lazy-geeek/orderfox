@@ -17,7 +17,6 @@ const createTestableUpdateFunction = () => {
   let pendingVolumeData = null;
   
   // Mock console for testing
-  const originalConsole = { ...console };
   
   // The actual function implementation (copied from LightweightChart.js)
   function timeToLocal(time) {

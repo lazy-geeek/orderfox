@@ -1,5 +1,5 @@
 // @ts-check
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Debug Console Errors', () => {
   test('should capture JavaScript console errors', async ({ page }) => {

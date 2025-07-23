@@ -2,7 +2,6 @@
  * Global setup for Playwright tests
  * Initializes test database and creates necessary test data
  */
-import { chromium } from '@playwright/test';
 
 async function globalSetup() {
   console.log('🔧 Setting up test environment...');

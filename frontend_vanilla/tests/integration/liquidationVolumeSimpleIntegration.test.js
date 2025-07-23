@@ -23,12 +23,12 @@ describe('Liquidation Volume Simple Integration Tests', () => {
         data: [
           {
             time: 1640995200,
-            buy_volume: "15000.0",
-            sell_volume: "25000.0",
-            total_volume: "40000.0",
-            buy_volume_formatted: "15,000.00",
-            sell_volume_formatted: "25,000.00",
-            total_volume_formatted: "40,000.00",
+            buy_volume: '15000.0',
+            sell_volume: '25000.0',
+            total_volume: '40000.0',
+            buy_volume_formatted: '15,000.00',
+            sell_volume_formatted: '25,000.00',
+            total_volume_formatted: '40,000.00',
             count: 50,
             timestamp_ms: 1640995200000
           }
@@ -49,7 +49,7 @@ describe('Liquidation Volume Simple Integration Tests', () => {
       expect(data.symbol).toBe('BTCUSDT');
       expect(data.timeframe).toBe('1m');
       expect(data.data).toHaveLength(1);
-      expect(data.data[0].total_volume).toBe("40000.0");
+      expect(data.data[0].total_volume).toBe('40000.0');
       
       // 2. Data Processing for Chart
       const chartData = data.data.map(item => ({
@@ -71,12 +71,12 @@ describe('Liquidation Volume Simple Integration Tests', () => {
         timeframe: '1m',
         data: [{
           time: 1640995260,
-          buy_volume: "5000.0",
-          sell_volume: "3000.0",
-          total_volume: "8000.0",
-          buy_volume_formatted: "5,000.00",
-          sell_volume_formatted: "3,000.00",
-          total_volume_formatted: "8,000.00",
+          buy_volume: '5000.0',
+          sell_volume: '3000.0',
+          total_volume: '8000.0',
+          buy_volume_formatted: '5,000.00',
+          sell_volume_formatted: '3,000.00',
+          total_volume_formatted: '8,000.00',
           count: 15,
           timestamp_ms: 1640995260000
         }],
@@ -100,10 +100,10 @@ describe('Liquidation Volume Simple Integration Tests', () => {
     it('should handle multiple timeframes correctly', async () => {
       const timeframes = ['1m', '5m', '15m', '1h'];
       const mockResponses = {
-        '1m': { total_volume: "40000.0", candles: 60 },
-        '5m': { total_volume: "200000.0", candles: 12 },
-        '15m': { total_volume: "600000.0", candles: 4 },
-        '1h': { total_volume: "2400000.0", candles: 1 }
+        '1m': { total_volume: '40000.0', candles: 60 },
+        '5m': { total_volume: '200000.0', candles: 12 },
+        '15m': { total_volume: '600000.0', candles: 4 },
+        '1h': { total_volume: '2400000.0', candles: 1 }
       };
       
       for (const timeframe of timeframes) {
@@ -115,8 +115,8 @@ describe('Liquidation Volume Simple Integration Tests', () => {
             data: Array(mockResponses[timeframe].candles).fill({
               time: 1640995200,
               total_volume: mockResponses[timeframe].total_volume,
-              buy_volume: "1000.0",
-              sell_volume: "2000.0"
+              buy_volume: '1000.0',
+              sell_volume: '2000.0'
             })
           })
         });
@@ -161,18 +161,18 @@ describe('Liquidation Volume Simple Integration Tests', () => {
       const rawData = [
         {
           time: 1640995200,
-          buy_volume: "15000.0",
-          sell_volume: "25000.0"
+          buy_volume: '15000.0',
+          sell_volume: '25000.0'
         },
         {
           time: 1640995260,
-          buy_volume: "8000.0",
-          sell_volume: "12000.0"
+          buy_volume: '8000.0',
+          sell_volume: '12000.0'
         },
         {
           time: 1640995320,
-          buy_volume: "20000.0",
-          sell_volume: "10000.0"
+          buy_volume: '20000.0',
+          sell_volume: '10000.0'
         }
       ];
       
@@ -251,7 +251,7 @@ describe('Liquidation Volume Simple Integration Tests', () => {
           json: async () => ({
             symbol: 'BTCUSDT',
             timeframe: '1m',
-            data: [{ time: 1640995200, total_volume: "1000.0" }]
+            data: [{ time: 1640995200, total_volume: '1000.0' }]
           })
         });
         

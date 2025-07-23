@@ -16,7 +16,9 @@ OrderFox frontend is built with vanilla JavaScript and Vite, providing a lightwe
 ## Code Quality Standards
 
 ### JavaScript/ESLint Requirements
-- **Linting**: ESLint with no errors or warnings
+- **Linting**: ESLint with no errors or warnings across all JavaScript files
+- **File Coverage**: Source files, test files, and configuration files
+- **Exclusions**: node_modules, dist, build directories excluded via .eslintignore
 - **Run lint check**: `npm run lint`
 - **Auto-fix issues**: `npm run lint:fix`
 - **Style Guide**: Follow existing patterns in codebase

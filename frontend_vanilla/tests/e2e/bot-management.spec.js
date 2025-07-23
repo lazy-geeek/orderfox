@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { testBots, testUserActions, selectors, waitTimes } from './fixtures/test-data.js';
+import { testUserActions, selectors, waitTimes } from './fixtures/test-data.js';
 
 test.describe('Bot Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -235,8 +235,6 @@ test.describe('Bot Management', () => {
 
   test('should display loading states', async ({ page }) => {
     // Check for loading spinner during initial load
-    const loadingSpinner = page.locator(selectors.loadingSpinner);
-    
     // Loading spinner might appear briefly during page load
     // We don't assert its presence since it might be too fast to catch
     
