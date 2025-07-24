@@ -169,7 +169,7 @@ function createLiquidationVolumeSeries() {
     priceScaleId: '', // Empty string makes it an overlay
     scaleMargins: {
       top: 0.7,    // Start 70% from top
-      bottom: 0,   // Extend to bottom
+      bottom: 0,   // Extend to bottom - now safe with overflow: visible
     },
     lastValueVisible: false, // Don't show last value label
     priceLineVisible: false, // Don't show horizontal price line
@@ -213,7 +213,7 @@ function adjustChartMarginsForScreenSize(width) {
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: 0.65,  // Adjusted for overlay
-        bottom: 0,
+        bottom: 0,   // No margin needed with overflow: visible
       },
     });
   } else if (isMobile) {
@@ -227,7 +227,7 @@ function adjustChartMarginsForScreenSize(width) {
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: 0.65,  // Adjusted for overlay
-        bottom: 0,
+        bottom: 0,   // No margin needed with overflow: visible
       },
     });
   } else {
@@ -241,7 +241,7 @@ function adjustChartMarginsForScreenSize(width) {
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: 0.7,   // Standard overlay position
-        bottom: 0,
+        bottom: 0,   // No margin needed with overflow: visible
       },
     });
   }
