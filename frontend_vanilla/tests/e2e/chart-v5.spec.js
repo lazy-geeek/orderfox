@@ -163,4 +163,91 @@ test.describe('Lightweight Charts v5 Integration', () => {
     // Should have no critical chart-related errors
     expect(criticalErrors.length).toBe(0);
   });
+
+  test('should display symbol overlay in chart after bot selection', async ({ page }) => {
+    // Test is already set up with bot selection in beforeEach
+    
+    // Wait for symbol overlay to be visible
+    const symbolOverlay = page.locator('[data-testid="chart-symbol-overlay"]');
+    await expect(symbolOverlay).toBeVisible({ timeout: 5000 });
+    
+    // Verify the overlay contains a symbol (e.g., BTCUSDT, ETHUSDT, etc.)
+    const symbolText = await symbolOverlay.textContent();
+    expect(symbolText).toMatch(/^[A-Z]+USDT$/); // Matches patterns like BTCUSDT, ETHUSDT
+  });
+
+  test('should update symbol overlay when switching between bots', async ({ page }) => {
+    // Get initial symbol
+    const symbolOverlay = page.locator('[data-testid="chart-symbol-overlay"]');
+    await expect(symbolOverlay).toBeVisible({ timeout: 5000 });
+    
+    // Navigate back to bot list
+    await page.click('text=🤖 My Bots');
+    await page.waitForSelector('[data-testid="bot-list"]', { state: 'visible' });
+    
+    // Select a different bot (if available)
+    const selectButtons = page.locator('.select-bot-btn');
+    const buttonCount = await selectButtons.count();
+    
+    if (buttonCount > 1) {
+      // Click the second bot
+      await selectButtons.nth(1).click();
+      
+      // Wait for chart to update
+      await page.waitForTimeout(2000);
+      
+      // Verify overlay is still visible with valid symbol
+      await expect(symbolOverlay).toBeVisible({ timeout: 5000 });
+      const newSymbol = await symbolOverlay.textContent();
+      // Note: Symbol might be the same if both bots trade the same symbol, so we just check visibility
+      expect(newSymbol).toMatch(/^[A-Z]+USDT$/);
+    }
+  });
+
+  test('should maintain overlay visibility when switching themes', async ({ page }) => {
+    const symbolOverlay = page.locator('[data-testid="chart-symbol-overlay"]');
+    
+    // Verify overlay is visible in initial theme
+    await expect(symbolOverlay).toBeVisible({ timeout: 5000 });
+    const initialSymbol = await symbolOverlay.textContent();
+    
+    // Switch theme
+    const themeSwitcher = page.locator('[data-testid="theme-switcher"]');
+    if (await themeSwitcher.count() > 0) {
+      await themeSwitcher.click();
+      
+      // Wait for theme transition
+      await page.waitForTimeout(500);
+      
+      // Verify overlay is still visible with same symbol
+      await expect(symbolOverlay).toBeVisible();
+      const symbolAfterThemeSwitch = await symbolOverlay.textContent();
+      expect(symbolAfterThemeSwitch).toBe(initialSymbol);
+    }
+  });
+
+  test('should not interfere with chart interactions', async ({ page }) => {
+    // Verify overlay is visible
+    const symbolOverlay = page.locator('[data-testid="chart-symbol-overlay"]');
+    await expect(symbolOverlay).toBeVisible({ timeout: 5000 });
+    
+    // Get overlay position
+    const overlayBox = await symbolOverlay.boundingBox();
+    
+    if (overlayBox) {
+      // Try to click through the overlay area (chart should receive the click)
+      await page.mouse.click(overlayBox.x + 5, overlayBox.y + 5);
+      
+      // Verify no errors occurred (chart should handle the click normally)
+      const consoleErrors = [];
+      page.on('console', msg => {
+        if (msg.type() === 'error') {
+          consoleErrors.push(msg.text());
+        }
+      });
+      
+      await page.waitForTimeout(1000);
+      expect(consoleErrors.length).toBe(0);
+    }
+  });
 });

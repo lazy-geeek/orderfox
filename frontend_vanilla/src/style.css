@@ -36,6 +36,9 @@
   
   /* Shadows */
   --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.15);
+  
+  /* Overlay backgrounds */
+  --bg-overlay: rgba(0, 0, 0, 0.7);
   --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.25);
   --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
@@ -71,6 +74,9 @@
   
   /* Shadows */
   --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+  
+  /* Overlay backgrounds */
+  --bg-overlay: rgba(255, 255, 255, 0.9);
   --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.16);
 }
@@ -686,6 +692,30 @@ main {
   height: 60vh;
   min-height: 400px;
   max-height: 800px;
+  position: relative; /* Ensure overlay positioning works */
+}
+
+.chart-symbol-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10; /* Above chart but below tooltips */
+  padding: 8px 12px;
+  background-color: var(--bg-overlay, rgba(0, 0, 0, 0.7));
+  color: var(--text-primary);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none; /* Don't interfere with chart interactions */
+  user-select: none;
+  transition: opacity 0.2s ease;
+  display: none; /* Hidden by default until symbol is set */
+}
+
+/* Theme-specific overrides */
+[data-theme="light"] .chart-symbol-overlay {
+  background-color: var(--bg-overlay, rgba(255, 255, 255, 0.9));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Scrollbars */
@@ -739,6 +769,11 @@ main {
     min-height: 300px;
   }
   
+  .chart-symbol-overlay {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
   .orderfox-display-base {
     margin: 5px;
   }
@@ -765,6 +800,13 @@ main {
   .chart-container {
     height: 35vh;
     min-height: 250px;
+  }
+  
+  .chart-symbol-overlay {
+    font-size: 11px;
+    padding: 4px 8px;
+    top: 5px;
+    left: 5px;
   }
 }
 

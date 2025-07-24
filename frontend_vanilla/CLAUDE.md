@@ -433,6 +433,32 @@ All display components (OrderBook, LastTrades, Liquidation, Chart) follow these 
 - **Pending Data Buffering**: Volume data is buffered in `pendingVolumeData` until chart is properly initialized
 - **Graceful Error Handling**: Chart warnings only appear after initialization, not during initial loading
 
+### Chart UI Overlay Pattern
+For adding UI overlays to charts (symbol indicators, status badges, info panels):
+
+#### Implementation Guidelines
+- **DOM Structure**: Create overlay elements as children of chart container during initialization
+- **CSS Positioning**: Use absolute positioning with appropriate z-index (10 for overlays, below tooltips)
+- **Non-Intrusive Design**: Use `pointer-events: none` to avoid interfering with chart interactions
+- **Theme Integration**: Use CSS custom properties (`--bg-overlay`) for theme compatibility
+- **Responsive Design**: Include breakpoints for tablet (768px) and mobile (480px) viewports
+- **State Management**: Store element references in module-level variables for updates
+- **Update Pattern**: Show/hide overlays based on content availability (display: block/none)
+- **Cleanup**: Clear element references in disposal functions to prevent memory leaks
+
+#### Testing Requirements
+- **E2E Coverage**: Test overlay visibility, content updates, and theme switching
+- **Test Selectors**: Add `data-testid` attributes and update fixtures in test-data.js
+- **Unit Tests**: Test update functions, error handling, and cleanup processes
+- **Pure UI Testing**: Focus on element visibility and content, not real-time data
+
+#### Best Practices
+- **Semantic Class Names**: Use `.chart-[overlay-name]-overlay` naming pattern
+- **Theme Awareness**: Define overlay backgrounds in both light and dark theme sections
+- **Performance**: Hide overlays by default, show only when content is available
+- **Accessibility**: Ensure proper contrast ratios and semantic markup
+- **Positioning**: Standard positions: top-left (10px, 10px), adjust for mobile (5px, 5px)
+
 ### Liquidation Volume Chart Overlay
 - **Histogram Series**: TradingView histogram series as overlay (empty `priceScaleId`)
 - **Scale Positioning**: Bottom 30% of chart (top: 0.7, bottom: 0)

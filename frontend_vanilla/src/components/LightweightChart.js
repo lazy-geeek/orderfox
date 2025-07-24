@@ -29,12 +29,20 @@ let currentVolumeData = []; // Store volume data for tooltips
 let tooltipElement = null;
 let chartInitialized = false; // Track if chart has received initial data
 let pendingVolumeData = null; // Buffer volume data until chart is ready
+let symbolOverlayElement = null; // Symbol overlay element reference
 
 function createLightweightChart(container) {
   const chartContainer = document.createElement('div');
   chartContainer.className = 'chart-container';
   chartContainer.setAttribute('data-testid', 'chart-container');
   container.appendChild(chartContainer);
+
+  // Create symbol overlay element
+  symbolOverlayElement = document.createElement('div');
+  symbolOverlayElement.className = 'chart-symbol-overlay';
+  symbolOverlayElement.setAttribute('data-testid', 'chart-symbol-overlay');
+  symbolOverlayElement.style.display = 'none'; // Hidden by default until symbol is set
+  chartContainer.appendChild(symbolOverlayElement);
 
   // Get current theme
   currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -502,6 +510,16 @@ function updateLightweightChart(data, symbol, timeframe, isInitialLoad = false, 
 }
 
 function updateChartTitle(symbol, timeframe) {
+  // Update the overlay text
+  if (symbolOverlayElement) {
+    if (symbol) {
+      symbolOverlayElement.textContent = symbol;
+      symbolOverlayElement.style.display = 'block';
+    } else {
+      symbolOverlayElement.style.display = 'none';
+    }
+  }
+  
   // Since Lightweight Charts doesn't have built-in title support like ECharts,
   // we can create a custom title element or rely on external UI
   // For now, we'll emit a custom event that the UI can listen to
@@ -840,17 +858,20 @@ function disposeLightweightChart() {
   volumeSeriesVisible = true;
   chartInitialized = false;
   pendingVolumeData = null;
+  symbolOverlayElement = null;
 }
 
 // Export functions for backward compatibility with existing code
 export { 
   createLightweightChart as createCandlestickChart, 
+  createLightweightChart,
   createTimeframeSelector,
   createVolumeToggleButton,
   updateLightweightChart as updateCandlestickChart,
   updateLatestCandle,
   updateLiquidationVolume,
   toggleLiquidationVolume,
+  updateChartTitle,
   resetZoomState,
   resetChartData,
   disposeLightweightChart

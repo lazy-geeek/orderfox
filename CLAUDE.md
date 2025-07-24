@@ -21,7 +21,7 @@ OrderFox is a cryptocurrency trading application with bot management capabilitie
 
 **Enhanced Backend Test Execution System:**
 ```bash
-# 🚀 COMPREHENSIVE TEST SUITE (617 tests across 15 chunks)
+# 🚀 COMPREHENSIVE TEST SUITE
 cd backend && ./scripts/run-backend-tests.sh           # Full test suite with warning detection
 cd backend && ./scripts/analyze-test-results.sh        # Intelligent failure analysis
 cd backend && cat logs/test-results/chunk*-warnings.txt # LLM-actionable warning insights
@@ -31,17 +31,17 @@ cd backend && cat logs/test-results/chunk*-warnings.txt # LLM-actionable warning
 - ✅ **Real WebSocket Testing**: Uses actual WebSocket connections instead of problematic mocks
 - ✅ **Chunked Execution**: Organized into logical test groups for better isolation and debugging
 - ✅ **Enhanced Warning Detection**: Captures deprecations, runtime issues, and optimization opportunities
-- ✅ **100% Success Rate**: All 617 tests passing when executed through enhanced system
+- ✅ **100% Success Rate**: All tests passing when executed through enhanced system
 - ✅ **Proactive Maintenance**: Warning files provide actionable insights for code improvements
 
 **Frontend Testing:**
 ```bash
-cd frontend_vanilla && npm test                        # Vitest unit tests (254 tests)
-cd frontend_vanilla && ./run-tests-minimal.sh complete # E2E tests (53 tests, 100% success rate)
+cd frontend_vanilla && npm test                        # Vitest unit tests
+cd frontend_vanilla && ./run-tests-minimal.sh complete # E2E tests (100% success rate)
 ```
 
 **🎯 E2E Testing Excellence (UltraThink Achievement):**
-- ✅ **100% Success Rate**: All 53 E2E tests passing with robust waiting patterns
+- ✅ **100% Success Rate**: All E2E tests passing with robust waiting patterns
 - ✅ **Project-Based Architecture**: Playwright projects prevent timeouts and resource contention
 - ✅ **Pure UI Testing Philosophy**: Tests UI interactions, NOT WebSocket data integration
 - ✅ **Resource Contention Handling**: Intelligent retry logic for modal close operations

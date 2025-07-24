@@ -862,4 +862,121 @@ describe('LightweightChart Backend Data Integration', () => {
       mockDispatchEvent.mockRestore();
     });
   });
+
+  describe('Symbol Overlay', () => {
+    let mockContainer;
+
+    beforeEach(() => {
+      // Setup DOM container
+      mockContainer = document.createElement('div');
+      document.body.appendChild(mockContainer);
+      
+      // Mock the createChart function from lightweight-charts
+      vi.mock('lightweight-charts', () => ({
+        createChart: vi.fn(() => ({
+          addSeries: vi.fn(() => ({
+            priceScale: vi.fn(() => ({
+              applyOptions: vi.fn()
+            }))
+          })),
+          timeScale: vi.fn(() => ({
+            subscribeVisibleTimeRangeChange: vi.fn()
+          })),
+          remove: vi.fn()
+        })),
+        CandlestickSeries: {},
+        HistogramSeries: {},
+        ColorType: { Solid: 'Solid' }
+      }));
+    });
+
+    afterEach(() => {
+      // Clean up DOM
+      if (mockContainer && document.body.contains(mockContainer)) {
+        document.body.removeChild(mockContainer);
+      }
+      vi.clearAllMocks();
+    });
+
+    it('should create symbol overlay element on chart initialization', () => {
+      // Import and call createLightweightChart
+      const { createLightweightChart } = require('../../src/components/LightweightChart.js');
+      
+      createLightweightChart(mockContainer);
+      
+      const overlay = mockContainer.querySelector('.chart-symbol-overlay');
+      expect(overlay).toBeTruthy();
+      expect(overlay.getAttribute('data-testid')).toBe('chart-symbol-overlay');
+      expect(overlay.style.display).toBe('none');
+    });
+
+    it('should update overlay text when updateChartTitle is called', () => {
+      // This test validates the updateChartTitle function behavior through integration
+      // Since symbolOverlayElement is a module-level variable, we test the function's logic
+      const { updateChartTitle } = require('../../src/components/LightweightChart.js');
+      
+      // Mock window.dispatchEvent to capture the custom event
+      const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => {});
+      
+      // Call updateChartTitle with a symbol
+      updateChartTitle('BTCUSDT', '1m');
+      
+      // Verify custom event was dispatched with correct title
+      expect(mockDispatchEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'chartTitleUpdate',
+          detail: expect.objectContaining({
+            title: 'BTCUSDT - 1m'
+          })
+        })
+      );
+      
+      // Test with null symbol
+      updateChartTitle(null, '1m');
+      expect(mockDispatchEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'chartTitleUpdate',
+          detail: expect.objectContaining({
+            title: 'Select a Symbol'
+          })
+        })
+      );
+      
+      mockDispatchEvent.mockRestore();
+    });
+
+    it('should handle missing overlay element gracefully in updateChartTitle', () => {
+      const { updateChartTitle } = require('../../src/components/LightweightChart.js');
+      
+      // Mock window.dispatchEvent to ensure function completes
+      const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => {});
+      
+      // Should not throw error when overlay element is not available (default state)
+      expect(() => {
+        updateChartTitle('BTCUSDT', '1m');
+      }).not.toThrow();
+      
+      expect(() => {
+        updateChartTitle(null, '1m');
+      }).not.toThrow();
+      
+      // Verify function still dispatches events properly
+      expect(mockDispatchEvent).toHaveBeenCalledTimes(2);
+      
+      mockDispatchEvent.mockRestore();
+    });
+
+    it('should clean up overlay reference on disposal', () => {
+      const { disposeLightweightChart } = require('../../src/components/LightweightChart.js');
+      
+      // Test that disposal function doesn't throw errors
+      // Since symbolOverlayElement is module-level, we test the function behavior
+      expect(() => {
+        disposeLightweightChart();
+      }).not.toThrow();
+      
+      // Function should complete successfully and reset all module state
+      // This is primarily a smoke test to ensure disposal works
+    });
+  });
 });

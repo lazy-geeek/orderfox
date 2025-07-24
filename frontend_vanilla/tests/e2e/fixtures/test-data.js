@@ -68,6 +68,7 @@ export const selectors = {
   // Trading Interface
   tradingInterface: '[data-testid="trading-interface"]',
   chartContainer: '[data-testid="chart-container"]',
+  chartSymbolOverlay: '[data-testid="chart-symbol-overlay"]',
   orderbookDisplay: '[data-testid="orderbook-display"]',
   tradesDisplay: '[data-testid="trades-display"]',
   liquidationsDisplay: '[data-testid="liquidations-display"]',
