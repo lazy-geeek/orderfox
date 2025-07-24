@@ -109,6 +109,14 @@ export default defineConfig({
       fullyParallel: false,
       use: { ...devices['Desktop Chrome'] },
     },
+    
+    // Modal: Trading modal specific functionality tests
+    {
+      name: 'trading-modal',
+      testMatch: /trading-modal\.spec\.js/,
+      fullyParallel: false,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 
   /* Run your local dev server before starting the tests */

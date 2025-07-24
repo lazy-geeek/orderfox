@@ -34,7 +34,18 @@ import {
 function getContainerWidth() {
   // Get chart container width (fallback to reasonable default if not available)
   const chartContainer = document.querySelector('.chart-container');
-  const containerWidth = chartContainer ? chartContainer.clientWidth : 800; // Default 800px
+  
+  // If container doesn't exist yet, return default
+  if (!chartContainer) {
+    return 800; // Default 800px
+  }
+  
+  // Check if container is visible to avoid forced reflow on hidden elements
+  if (chartContainer.offsetParent === null) {
+    return 800; // Default for hidden elements
+  }
+  
+  const containerWidth = chartContainer.clientWidth || 800;
   
   return containerWidth;
 }
@@ -370,6 +381,14 @@ export class WebSocketManager {
       isValid: selectedBot ? this.validateBotConnections(selectedBot) : false,
       lastUpdate: new Date().toISOString()
     };
+  }
+
+  /**
+   * Disconnect all WebSocket connections.
+   * Wrapper around the websocketService function for consistency.
+   */
+  static disconnectAllWebSockets() {
+    disconnectAllWebSockets();
   }
 }
 

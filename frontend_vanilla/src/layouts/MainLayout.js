@@ -56,12 +56,7 @@ export function createMainLayout() {
   navbar.appendChild(navbarEnd);
   drawerContent.appendChild(navbar);
   
-  // Main content area (trading interface)
-  const mainContent = document.createElement('div');
-  mainContent.id = 'main-content';
-  mainContent.setAttribute('data-testid', 'trading-interface');
-  mainContent.className = 'flex-1 p-4 bg-base-100 overflow-auto';
-  mainContent.style.display = 'none'; // Hidden by default until bot is selected
+  // Main content area (removed - trading interface now in modal)
   
   // Bot selection prompt (shown when no bot is selected)
   const botSelectionPrompt = document.createElement('div');
@@ -91,36 +86,8 @@ export function createMainLayout() {
   botListPlaceholder.textContent = 'BotList will be inserted here';
   botManagementSection.appendChild(botListPlaceholder);
   
-  // Main trading content with side-by-side layout
-  const tradingContentWrapper = document.createElement('div');
-  tradingContentWrapper.className = 'trading-content-wrapper flex flex-col lg:flex-row gap-4 h-full';
-  
-  // Left Section - Chart (flexible width)
-  const leftSection = document.createElement('div');
-  leftSection.className = 'left-section flex-1 min-w-0'; // min-w-0 prevents flex overflow issues
-  
-  const candlestickChartPlaceholder = document.createElement('div');
-  candlestickChartPlaceholder.id = 'candlestick-chart-placeholder';
-  candlestickChartPlaceholder.textContent = 'CandlestickChart';
-  leftSection.appendChild(candlestickChartPlaceholder);
-  
-  // Right Section - Tabbed Trading Tables (fixed/min width)
-  const rightSection = document.createElement('div');
-  rightSection.className = 'right-section w-full lg:w-96 flex-shrink-0';
-  
-  const tabbedTradingPlaceholder = document.createElement('div');
-  tabbedTradingPlaceholder.id = 'tabbed-trading-placeholder';
-  tabbedTradingPlaceholder.textContent = 'TabbedTradingDisplay';
-  rightSection.appendChild(tabbedTradingPlaceholder);
-  
-  tradingContentWrapper.appendChild(leftSection);
-  tradingContentWrapper.appendChild(rightSection);
-  
-  mainContent.appendChild(tradingContentWrapper);
-  
   drawerContent.appendChild(botSelectionPrompt);
   drawerContent.appendChild(botManagementSection);
-  drawerContent.appendChild(mainContent);
   
   // Drawer side (sidebar)
   const drawerSide = document.createElement('div');

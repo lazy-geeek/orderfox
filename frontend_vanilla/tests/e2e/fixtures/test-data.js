@@ -85,7 +85,12 @@ export const selectors = {
   // Modals
   confirmDialog: '[data-testid="confirm-dialog"]',
   confirmButton: '[data-testid="confirm-button"]',
-  cancelButton: '[data-testid="cancel-button"]'
+  cancelButton: '[data-testid="cancel-button"]',
+  
+  // Trading Modal
+  tradingModal: '[data-testid="trading-modal"]',
+  modalCloseButton: '[data-testid="modal-close-button"]',
+  tradingInterfaceContainer: '[data-testid="trading-interface-container"]'
 };
 
 export const waitTimes = {
@@ -99,6 +104,20 @@ export const waitTimes = {
   modalCloseComplete: 10000,  // Extended timeout for complete suite runs
   listRefresh: 4000    // Bot list refresh after operations
 };
+
+/**
+ * Wait for modal to be visible and ready
+ */
+export async function waitForModalOpen(page, modalSelector) {
+  // Wait for modal to be visible
+  await page.waitForSelector(modalSelector, { state: 'visible', timeout: waitTimes.botOperation });
+  
+  // Wait for modal content to be ready
+  await page.waitForLoadState('networkidle');
+  
+  // Small delay to ensure modal animation is complete
+  await page.waitForTimeout(waitTimes.short);
+}
 
 export const testConfig = {
   baseURL: process.env.FRONTEND_URL || 'http://localhost:3000',

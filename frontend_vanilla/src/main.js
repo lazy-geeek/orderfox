@@ -2,9 +2,11 @@
 import './style.css';
 
 import { createMainLayout } from './layouts/MainLayout.js';
-import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButton, updateCandlestickChart, updateLatestCandle, updateLiquidationVolume, toggleLiquidationVolume, resetZoomState, resetChartData } from './components/LightweightChart.js';
+// Chart components are now managed by TradingModal - no direct imports needed
+// import { createCandlestickChart, createTimeframeSelector, createVolumeToggleButton, updateCandlestickChart, updateLatestCandle, updateLiquidationVolume, toggleLiquidationVolume, resetZoomState, resetChartData } from './components/LightweightChart.js';
 import { updateTradesHeaders } from './components/LastTradesDisplay.js';
 import { createTabbedTradingDisplay } from './components/TabbedTradingDisplay.js';
+import { createTradingModal } from './components/TradingModal.js';
 import { createThemeSwitcher, initializeTheme } from './components/ThemeSwitcher.js';
 import { createBotNavigation, addNavigationEventListeners, showSelectedBotInfo } from './components/BotNavigation.js';
 import { createBotList, updateBotList, addBotListEventListeners } from './components/BotList.js';
@@ -44,22 +46,16 @@ const mainLayout = createMainLayout();
 app.appendChild(mainLayout);
 
 // Get references to the component placeholders in the main layout
-const candlestickChartPlaceholder = document.querySelector('#candlestick-chart-placeholder');
-const tabbedTradingPlaceholder = document.querySelector('#tabbed-trading-placeholder');
 const themeSwitcherPlaceholder = document.querySelector('#theme-switcher-placeholder');
 const botNavigationPlaceholder = document.querySelector('#bot-navigation-placeholder');
 const botListPlaceholder = document.querySelector('#bot-list-placeholder');
 
-// Create and append the actual components
-const candlestickChartContainer = document.createElement('div');
-candlestickChartPlaceholder.replaceWith(candlestickChartContainer);
-createCandlestickChart(candlestickChartContainer);
+// Create trading modal (lazy initialization)
+const tradingModal = createTradingModal();
+document.body.appendChild(tradingModal.element);
 
-// Volume toggle button will be created later with controls
-
-// Create and insert tabbed trading display
-const tabbedTradingDisplay = createTabbedTradingDisplay();
-tabbedTradingPlaceholder.replaceWith(tabbedTradingDisplay.element);
+// Add modal reference to global scope for easy access
+window.tradingModal = tradingModal;
 
 
 const themeSwitcher = createThemeSwitcher();
@@ -92,10 +88,19 @@ addNavigationEventListeners(botNavigation, (action, itemId) => {
         mode: 'create' 
       });
       break;
-    case 'show-trading':
-      setCurrentView('trading');
-      window.showTradingInterface();
+    case 'show-trading': {
+      // Open trading modal if bot is selected
+      const selectedBot = getSelectedBot();
+      if (selectedBot) {
+        tradingModal.open().catch(error => {
+          console.error('Error opening trading modal:', error);
+          setBotError(`Failed to open trading modal: ${error.message}`);
+        });
+      } else {
+        console.log('No bot selected for trading');
+      }
       break;
+    }
     default:
       console.log('Unknown navigation action:', action);
   }
@@ -147,15 +152,25 @@ addBotListEventListeners(botList, {
     if (selectedBot) {
       showSelectedBotInfo(botNavigation, selectedBot);
       
-      // Use WebSocketManager to switch to bot context
-      try {
-        await WebSocketManager.switchToBotContext(selectedBot);
-        setCurrentView('trading');
-        window.showTradingInterface();
-        console.log(`Successfully switched to bot context: ${selectedBot.name}`);
-      } catch (error) {
-        console.error('Error switching to bot context:', error);
-        setBotError(`Failed to switch to bot context: ${error.message}`);
+      // Check if modal is already open
+      if (tradingModal.isOpen()) {
+        // Modal is already open - switch bot context without closing
+        try {
+          await tradingModal.switchBotContext(selectedBot);
+          console.log(`Successfully switched to bot context in open modal: ${selectedBot.name}`);
+        } catch (error) {
+          console.error('Error switching bot context in modal:', error);
+          setBotError(`Failed to switch bot context: ${error.message}`);
+        }
+      } else {
+        // Modal is closed - open it for the selected bot
+        try {
+          await tradingModal.open();
+          console.log(`Successfully opened trading modal for bot: ${selectedBot.name}`);
+        } catch (error) {
+          console.error('Error opening trading modal:', error);
+          setBotError(`Failed to open trading modal: ${error.message}`);
+        }
       }
     }
   },
@@ -214,57 +229,30 @@ addBotEditorEventListeners(botEditor, {
   }
 });
 
-// Set up global function for direct chart updates from WebSocket
-window.updateLatestCandleDirectly = updateLatestCandle;
+// IMPORTANT: Global chart functions are now set up by TradingModal when it initializes
+// This prevents chart updates from being processed before the chart is ready
+// The modal will set up these functions when it creates the chart:
+// - window.updateLatestCandleDirectly
+// - window.state
+// - window.notify
+// - window.resetChartData
+// - window.updateLiquidationVolume
+// - window.toggleLiquidationVolume
 
-// CRITICAL: Expose state globally for chart symbol validation
-window.state = state;
-
-// CRITICAL: Expose notify globally for chart error recovery
-window.notify = notify;
-
-// CRITICAL: Expose resetChartData globally for timeframe switches
-window.resetChartData = resetChartData;
-
-// Set up global function for liquidation volume updates
-window.updateLiquidationVolume = (data) => {
-  if (data && data.data && Array.isArray(data.data)) {
-    // Use the is_update flag from backend to determine if this is a real-time update
-    const isRealTimeUpdate = data.is_update || false;
-    console.log('Processing liquidation volume update, is_update:', isRealTimeUpdate, 'data points:', data.data.length);
-    updateLiquidationVolume(data.data, isRealTimeUpdate);
-  }
-};
-
-// Set up global function for liquidation volume toggle
-window.toggleLiquidationVolume = () => {
-  return toggleLiquidationVolume();
-};
-
-// Global functions for layout management
+// Global functions for layout management (simplified for modal paradigm)
 window.showBotSelectionPrompt = () => {
   document.getElementById('bot-selection-prompt').style.display = 'flex';
   document.getElementById('bot-management-section').style.display = 'none';
-  document.getElementById('main-content').style.display = 'none';
 };
 
 window.showBotManagementSection = () => {
   document.getElementById('bot-selection-prompt').style.display = 'none';
   document.getElementById('bot-management-section').style.display = 'flex';
-  document.getElementById('main-content').style.display = 'none';
-};
-
-window.showTradingInterface = () => {
-  document.getElementById('bot-selection-prompt').style.display = 'none';
-  document.getElementById('bot-management-section').style.display = 'none';
-  document.getElementById('main-content').style.display = 'flex';
 };
 
 // Note: getOptimalCandleCount() function moved to WebSocketManager for centralization
 
-// Initial renders
-updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
-// Order book and trades displays are now managed by TabbedTradingDisplay
+// Trading interface components are now managed by TradingModal
 
 // Subscribe to state changes and update UI
 subscribe((key) => {
@@ -282,15 +270,6 @@ subscribe((key) => {
       break;
     case 'selectedSymbol': {
       const selectedSymbolData = state.symbolsList.find(s => s.id === state.selectedSymbol);
-      // Pass symbol data when symbol changes - reset zoom and treat as initial load
-      resetZoomState();
-      updateCandlestickChart(
-        { currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected },
-        state.selectedSymbol,
-        state.selectedTimeframe,
-        true, // isInitialLoad
-        selectedSymbolData // Pass symbol data for precision update
-      );
       
       // Update trades headers with new symbol data
       if (selectedSymbolData) {
@@ -298,16 +277,9 @@ subscribe((key) => {
       }
       break;
     }
+    // Chart and trading interface state updates are now handled by TradingModal components
     case 'currentCandles':
-      // Real-time updates - don't reset zoom
-      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, false); // isInitialLoad = false
-      break;
     case 'selectedTimeframe':
-      // Timeframe change - reset zoom and treat as initial load
-      resetZoomState();
-      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, true); // isInitialLoad = true
-      break;
-    // Order book and trades state updates are now handled by TabbedTradingDisplay components
     case 'currentOrderBook':
     case 'orderBookWsConnected':
     case 'selectedRounding':
@@ -318,37 +290,17 @@ subscribe((key) => {
     case 'tradesWsConnected':
     case 'tradesLoading':
     case 'tradesError':
-      // These will be handled by individual components within TabbedTradingDisplay
+    case 'candlesWsConnected':
+      // These will be handled by components within TradingModal
       break;
     case 'tradingMode':
-      break;
-    case 'candlesWsConnected':
-      // Update chart to reflect connection status - don't reset zoom
-      updateCandlestickChart({ currentCandles: state.currentCandles, candlesWsConnected: state.candlesWsConnected }, state.selectedSymbol, state.selectedTimeframe, false); // isInitialLoad = false
       break;
     default:
       break;
   }
 });
 
-// Event Listeners
-const timeframeSelector = createTimeframeSelector((newTimeframe) => {
-  WebSocketManager.switchTimeframe(newTimeframe);
-});
-
-const volumeToggleButton = createVolumeToggleButton();
-
-// Create a controls container for chart controls
-const chartControls = document.createElement('div');
-chartControls.style.display = 'flex';
-chartControls.style.gap = '1rem';
-chartControls.style.marginBottom = '0.5rem';
-chartControls.appendChild(timeframeSelector);
-chartControls.appendChild(volumeToggleButton);
-
-candlestickChartContainer.prepend(chartControls);
-
-// OrderBook event listeners are now managed within TabbedTradingDisplay
+// Chart controls and event listeners are now managed within TradingModal
 
 
 // Trading mode toggle removed - now a per-bot setting
@@ -358,21 +310,14 @@ Promise.all([
   fetchSymbols(),
   fetchBots()
 ]).then(() => {
-  // Automatically select the first symbol (highest volume) after symbols are fetched
-  if (state.symbolsList.length > 0) {
-    const firstSymbol = state.symbolsList[0];
-    WebSocketManager.initializeConnections(firstSymbol.id);
-    // Initial chart update with symbol data for price precision
-    updateCandlestickChart(
-      { currentCandles: [], candlesWsConnected: false },
-      firstSymbol.id,
-      state.selectedTimeframe,
-      true,
-      firstSymbol // Pass full symbol object for precision
-    );
-    // Update trades headers with initial symbol data
-    updateTradesHeaders(firstSymbol);
-  }
+  // IMPORTANT: WebSocket connections are now managed by TradingModal
+  // Don't initialize connections here to prevent consuming historical data before modal opens
+  // if (state.symbolsList.length > 0) {
+  //   const firstSymbol = state.symbolsList[0];
+  //   WebSocketManager.initializeConnections(firstSymbol.id);
+  //   // Update trades headers with initial symbol data
+  //   updateTradesHeaders(firstSymbol);
+  // }
   
   // Initialize bot list display
   updateBotList(botList, state.bots, {

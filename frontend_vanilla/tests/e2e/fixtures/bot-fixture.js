@@ -171,17 +171,17 @@ async function selectBot(page, botName) {
   const selectButton = botCard.locator(selectors.selectBotButton);
   await selectButton.click();
   
-  // Wait for trading interface to appear
-  await page.waitForSelector(selectors.tradingInterface, { timeout: waitTimes.long });
+  // Wait for trading modal to appear
+  await page.waitForSelector(selectors.tradingModal, { timeout: waitTimes.botOperation });
   
-  // Wait for the trading interface to be visible (not just in DOM)
+  // Wait for the trading modal to be visible (dialog.open should be true)
   await page.waitForFunction(
     selector => {
-      const element = document.querySelector(selector);
-      return element && element.style.display !== 'none';
+      const modal = document.querySelector(selector);
+      return modal && modal.open === true;
     },
-    selectors.tradingInterface,
-    { timeout: 10000 }
+    selectors.tradingModal,
+    { timeout: waitTimes.botOperation }
   );
   
   // Wait for chart container to be created and visible
@@ -316,9 +316,9 @@ export const test = base.extend({
       { timeout: 10000 }
     );
     
-    // Check if trading interface is already visible
-    const tradingInterface = page.locator(selectors.tradingInterface);
-    const isVisible = await tradingInterface.isVisible();
+    // Check if trading modal is already visible
+    const tradingModal = page.locator(selectors.tradingModal);
+    const isVisible = await tradingModal.isVisible();
     
     if (!isVisible) {
       // Navigate to bot management
@@ -368,8 +368,8 @@ export const test = base.extend({
       // UI handles connections automatically
     }
     
-    // Verify trading interface is visible
-    await page.waitForSelector(selectors.tradingInterface, { timeout: waitTimes.long });
+    // Verify trading modal is visible
+    await page.waitForSelector(selectors.tradingModal, { timeout: waitTimes.botOperation });
     
     await use(page);
   }

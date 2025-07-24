@@ -493,7 +493,7 @@ For adding UI overlays to charts (symbol indicators, status badges, info panels)
 The TabbedTradingDisplay component consolidates OrderBook, LastTrades, and Liquidations into a single tabbed interface using DaisyUI v5 tabs pattern.
 
 #### Architecture
-- **Lazy Initialization**: Components are only created when their tab is first selected, improving initial load performance
+- **Immediate Initialization**: All components are initialized when the modal opens to ensure accurate connection status display
 - **Mixed WebSocket Management**: OrderBook and LastTrades use external WebSocketManager, while Liquidations manages its own connections
 - **State Persistence**: Tab selection state managed through DaisyUI radio inputs without JavaScript state management
 - **Component Lifecycle**: Each integrated component maintains its own lifecycle and cleanup methods
@@ -543,7 +543,7 @@ tabbedDisplay.destroy();
 When working with the consolidated tabbed trading interface:
 
 1. **Accessing Components**: Individual components (OrderBook, LastTrades, Liquidations) are now inside the TabbedTradingDisplay
-2. **Lazy Loading**: Components are only initialized when their tab is first selected
+2. **Immediate Initialization**: All components are initialized when the modal opens to ensure connection status is accurate
 3. **WebSocket Management**: 
    - OrderBook and LastTrades: Use external WebSocketManager
    - Liquidations: Uses internal WebSocket management with `window.updateLiquidationDisplay`
@@ -603,14 +603,14 @@ MainLayout
             │   ├── Order Book Tab (default active)
             │   ├── Trades Tab
             │   └── Liquidations Tab
-            └── Tab Content Areas (Lazy Initialized)
-                ├── OrderBookDisplay (WebSocketManager) 🔄
-                ├── LastTradesDisplay (WebSocketManager) 🔄  
-                └── LiquidationDisplay (Internal WebSocket) 🔄
+            └── Tab Content Areas (All Initialized on Modal Open)
+                ├── OrderBookDisplay (WebSocketManager) ✅
+                ├── LastTradesDisplay (WebSocketManager) ✅  
+                └── LiquidationDisplay (Internal WebSocket) ✅
 
 Legend:
 ⭐ = New consolidated component
-🔄 = Lazy initialization (created on first tab selection)
+✅ = Initialized immediately when modal opens
 ```
 
 ### Key Architectural Changes
@@ -632,20 +632,20 @@ Legend:
    └── Right: TabbedTradingDisplay (fixed width)
    ```
 
-### Lazy Initialization Flow
+### Immediate Initialization Flow
 
 ```
-User loads page → TabbedTradingDisplay created → Only "Order Book" tab initialized
+User opens modal → TabbedTradingDisplay created → All three tabs initialized immediately
                                                   ↓
-User clicks "Trades" → LastTradesDisplay created and WebSocket connected
-                                                  ↓
-User clicks "Liquidations" → LiquidationDisplay instantiated with internal WebSocket
+                   Order Book WebSocket connected → Green status indicator
+                   Trades WebSocket connected     → Green status indicator
+                   Liquidations WebSocket connected → Green status indicator
 
 Benefits:
-✅ Faster initial page load
-✅ Reduced memory usage  
-✅ Better user experience
-✅ Preserved existing functionality
+✅ No confusing red dots on initial load
+✅ All WebSocket connections established upfront
+✅ Consistent user experience  
+✅ Clear connection status visibility
 ```
 
 ### Working with Bot Management
@@ -654,6 +654,32 @@ Benefits:
 3. **Bot API**: All bot operations go through `botApiService.js`
 4. **Bot Context**: WebSocket connections contextualized to selected bot
 5. **Testing**: Unit tests for bot components and E2E tests for bot workflows
+
+### TradingModal Component
+The trading interface now uses a modal overlay paradigm instead of page-based navigation:
+
+1. **Modal Architecture**: 
+   - Uses DaisyUI v5 native `<dialog>` element with `showModal()` and `close()` methods
+   - Bot list remains visible and accessible in the background
+   - Modal contains the complete trading interface (chart + TabbedTradingDisplay)
+
+2. **User Flow**:
+   - User selects a bot from the bot list
+   - Trading modal opens as an overlay
+   - User can close modal with X button or ESC key
+   - Bot list is still visible/accessible behind the modal
+
+3. **WebSocket Lifecycle**:
+   - WebSocket connections are established when modal opens
+   - All connections are properly cleaned up when modal closes
+   - No trading data flows until modal is opened
+   - Historical data is preserved for the modal context
+
+4. **Implementation Details**:
+   - Component: `src/components/TradingModal.js`
+   - Global functions for WebSocket data are set up in modal context
+   - Chart and trading components are initialized inside the modal
+   - State management integrated with modal lifecycle
 
 ### DaisyUI v5 Patterns
 1. **Drawer Component**: Main layout uses DaisyUI drawer for sidebar navigation

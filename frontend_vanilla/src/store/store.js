@@ -45,7 +45,8 @@ const state = {
     active: 0,
     inactive: 0
   },
-  currentView: 'bot-selection', // 'bot-selection', 'bot-management', 'trading'
+  currentView: 'bot-selection', // 'bot-selection', 'bot-management', 'trading', 'trading-modal'
+  isModalOpen: false,
 };
 
 const subscribers = [];
@@ -548,6 +549,21 @@ function setCurrentView(view) {
   notify('currentView');
 }
 
+function setModalOpen(isOpen) {
+  state.isModalOpen = isOpen;
+  notify('isModalOpen');
+}
+
+function openModal() {
+  setModalOpen(true);
+  setCurrentView('trading-modal');
+}
+
+function closeModal() {
+  setModalOpen(false);
+  setCurrentView('bot-management');
+}
+
 function updateBotStats() {
   const total = state.bots.length;
   const active = state.bots.filter(bot => bot.isActive).length;
@@ -749,6 +765,9 @@ export {
   setBotError,
   clearBotError,
   setCurrentView,
+  setModalOpen,
+  openModal,
+  closeModal,
   // Bot API functions
   fetchBots,
   createBot,

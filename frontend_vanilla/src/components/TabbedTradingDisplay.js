@@ -2,9 +2,9 @@
  * TabbedTradingDisplay - A unified component that consolidates OrderBook, 
  * LastTrades, and Liquidation displays into a single tabbed interface.
  * 
- * This component uses DaisyUI v5 radio input tabs pattern for state management
- * and implements lazy initialization to optimize performance. Components are
- * only created when their tab is first selected.
+ * This component uses DaisyUI v5 radio input tabs pattern for state management.
+ * All components are initialized immediately to ensure WebSocket connections
+ * are established and all status indicators show accurate connection states.
  * 
  * @module TabbedTradingDisplay
  */
@@ -20,7 +20,7 @@ import { state, subscribe } from '../store/store.js';
  * 
  * Architecture:
  * - Uses DaisyUI v5 radio input tabs for tab switching
- * - Implements lazy initialization for performance optimization
+ * - All components initialize immediately for consistent connection status display
  * - Maintains existing WebSocket connections and state management
  * - OrderBook and LastTrades use external WebSocketManager
  * - LiquidationDisplay manages its own WebSocket connections
@@ -93,7 +93,8 @@ export function createTabbedTradingDisplay() {
 
     /**
      * Initializes a component for the specified tab if not already initialized.
-     * This is called lazily when a tab is first selected to optimize performance.
+     * All components are initialized immediately when the tabbed display is created
+     * to ensure WebSocket connections are established and status indicators are accurate.
      * 
      * @param {string} tabName - The tab name ('orderbook', 'trades', or 'liquidations')
      */
@@ -229,17 +230,30 @@ export function createTabbedTradingDisplay() {
         radio.addEventListener('change', handleTabChange);
     });
 
-    // Initialize the default tab (Order Book) immediately since it's checked
-    // Use setTimeout to ensure DOM is fully ready
-    setTimeout(() => {
-        console.log('Initializing default orderbook tab with symbol:', state.selectedSymbol || 'No symbol selected');
-        // Make sure the orderbook tab content is visible
+    // Initialize tabs with staggered timing to avoid performance issues
+    // Use requestAnimationFrame to defer work and avoid blocking the UI
+    requestAnimationFrame(() => {
+        console.log('Initializing trading tabs with symbol:', state.selectedSymbol || 'No symbol selected');
+        
+        // Initialize Order Book first (visible by default)
         const orderbookContent = container.querySelector('.tab-content[data-tab="orderbook"]');
         if (orderbookContent) {
             orderbookContent.style.display = 'block';
         }
         initializeTabComponent('orderbook');
-    }, 0);
+        
+        // Initialize other tabs after a small delay to spread out the work
+        requestAnimationFrame(() => {
+            // Initialize Trades (hidden but connected)
+            initializeTabComponent('trades');
+            
+            // Initialize Liquidations after another frame
+            requestAnimationFrame(() => {
+                initializeTabComponent('liquidations');
+                console.log('All trading tabs initialized');
+            });
+        });
+    });
 
     /**
      * Updates the connection status indicator for a specific tab

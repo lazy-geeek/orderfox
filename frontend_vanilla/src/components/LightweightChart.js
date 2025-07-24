@@ -49,9 +49,26 @@ function createLightweightChart(container) {
   
   // Initialize chart with theme options
   const chartOptions = getChartOptions(currentTheme);
-  chartOptions.width = chartContainer.clientWidth;
-  chartOptions.height = chartContainer.clientHeight;
   
+  // Defer chart creation to avoid forced reflow
+  // Use double requestAnimationFrame to ensure layout is complete
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!chartContainer.parentNode) return; // Container might have been removed
+      
+      // Only read dimensions after layout is stable
+      chartOptions.width = chartContainer.clientWidth;
+      chartOptions.height = chartContainer.clientHeight;
+      
+      // Create chart only after dimensions are available
+      createChartInstance(chartContainer, chartOptions);
+    });
+  });
+
+  return chartContainer;
+}
+
+function createChartInstance(chartContainer, chartOptions) {
   chartInstance = createChart(chartContainer, chartOptions);
   
   // Add candlestick series with adjusted margins
@@ -87,8 +104,6 @@ function createLightweightChart(container) {
     const newTheme = e.detail.theme;
     switchTheme(newTheme);
   });
-
-  return chartContainer;
 }
 
 function getChartOptions(theme) {
@@ -139,7 +154,12 @@ function getCandlestickOptions() {
 }
 
 function createLiquidationVolumeSeries() {
-  if (!chartInstance) return null;
+  if (!chartInstance) {
+    console.warn('Cannot create liquidation volume series - chart instance not ready');
+    return null;
+  }
+  
+  console.log('Creating liquidation volume series');
   
   // Create histogram series as overlay
   const series = chartInstance.addSeries(HistogramSeries, {
