@@ -4,15 +4,6 @@ function createOrderBookDisplay() {
   container.className = 'orderfox-display-base orderfox-order-book-display';
 
   container.innerHTML = `
-    <div class="display-header">
-      <div class="header-controls">
-        <span class="symbol-label"></span>
-        <div class="connection-status" style="display: none;">
-          <span class="status-indicator disconnected">○</span>
-          <span class="status-text">Disconnected</span>
-        </div>
-      </div>
-    </div>
     <div class="depth-selector">
       <label for="depth-select">Display Depth:</label>
       <select id="depth-select" class="depth-select">
@@ -56,32 +47,10 @@ function updateOrderBookDisplay(container, data) {
   const { 
     selectedSymbol,
     currentOrderBook: orderBook, 
-    orderBookWsConnected, 
     selectedRounding,
     availableRoundingOptions,
     displayDepth
   } = data;
-
-  // Update symbol label
-  const symbolLabel = container.querySelector('.symbol-label');
-  if (symbolLabel) {
-    symbolLabel.textContent = selectedSymbol || '';
-  }
-
-  // Update connection status
-  const statusIndicator = container.querySelector('.status-indicator');
-  const statusText = container.querySelector('.status-text');
-  if (statusIndicator && statusText) {
-    if (orderBookWsConnected) {
-      statusIndicator.className = 'status-indicator connected';
-      statusIndicator.textContent = '●';
-      statusText.textContent = 'Live';
-    } else {
-      statusIndicator.className = 'status-indicator disconnected';
-      statusIndicator.textContent = '○';
-      statusText.textContent = 'Disconnected';
-    }
-  }
 
   // Update depth selector
   const depthSelect = container.querySelector('#depth-select');

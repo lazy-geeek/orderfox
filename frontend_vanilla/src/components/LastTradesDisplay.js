@@ -14,15 +14,6 @@ function createLastTradesDisplay() {
   container.className = 'orderfox-display-base orderfox-last-trades-display';
 
   container.innerHTML = `
-    <div class="display-header">
-      <div class="header-controls">
-        <span class="symbol-label"></span>
-        <div class="connection-status" style="display: none;">
-          <span class="status-indicator disconnected">○</span>
-          <span class="status-text">Disconnected</span>
-        </div>
-      </div>
-    </div>
     <div class="display-content">
       <div class="trades-section">
         <div class="section-header three-columns trades-header">
@@ -52,32 +43,9 @@ function createLastTradesDisplay() {
  */
 function updateLastTradesDisplay(container, data) {
   const {
-    selectedSymbol,
     currentTrades: trades,
-    tradesWsConnected,
     tradesLoading
   } = data;
-
-  // Update symbol label
-  const symbolLabel = container.querySelector('.symbol-label');
-  if (symbolLabel) {
-    symbolLabel.textContent = selectedSymbol || '';
-  }
-
-  // Update connection status
-  const statusIndicator = container.querySelector('.status-indicator');
-  const statusText = container.querySelector('.status-text');
-  if (statusIndicator && statusText) {
-    if (tradesWsConnected) {
-      statusIndicator.className = 'status-indicator connected';
-      statusIndicator.textContent = '●';
-      statusText.textContent = 'Live';
-    } else {
-      statusIndicator.className = 'status-indicator disconnected';
-      statusIndicator.textContent = '○';
-      statusText.textContent = 'Disconnected';
-    }
-  }
 
   // Update trades list
   const tradesList = container.querySelector('#trades-list');
@@ -179,21 +147,8 @@ function updateLastTradesData(trades) {
  * Update connection status indicator
  * @param {boolean} connected - Connection status
  */
-function updateTradesConnectionStatus(connected) {
-  const statusIndicator = document.querySelector('.orderfox-last-trades-display .status-indicator');
-  const statusText = document.querySelector('.orderfox-last-trades-display .status-text');
-  
-  if (statusIndicator && statusText) {
-    if (connected) {
-      statusIndicator.className = 'status-indicator connected';
-      statusIndicator.textContent = '●';
-      statusText.textContent = 'Live';
-    } else {
-      statusIndicator.className = 'status-indicator disconnected';
-      statusIndicator.textContent = '○';
-      statusText.textContent = 'Disconnected';
-    }
-  }
+function updateTradesConnectionStatus() {
+  // Connection status is now handled by the tab indicators in TabbedTradingDisplay
 }
 
 export { 

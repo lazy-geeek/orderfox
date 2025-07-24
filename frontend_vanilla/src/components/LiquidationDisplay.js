@@ -29,15 +29,6 @@ export class LiquidationDisplay {
     render() {
         this.container.innerHTML = `
             <div class="orderfox-liquidation-display orderfox-display-base">
-                <div class="display-header">
-                    <div class="header-controls">
-                        <span class="symbol-label"></span>
-                        <div class="connection-status" style="display: none;">
-                            <span class="status-indicator disconnected">○</span>
-                            <span class="status-text">Disconnected</span>
-                        </div>
-                    </div>
-                </div>
                 <div class="display-content">
                     <div class="section-header three-columns liquidation-header">
                         <span class="amount-header">Amount (USDT)</span>
@@ -60,12 +51,6 @@ export class LiquidationDisplay {
             // Update connection status to show we're waiting for symbol selection
             this.updateConnectionStatus(false);
             return;
-        }
-        
-        // Update symbol label
-        const symbolLabel = this.container.querySelector('.symbol-label');
-        if (symbolLabel) {
-            symbolLabel.textContent = symbol || '';
         }
         
         // Update quantity header with symbol name
@@ -163,21 +148,6 @@ export class LiquidationDisplay {
         
         // Update global state for tab indicators
         setLiquidationsWsConnected(connected);
-        
-        const statusIndicator = this.container.querySelector('.status-indicator');
-        const statusText = this.container.querySelector('.status-text');
-        
-        if (statusIndicator && statusText) {
-            if (connected) {
-                statusIndicator.className = 'status-indicator connected';
-                statusIndicator.textContent = '●';
-                statusText.textContent = 'Live';
-            } else {
-                statusIndicator.className = 'status-indicator disconnected';
-                statusIndicator.textContent = '○';
-                statusText.textContent = 'Disconnected';
-            }
-        }
     }
     
     setupStateSubscriptions() {
@@ -188,12 +158,6 @@ export class LiquidationDisplay {
                 this.liquidations = [];  // Clear old data
                 this.renderLiquidations();
                 this.setupWebSocket();
-                
-                // Update symbol label
-                const symbolLabel = this.container.querySelector('.symbol-label');
-                if (symbolLabel) {
-                    symbolLabel.textContent = state.selectedSymbol || '';
-                }
                 
                 // Update quantity header
                 const quantityHeader = this.container.querySelector('.quantity-header');
