@@ -116,9 +116,9 @@ export class WebSocketManager {
     connectWebSocketStream(newSymbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(newSymbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(newSymbol, 'trades');
-    // Note: LiquidationDisplay component creates its own connection without timeframe
-    // connectWebSocketStream(newSymbol, 'liquidations'); // Handled by component
-    connectWebSocketStream(newSymbol, 'liquidations', state.selectedTimeframe); // For volume with timeframe
+    // Connect both liquidation streams - one for orders (table) and one for volume (chart)
+    connectWebSocketStream(newSymbol, 'liquidations'); // For orders table (without timeframe)
+    connectWebSocketStream(newSymbol, 'liquidations', state.selectedTimeframe); // For volume chart (with timeframe)
     
     // Fetch liquidation volume data for new symbol
     this.fetchLiquidationVolumeData(newSymbol, state.selectedTimeframe);
@@ -272,7 +272,9 @@ export class WebSocketManager {
     connectWebSocketStream(bot.symbol, 'candles', state.selectedTimeframe, containerWidth);
     connectWebSocketStream(bot.symbol, 'orderbook', null, state.displayDepth, state.selectedRounding);
     connectWebSocketStream(bot.symbol, 'trades');
-    connectWebSocketStream(bot.symbol, 'liquidations', state.selectedTimeframe);
+    // Connect both liquidation streams - one for orders (table) and one for volume (chart)
+    connectWebSocketStream(bot.symbol, 'liquidations'); // For orders table (without timeframe)
+    connectWebSocketStream(bot.symbol, 'liquidations', state.selectedTimeframe); // For volume chart (with timeframe)
     
     // Fetch initial liquidation volume data
     this.fetchLiquidationVolumeData(bot.symbol, state.selectedTimeframe);

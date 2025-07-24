@@ -493,8 +493,8 @@ For adding UI overlays to charts (symbol indicators, status badges, info panels)
 The TabbedTradingDisplay component consolidates OrderBook, LastTrades, and Liquidations into a single tabbed interface using DaisyUI v5 tabs pattern.
 
 #### Architecture
-- **Immediate Initialization**: All components are initialized when the modal opens to ensure accurate connection status display
-- **Mixed WebSocket Management**: OrderBook and LastTrades use external WebSocketManager, while Liquidations manages its own connections
+- **Immediate Initialization**: All components are initialized immediately when the tabbed display is created to ensure WebSocket data isn't missed
+- **Centralized WebSocket Management**: All components (OrderBook, LastTrades, and Liquidations) use external WebSocketManager for connection management
 - **State Persistence**: Tab selection state managed through DaisyUI radio inputs without JavaScript state management
 - **Component Lifecycle**: Each integrated component maintains its own lifecycle and cleanup methods
 - **Connection Status Integration**: Each tab displays real-time connection status indicators (green/red dots) without redundant text
@@ -513,14 +513,14 @@ tabbedDisplay.destroy();
 ```
 
 #### Tab Structure
-- **Order Book Tab**: Default active tab, lazily initializes OrderBookDisplay
-- **Trades Tab**: Lazily initializes LastTradesDisplay on first selection
-- **Liquidations Tab**: Lazily initializes LiquidationDisplay class instance on first selection
+- **Order Book Tab**: Default active tab, initialized immediately
+- **Trades Tab**: Initialized immediately to ensure data capture
+- **Liquidations Tab**: Initialized immediately to prevent missing historical data
 
 #### WebSocket Integration
 - **OrderBook**: Uses WebSocketManager for connection management and dynamic parameter updates
 - **LastTrades**: Uses WebSocketManager for connection management and historical data merging
-- **Liquidations**: Manages own WebSocket connections with internal connection pooling
+- **Liquidations**: Uses WebSocketManager for both liquidation orders (table) and volume (chart) connections
 
 #### Responsive Design
 - **Desktop (>1024px)**: Tabbed display in right sidebar alongside chart
@@ -545,8 +545,8 @@ When working with the consolidated tabbed trading interface:
 1. **Accessing Components**: Individual components (OrderBook, LastTrades, Liquidations) are now inside the TabbedTradingDisplay
 2. **Immediate Initialization**: All components are initialized when the modal opens to ensure connection status is accurate
 3. **WebSocket Management**: 
-   - OrderBook and LastTrades: Use external WebSocketManager
-   - Liquidations: Uses internal WebSocket management with `window.updateLiquidationDisplay`
+   - All components (OrderBook, LastTrades, Liquidations): Use external WebSocketManager
+   - Liquidations: Still uses `window.updateLiquidationDisplay` for data updates but connections managed by WebSocketManager
 4. **Connection Status**: Each component must update global state (`setLiquidationsWsConnected`, etc.) to reflect tab indicator status
 5. **Header Management**: Individual component headers are hidden (`display: none`) since tabs provide clear labeling
 6. **Testing**: E2E tests must switch to appropriate tabs before checking component content and account for hidden radio inputs
@@ -637,13 +637,17 @@ Legend:
 ```
 User opens modal → TabbedTradingDisplay created → All three tabs initialized immediately
                                                   ↓
-                   Order Book WebSocket connected → Green status indicator
-                   Trades WebSocket connected     → Green status indicator
-                   Liquidations WebSocket connected → Green status indicator
+WebSocketManager connects all streams:
+- Order Book WebSocket connected → Green status indicator
+- Trades WebSocket connected → Green status indicator  
+- Liquidations (orders) WebSocket connected → Green status indicator
+- Liquidations (volume) WebSocket connected → Chart histogram updates
 
 Benefits:
 ✅ No confusing red dots on initial load
 ✅ All WebSocket connections established upfront
+✅ No missed historical data (critical for liquidations)
+✅ Centralized connection management prevents conflicts
 ✅ Consistent user experience  
 ✅ Clear connection status visibility
 ```

@@ -230,30 +230,22 @@ export function createTabbedTradingDisplay() {
         radio.addEventListener('change', handleTabChange);
     });
 
-    // Initialize tabs with staggered timing to avoid performance issues
-    // Use requestAnimationFrame to defer work and avoid blocking the UI
-    requestAnimationFrame(() => {
-        console.log('Initializing trading tabs with symbol:', state.selectedSymbol || 'No symbol selected');
-        
-        // Initialize Order Book first (visible by default)
-        const orderbookContent = container.querySelector('.tab-content[data-tab="orderbook"]');
-        if (orderbookContent) {
-            orderbookContent.style.display = 'block';
-        }
-        initializeTabComponent('orderbook');
-        
-        // Initialize other tabs after a small delay to spread out the work
-        requestAnimationFrame(() => {
-            // Initialize Trades (hidden but connected)
-            initializeTabComponent('trades');
-            
-            // Initialize Liquidations after another frame
-            requestAnimationFrame(() => {
-                initializeTabComponent('liquidations');
-                console.log('All trading tabs initialized');
-            });
-        });
-    });
+    // Initialize all tabs immediately to ensure WebSocket data isn't missed
+    // This is critical for liquidations which send historical data on first connection
+    console.log('Initializing trading tabs with symbol:', state.selectedSymbol || 'No symbol selected');
+    
+    // Initialize Order Book first (visible by default)
+    const orderbookContent = container.querySelector('.tab-content[data-tab="orderbook"]');
+    if (orderbookContent) {
+        orderbookContent.style.display = 'block';
+    }
+    initializeTabComponent('orderbook');
+    
+    // Initialize all other tabs immediately to catch initial data
+    initializeTabComponent('trades');
+    initializeTabComponent('liquidations');
+    
+    console.log('All trading tabs initialized');
 
     /**
      * Updates the connection status indicator for a specific tab

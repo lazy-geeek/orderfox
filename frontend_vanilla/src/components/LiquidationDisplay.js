@@ -76,15 +76,15 @@ export class LiquidationDisplay {
             quantityHeader.textContent = `Quantity (${baseAsset})`;
         }
         
-        // Clean up existing connection for old symbol
-        if (this.currentSymbol && this.currentSymbol !== symbol) {
-            disconnectWebSocketStream('liquidations', this.currentSymbol);
-        }
+        // WebSocketManager handles cleaning up connections when switching symbols
+        // if (this.currentSymbol && this.currentSymbol !== symbol) {
+        //     disconnectWebSocketStream('liquidations', this.currentSymbol);
+        // }
         
         this.currentSymbol = symbol;
         
-        // Connect to liquidation stream
-        connectWebSocketStream(symbol, 'liquidations');
+        // WebSocketManager handles the liquidation stream connection
+        // connectWebSocketStream(symbol, 'liquidations');
     }
     
     addLiquidation(liquidation) {
@@ -225,7 +225,7 @@ export class LiquidationDisplay {
                             }
                         }
                     });
-                } else {
+                } else if (data.data) {
                     // Handle single liquidation
                     const liquidation = data.data;
                     this.addLiquidation(liquidation);
@@ -247,9 +247,10 @@ export class LiquidationDisplay {
     }
     
     cleanup() {
-        if (this.currentSymbol) {
-            disconnectWebSocketStream(this.currentSymbol, 'liquidations');
-        }
+        // WebSocketManager handles the liquidation stream disconnection
+        // if (this.currentSymbol) {
+        //     disconnectWebSocketStream(this.currentSymbol, 'liquidations');
+        // }
         if (window.updateLiquidationDisplay) {
             delete window.updateLiquidationDisplay;
         }
