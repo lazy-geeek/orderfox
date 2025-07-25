@@ -366,6 +366,29 @@ function setupVolumeTooltip(container) {
       return;
     }
     
+    // Check if mouse is in the histogram area (bottom portion of chart)
+    // Histogram area changes based on screen size
+    const chartHeight = container.clientHeight;
+    const chartWidth = container.clientWidth;
+    
+    // Determine histogram area start based on screen size (matching adjustChartMarginsForScreenSize)
+    let histogramTopMargin = 0.7; // Default desktop
+    if (chartWidth < 480) {
+      // Small mobile
+      histogramTopMargin = 0.65;
+    } else if (chartWidth < 768) {
+      // Mobile
+      histogramTopMargin = 0.65;
+    }
+    
+    const histogramAreaStart = chartHeight * histogramTopMargin;
+    
+    // If mouse is not in histogram area, hide tooltip
+    if (!param.point || param.point.y < histogramAreaStart) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
     // Find volume data for the current time
     const volumeData = currentVolumeData.find(d => d.time === param.time);
     if (!volumeData) {
@@ -388,6 +411,27 @@ function setupVolumeTooltip(container) {
     // Check if there's actual volume
     const totalVolume = parseFloat(volumeData.buy_volume || 0) + parseFloat(volumeData.sell_volume || 0);
     if (totalVolume === 0) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Check if mouse is actually over the histogram bar
+    // Convert Y coordinate to price value
+    const priceAtMouse = volumeSeries.coordinateToPrice(param.point.y);
+    if (priceAtMouse === null) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Get the bar's value (absolute delta volume)
+    const barValue = seriesData.value;
+    
+    // Add a small tolerance (5% of bar height) for easier hovering
+    const tolerance = barValue * 0.05;
+    
+    // Check if mouse price is within the bar's range (0 to barValue + tolerance)
+    // Histogram bars extend from 0 up to their value
+    if (priceAtMouse < -tolerance || priceAtMouse > barValue + tolerance) {
       tooltipElement.style.display = 'none';
       return;
     }

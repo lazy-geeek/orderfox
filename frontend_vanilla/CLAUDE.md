@@ -471,6 +471,18 @@ For adding UI overlays to charts (symbol indicators, status badges, info panels)
 - **Mobile Responsive**: Dynamic scale margins for different screen sizes
 - **Performance**: Efficient volume data aggregation for large datasets
 
+#### Tooltip Area Detection & Hit Testing
+- **Histogram Area Detection**: Tooltip only appears when mouse is in histogram area (bottom portion of chart)
+  - Desktop (≥768px): Histogram starts at 70% from top (`chartHeight * 0.7`)
+  - Mobile (<768px): Histogram starts at 65% from top (`chartHeight * 0.65`)
+  - Prevents tooltip interference with candlestick price analysis
+- **Bar Hit Detection**: Uses `volumeSeries.coordinateToPrice(param.point.y)` to detect hover over actual bars
+  - Converts mouse Y coordinate to price value
+  - Checks if price falls within bar range (0 to bar value)
+  - Includes 5% tolerance (`barValue * 0.05`) for easier hovering
+- **Responsive Behavior**: Area detection adapts to screen size matching chart scale margins
+- **UI Separation**: Ensures volume tooltips never appear in price chart area, maintaining clear UX boundaries
+
 ### Order Book Display
 - **Four Columns**: Price, Size for both bids and asks
 - **Color Coding**: Green for bids, red for asks

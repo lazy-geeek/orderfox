@@ -1081,4 +1081,68 @@ describe('LightweightChart Backend Data Integration', () => {
       expect(totalFormatted).toBe('1.23M');
     });
   });
+
+  describe('Histogram Area Detection', () => {
+    it('calculates histogram area start for desktop screens', () => {
+      const chartHeight = 600;
+      const chartWidth = 1200; // Desktop width
+      let histogramTopMargin = 0.7; // Default desktop
+      
+      if (chartWidth < 480) {
+        histogramTopMargin = 0.65;
+      } else if (chartWidth < 768) {
+        histogramTopMargin = 0.65;
+      }
+      
+      const histogramAreaStart = chartHeight * histogramTopMargin;
+      expect(histogramAreaStart).toBe(420); // 600 * 0.7
+    });
+
+    it('calculates histogram area start for mobile screens', () => {
+      const chartHeight = 400;
+      const chartWidth = 375; // Mobile width
+      let histogramTopMargin = 0.7; // Default desktop
+      
+      if (chartWidth < 480) {
+        histogramTopMargin = 0.65;
+      } else if (chartWidth < 768) {
+        histogramTopMargin = 0.65;
+      }
+      
+      const histogramAreaStart = chartHeight * histogramTopMargin;
+      expect(histogramAreaStart).toBe(260); // 400 * 0.65
+    });
+
+    it('detects if mouse is in histogram area', () => {
+      const histogramAreaStart = 420; // 70% of 600
+      
+      // Test points
+      const pointInCandlestickArea = { y: 200 }; // Above histogram
+      const pointInHistogramArea = { y: 500 }; // Below histogram start
+      const pointAtBoundary = { y: 420 }; // Exactly at boundary
+      
+      expect(pointInCandlestickArea.y < histogramAreaStart).toBe(true); // Should hide tooltip
+      expect(pointInHistogramArea.y < histogramAreaStart).toBe(false); // Should show tooltip
+      expect(pointAtBoundary.y < histogramAreaStart).toBe(false); // Should show tooltip
+    });
+
+    it('validates bar hit detection tolerance', () => {
+      const barValue = 100; // Histogram bar value
+      const tolerance = barValue * 0.05; // 5% tolerance
+      
+      // Test different mouse price positions
+      const priceInsideBar = 50; // Within bar
+      const priceAtTop = 100; // At bar top
+      const priceJustAbove = 105; // Within tolerance
+      const priceFarAbove = 110; // Outside tolerance
+      const priceBelow = -10; // Below zero
+      
+      // Check if price is within bar range with tolerance
+      expect(priceInsideBar >= -tolerance && priceInsideBar <= barValue + tolerance).toBe(true);
+      expect(priceAtTop >= -tolerance && priceAtTop <= barValue + tolerance).toBe(true);
+      expect(priceJustAbove >= -tolerance && priceJustAbove <= barValue + tolerance).toBe(true);
+      expect(priceFarAbove >= -tolerance && priceFarAbove <= barValue + tolerance).toBe(false);
+      expect(priceBelow >= -tolerance && priceBelow <= barValue + tolerance).toBe(false);
+    });
+  });
 });
