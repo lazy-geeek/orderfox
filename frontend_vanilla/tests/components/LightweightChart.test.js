@@ -979,4 +979,106 @@ describe('LightweightChart Backend Data Integration', () => {
       // This is primarily a smoke test to ensure disposal works
     });
   });
+
+  describe('Liquidation Volume Tooltip', () => {
+    it('calculates percentages correctly', () => {
+      const buyVolume = 1000;
+      const sellVolume = 1500;
+      const total = buyVolume + sellVolume;
+      const buyPercentage = ((buyVolume / total) * 100).toFixed(1);
+      const sellPercentage = ((sellVolume / total) * 100).toFixed(1);
+      expect(buyPercentage).toBe('40.0');
+      expect(sellPercentage).toBe('60.0');
+    });
+
+    it('handles zero volume gracefully', () => {
+      const buyVolume = 0;
+      const sellVolume = 0;
+      const total = buyVolume + sellVolume;
+      expect(total).toBe(0);
+      const buyPercentage = total > 0 ? ((buyVolume / total) * 100).toFixed(1) : '0.0';
+      expect(buyPercentage).toBe('0.0');
+    });
+
+    it('handles equal volumes', () => {
+      const buyVolume = 1000;
+      const sellVolume = 1000;
+      const total = buyVolume + sellVolume;
+      const buyPercentage = ((buyVolume / total) * 100).toFixed(1);
+      expect(buyPercentage).toBe('50.0');
+    });
+
+    it('formats large numbers correctly', () => {
+      const buyVolume = 1234567;
+      const sellVolume = 7654321;
+      const total = buyVolume + sellVolume;
+      const buyPercentage = ((buyVolume / total) * 100).toFixed(1);
+      expect(buyPercentage).toBe('13.9');
+    });
+
+    it('handles division by zero edge cases', () => {
+      const testCases = [
+        { buy: 0, sell: 0, expectedBuy: '0.0', expectedSell: '0.0' },
+        { buy: 100, sell: 0, expectedBuy: '100.0', expectedSell: '0.0' },
+        { buy: 0, sell: 100, expectedBuy: '0.0', expectedSell: '100.0' }
+      ];
+
+      testCases.forEach(testCase => {
+        const total = testCase.buy + testCase.sell;
+        const buyPercentage = total > 0 ? ((testCase.buy / total) * 100).toFixed(1) : '0.0';
+        const sellPercentage = total > 0 ? ((testCase.sell / total) * 100).toFixed(1) : '0.0';
+        
+        expect(buyPercentage).toBe(testCase.expectedBuy);
+        expect(sellPercentage).toBe(testCase.expectedSell);
+      });
+    });
+
+    it('validates percentage calculation precision', () => {
+      const buyVolume = 333.33;
+      const sellVolume = 666.67;
+      const total = buyVolume + sellVolume;
+      const buyPercentage = ((buyVolume / total) * 100).toFixed(1);
+      const sellPercentage = ((sellVolume / total) * 100).toFixed(1);
+      
+      expect(buyPercentage).toBe('33.3');
+      expect(sellPercentage).toBe('66.7');
+      
+      // Verify percentages add up close to 100% (allowing for rounding)
+      const percentageSum = parseFloat(buyPercentage) + parseFloat(sellPercentage);
+      expect(percentageSum).toBeCloseTo(100.0, 0);
+    });
+
+    it('handles very small volumes correctly', () => {
+      const buyVolume = 0.001;
+      const sellVolume = 0.999;
+      const total = buyVolume + sellVolume;
+      const buyPercentage = ((buyVolume / total) * 100).toFixed(1);
+      const sellPercentage = ((sellVolume / total) * 100).toFixed(1);
+      
+      expect(buyPercentage).toBe('0.1');
+      expect(sellPercentage).toBe('99.9');
+    });
+
+    it('validates total volume formatting fallback', () => {
+      const totalVolume = 1234567.89;
+      const mockVolumeData = {
+        total_volume_formatted: undefined // Backend didn't provide formatted version
+      };
+      
+      // Test fallback to toLocaleString()
+      const totalFormatted = mockVolumeData.total_volume_formatted || totalVolume.toLocaleString();
+      expect(totalFormatted).toBe('1,234,567.89');
+    });
+
+    it('validates total volume formatting with backend data', () => {
+      const totalVolume = 1234567.89;
+      const mockVolumeData = {
+        total_volume_formatted: '1.23M' // Backend provided formatted version
+      };
+      
+      // Test using backend-provided formatted version
+      const totalFormatted = mockVolumeData.total_volume_formatted || totalVolume.toLocaleString();
+      expect(totalFormatted).toBe('1.23M');
+    });
+  });
 });

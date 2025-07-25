@@ -374,16 +374,27 @@ function setupVolumeTooltip(container) {
     }
     
     // Get coordinates - ensure volumeSeries exists
-    if (!volumeSeries || !param.seriesPrices) {
+    if (!volumeSeries || !param.seriesData) {
       tooltipElement.style.display = 'none';
       return;
     }
     
-    const coordinate = param.seriesPrices.get(volumeSeries);
-    if (!coordinate) {
+    const seriesData = param.seriesData.get(volumeSeries);
+    if (!seriesData || !seriesData.value) {
       tooltipElement.style.display = 'none';
       return;
     }
+    
+    // Check if there's actual volume
+    const totalVolume = parseFloat(volumeData.buy_volume || 0) + parseFloat(volumeData.sell_volume || 0);
+    if (totalVolume === 0) {
+      tooltipElement.style.display = 'none';
+      return;
+    }
+    
+    // Calculate percentages
+    const buyPercentage = totalVolume > 0 ? ((parseFloat(volumeData.buy_volume || 0) / totalVolume) * 100).toFixed(1) : '0.0';
+    const sellPercentage = totalVolume > 0 ? ((parseFloat(volumeData.sell_volume || 0) / totalVolume) * 100).toFixed(1) : '0.0';
     
     // Format tooltip content
     const buyVolume = volumeData.buy_volume_formatted || volumeData.buy_volume;
@@ -391,6 +402,9 @@ function setupVolumeTooltip(container) {
     const deltaVolume = volumeData.delta_volume_formatted || volumeData.delta_volume;
     const deltaValue = parseFloat(volumeData.delta_volume || 0);
     const timestamp = new Date(volumeData.timestamp_ms || volumeData.time * 1000).toLocaleTimeString();
+    
+    // Format total volume
+    const totalFormatted = volumeData.total_volume_formatted || totalVolume.toLocaleString();
     
     // Determine dominant side for tooltip
     const dominantSide = deltaValue > 0 ? 'Shorts' : 'Longs';
@@ -403,12 +417,17 @@ function setupVolumeTooltip(container) {
         <span class="tooltip-value">${timestamp}</span>
       </div>
       <div class="tooltip-row">
+        <span class="tooltip-label">Total Volume:</span>
+        <span class="tooltip-value">${totalFormatted}</span>
+      </div>
+      <div class="tooltip-divider"></div>
+      <div class="tooltip-row">
         <span class="tooltip-label">Shorts Liquidated:</span>
-        <span class="tooltip-value buy">${buyVolume}</span>
+        <span class="tooltip-value buy">${buyVolume} (${buyPercentage}%)</span>
       </div>
       <div class="tooltip-row">
         <span class="tooltip-label">Longs Liquidated:</span>
-        <span class="tooltip-value sell">${sellVolume}</span>
+        <span class="tooltip-value sell">${sellVolume} (${sellPercentage}%)</span>
       </div>
       <div class="tooltip-row">
         <span class="tooltip-label">Net (${dominantSide}):</span>
@@ -421,7 +440,7 @@ function setupVolumeTooltip(container) {
     let x = param.point.x;
     
     // Adjust position to keep tooltip visible
-    const tooltipWidth = 200;
+    const tooltipWidth = 260; // Increased for percentage display
     const containerWidth = container.clientWidth;
     
     if (x + tooltipWidth > containerWidth) {
@@ -729,14 +748,15 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         volumeSeries.update(histogramBar);
         console.log('Updated liquidation volume bar:', histogramBar);
         
-        // Update currentVolumeData for tooltips
-        // Find and update existing entry or add new one
-        const existingIndex = currentVolumeData.findIndex(d => d.time === item.time);
+        // Update currentVolumeData for tooltips with converted time to match histogram
+        const convertedItem = { ...item, time: timeToLocal(item.time) };
+        const convertedTime = timeToLocal(item.time);
+        const existingIndex = currentVolumeData.findIndex(d => d.time === convertedTime);
         if (existingIndex >= 0) {
-          currentVolumeData[existingIndex] = item;
+          currentVolumeData[existingIndex] = convertedItem;
         } else {
           // Insert in correct position to maintain time order
-          currentVolumeData.push(item);
+          currentVolumeData.push(convertedItem);
           currentVolumeData.sort((a, b) => a.time - b.time);
         }
       } catch (error) {
@@ -763,12 +783,14 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         try {
           volumeSeries.update(histogramBar);
           
-          // Update currentVolumeData for tooltips
-          const existingIndex = currentVolumeData.findIndex(d => d.time === item.time);
+          // Update currentVolumeData for tooltips with converted time to match histogram
+          const convertedItem = { ...item, time: timeToLocal(item.time) };
+          const convertedTime = timeToLocal(item.time);
+          const existingIndex = currentVolumeData.findIndex(d => d.time === convertedTime);
           if (existingIndex >= 0) {
-            currentVolumeData[existingIndex] = item;
+            currentVolumeData[existingIndex] = convertedItem;
           } else {
-            currentVolumeData.push(item);
+            currentVolumeData.push(convertedItem);
           }
         } catch (error) {
           console.error('Error updating liquidation volume bar:', error, histogramBar);
@@ -782,8 +804,11 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
     // Initial load - use setData() to establish the baseline
     console.log('Initial volume data load - using setData()');
     
-    // Store volume data for tooltips
-    currentVolumeData = volumeData;
+    // Store volume data for tooltips with converted times to match histogram series
+    currentVolumeData = volumeData.map(item => ({
+      ...item,
+      time: timeToLocal(item.time) // Convert time to match histogram bars
+    }));
     
     // Process volume data into histogram format using delta
     const histogramData = volumeData

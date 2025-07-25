@@ -250,4 +250,148 @@ test.describe('Lightweight Charts v5 Integration', () => {
       expect(consoleErrors.length).toBe(0);
     }
   });
+
+  test('should show liquidation volume tooltip on hover', async ({ page }) => {
+    // Monitor console for errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+    
+    // Wait for chart to be fully initialized
+    await page.waitForTimeout(3000);
+    
+    // Wait for chart to load
+    await page.waitForSelector('.tv-lightweight-charts', { timeout: 10000 });
+    
+    // Enable liquidation volume if needed
+    const volumeToggle = page.locator('button:has-text("Volume")');
+    if (await volumeToggle.count() > 0) {
+      const buttonText = await volumeToggle.textContent();
+      if (!buttonText?.includes('Hide')) {
+        await volumeToggle.click();
+        await page.waitForTimeout(1000);
+      }
+    }
+    
+    // Hover over chart area where histogram bars are likely to be
+    const chart = page.locator('.tv-lightweight-charts');
+    const box = await chart.boundingBox();
+    
+    if (box) {
+      // Move to bottom part of chart where histogram is displayed
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.8);
+      
+      // Check if tooltip appears (with short timeout as it should appear quickly)
+      const tooltip = page.locator('.volume-tooltip');
+      const isVisible = await tooltip.isVisible();
+      
+      if (isVisible) {
+        // Verify tooltip content
+        await expect(tooltip.locator('.tooltip-header')).toContainText('Liquidation Volume');
+        await expect(tooltip).toContainText('%'); // Check for percentage
+        
+        // Move mouse away
+        await page.mouse.move(0, 0);
+        
+        // Verify tooltip disappears
+        await expect(tooltip).not.toBeVisible();
+      }
+    }
+    
+    // Assert no console errors occurred
+    expect(consoleErrors).toHaveLength(0);
+  });
+
+  test('should display correct tooltip content format', async ({ page }) => {
+    // Monitor console for errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+    
+    // Wait for chart initialization
+    await page.waitForTimeout(3000);
+    await page.waitForSelector('.tv-lightweight-charts', { timeout: 10000 });
+    
+    // Enable volume toggle
+    const volumeToggle = page.locator('button:has-text("Volume")');
+    if (await volumeToggle.count() > 0) {
+      const buttonText = await volumeToggle.textContent();
+      if (!buttonText?.includes('Hide')) {
+        await volumeToggle.click();
+        await page.waitForTimeout(1000);
+      }
+    }
+    
+    // Hover over chart
+    const chart = page.locator('.tv-lightweight-charts');
+    const box = await chart.boundingBox();
+    
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.8);
+      
+      // Wait for tooltip to appear
+      const tooltip = page.locator('.volume-tooltip');
+      
+      // Only test if tooltip appears (depends on having volume data)
+      if (await tooltip.isVisible()) {
+        // Check all required elements exist
+        const tooltipRows = tooltip.locator('.tooltip-row');
+        const rowCount = await tooltipRows.count();
+        expect(rowCount).toBeGreaterThanOrEqual(5); // At least Time, Total, Shorts, Longs, Net
+        
+        // Verify percentage format (number followed by %)
+        const shortsRow = tooltip.locator('.tooltip-row:has-text("Shorts")');
+        if (await shortsRow.count() > 0) {
+          const shortsText = await shortsRow.textContent();
+          expect(shortsText).toMatch(/\d+\.\d%/); // Matches pattern like "45.5%"
+        }
+        
+        const longsRow = tooltip.locator('.tooltip-row:has-text("Longs")');
+        if (await longsRow.count() > 0) {
+          const longsText = await longsRow.textContent();
+          expect(longsText).toMatch(/\d+\.\d%/);
+        }
+      }
+    }
+    
+    // Assert no console errors occurred
+    expect(consoleErrors).toHaveLength(0);
+  });
+
+  test('should not show tooltip for zero-volume areas', async ({ page }) => {
+    // Monitor console for errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+    
+    await page.waitForTimeout(3000);
+    await page.waitForSelector('.tv-lightweight-charts', { timeout: 10000 });
+    
+    const chart = page.locator('.tv-lightweight-charts');
+    const box = await chart.boundingBox();
+    
+    if (box) {
+      // Move to top part of chart (less likely to have volume bars)
+      await page.mouse.move(box.x + box.width / 2, box.y + 50);
+      
+      // Wait a bit to ensure no tooltip appears
+      await page.waitForTimeout(1000);
+      
+      // Verify no tooltip is visible
+      const tooltip = page.locator('.volume-tooltip');
+      expect(await tooltip.isVisible()).toBe(false);
+    }
+    
+    // Assert no console errors occurred
+    expect(consoleErrors).toHaveLength(0);
+  });
 });

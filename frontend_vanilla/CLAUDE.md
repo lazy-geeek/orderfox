@@ -812,6 +812,10 @@ The liquidation volume histogram follows this pattern:
 - **Critical**: Check `is_update` flag from backend to determine update method
 - **Chart Initialization**: Buffer volume data in `pendingVolumeData` if chart not ready
 - **State Preservation**: Maintain `currentVolumeData` array for tooltips and state
+- **Time Synchronization Critical**: Tooltip data must use converted times matching chart series
+- **Pattern**: Both histogram bars and `currentVolumeData` must use `timeToLocal()` converted times
+- **Bug Prevention**: Mismatched times cause tooltip lookup failures (`param.time` vs stored times)
+- **Implementation**: `currentVolumeData` stores `{...item, time: timeToLocal(item.time)}` for both historical and real-time data
 - **Troubleshooting**: If historical data disappears, verify `is_update` flag handling
 
 ### TradingView Lightweight Charts v5.0 Patterns

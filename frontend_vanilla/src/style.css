@@ -637,6 +637,7 @@ code {
   box-shadow: var(--shadow-medium);
   pointer-events: none;
   white-space: nowrap;
+  min-width: 260px;
 }
 
 .volume-tooltip .tooltip-header {
@@ -669,6 +670,12 @@ code {
 
 .volume-tooltip .tooltip-value.sell {
   color: var(--color-sell);
+}
+
+.volume-tooltip .tooltip-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: 6px 0;
 }
 
 /* Layout Overrides for Dark Mode */
