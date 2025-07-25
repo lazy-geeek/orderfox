@@ -21,6 +21,8 @@ class LiquidationVolume(BaseModel):
     delta_volume_formatted: str = Field(..., description="Formatted delta volume for display")
     count: int = Field(..., description="Number of liquidations in this bucket")
     timestamp_ms: int = Field(..., description="Timestamp in milliseconds")
+    ma_value: Optional[str] = Field(None, description="Moving average value")
+    ma_value_formatted: Optional[str] = Field(None, description="Formatted MA value")
     
     model_config = ConfigDict(
         json_encoders={

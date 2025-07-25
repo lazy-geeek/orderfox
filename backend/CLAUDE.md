@@ -371,6 +371,30 @@ logs/test-results/
 - **Reference Counting**: Fan-out pattern tracks callbacks per symbol, only closes Binance connection when no subscribers remain
 - **Debug Logging**: Use `logger.debug()` to track volume aggregation flow, cache operations, and message routing
 
+### Moving Average Overlay System
+- **Implementation**: `MovingAverageCalculator` class in `liquidation_service.py` provides efficient SMA calculation
+- **Algorithm**: Simple Moving Average (SMA) using last 50 non-zero volume periods only
+- **Performance**: O(1) operations using `collections.deque(maxlen=50)` with automatic sum tracking
+- **Data Structure**: `ma_calculators: Dict[str, Dict[str, MovingAverageCalculator]]` (symbol -> timeframe -> calculator)
+- **Caching**: `_cached_ma` and `_cache_valid` flags to avoid recalculation of unchanged data
+- **Performance Monitoring**: Tracks calculation count, execution time, and maximum time per calculator
+- **Memory Management**: 
+  - Fixed-size deque prevents memory growth
+  - Memory usage tracking with `get_memory_usage()` method
+  - Periodic memory statistics logging
+  - Automatic cleanup when symbols disconnect
+- **Edge Case Handling**:
+  - Zero values ignored in calculation (`if abs(delta_volume) > 0`)
+  - NaN/infinite values filtered (`math.isfinite()` validation)
+  - Insufficient data returns `None` (graceful degradation)
+- **Integration Points**:
+  - `aggregate_liquidations_for_timeframe()`: Historical MA calculation
+  - `_process_aggregation_buffer()`: Real-time MA updates
+  - `disconnect_stream()`: MA calculator cleanup
+- **API Fields**: Optional `ma_value` and `ma_value_formatted` fields in `LiquidationVolume` model
+- **Performance Targets**: <1ms calculation time for historical, <5ms for 1m real-time, <10ms for other timeframes
+- **Testing**: 14 unit tests + 4 integration tests covering all calculation scenarios and edge cases
+
 ### Chart Data Service
 - **Container-Width Optimization**: Calculates optimal candle count based on container width: `min(max((containerWidth/6)*3, 200), 1000)`
 - **Dual Time Fields**: Chart data includes both `timestamp` (ms) and `time` (seconds) for TradingView compatibility

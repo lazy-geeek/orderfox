@@ -814,3 +814,170 @@ class TestLiquidationService:
         
         assert len(result) == 1
         assert result[0]["time"] == 1609459200  # Properly bucketed to minute
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_with_ma_calculation(self):
+        """Test aggregation with Moving Average calculation."""
+        # Clear MA calculator state for clean test
+        liquidation_service.ma_calculators.clear()
+        
+        # Create a series of liquidations that will generate a meaningful MA
+        liquidations = []
+        base_time = 1609459200000  # 2021-01-01 00:00:00
+        
+        # Create 10 minutes of data with varying volumes
+        volume_sequence = [100.0, 200.0, 150.0, 300.0, 250.0, 400.0, 350.0, 500.0, 450.0, 600.0]
+        
+        for i, volume in enumerate(volume_sequence):
+            liquidations.append({
+                "timestamp": base_time + (i * 60 * 1000),  # Each minute
+                "side": "buy",
+                "cumulated_usd_size": volume
+            })
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT_MA_TEST"  # Use unique symbol for isolation
+        )
+        
+        assert len(result) == 10  # Ten 1-minute buckets
+        
+        # Check that MA values are calculated for non-zero volumes
+        for i, bucket in enumerate(result):
+            # All buckets should have delta_volume > 0 (only buy side)
+            assert float(bucket["delta_volume"]) == volume_sequence[i]
+            
+            # MA calculation should start from the first bucket
+            if i == 0:
+                # First bucket MA should equal the single value
+                assert bucket["ma_value"] == str(volume_sequence[0])
+                assert bucket["ma_value_formatted"] is not None
+            elif i == 1:
+                # Second bucket MA should be average of first two values
+                expected_ma = (volume_sequence[0] + volume_sequence[1]) / 2
+                assert bucket["ma_value"] == str(expected_ma)
+            elif i == 2:
+                # Third bucket MA should be average of first three values
+                expected_ma = sum(volume_sequence[:3]) / 3
+                assert bucket["ma_value"] == str(expected_ma)
+            
+            # All MA values should be present and formatted
+            assert bucket["ma_value"] is not None
+            assert bucket["ma_value_formatted"] is not None
+            assert float(bucket["ma_value"]) > 0
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_ma_with_zero_values(self):
+        """Test MA calculation correctly ignores zero delta volumes."""
+        # Clear MA calculator state for clean test
+        liquidation_service.ma_calculators.clear()
+        
+        liquidations = [
+            {
+                "timestamp": 1609459200000,  # Minute 1
+                "side": "buy",
+                "cumulated_usd_size": 100.0
+            },
+            {
+                "timestamp": 1609459200000,  # Same minute - cancels out
+                "side": "sell", 
+                "cumulated_usd_size": 100.0
+            },
+            {
+                "timestamp": 1609459260000,  # Minute 2
+                "side": "buy",
+                "cumulated_usd_size": 200.0
+            },
+            {
+                "timestamp": 1609459320000,  # Minute 3
+                "side": "sell",
+                "cumulated_usd_size": 150.0
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT_ZERO_TEST"  # Use unique symbol for isolation
+        )
+        
+        assert len(result) == 3  # Three 1-minute buckets
+        
+        # First bucket: delta = 0 (buy 100 - sell 100), should not contribute to MA
+        assert result[0]["delta_volume"] == "0.0"
+        assert result[0]["ma_value"] is None  # No MA since no non-zero values yet
+        assert result[0]["ma_value_formatted"] is None
+        
+        # Second bucket: delta = 200, should be first MA value
+        assert result[1]["delta_volume"] == "200.0"
+        assert result[1]["ma_value"] == "200.0"  # First non-zero value
+        assert result[1]["ma_value_formatted"] is not None
+        
+        # Third bucket: delta = -150, should contribute to MA (absolute value)
+        assert result[2]["delta_volume"] == "-150.0"
+        expected_ma = (200.0 + 150.0) / 2  # Average of |200| and |-150|
+        assert result[2]["ma_value"] == str(expected_ma)
+        assert result[2]["ma_value_formatted"] is not None
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_ma_window_overflow(self):
+        """Test MA calculation with more than 50 values (window overflow)."""
+        # Clear MA calculator state for clean test
+        liquidation_service.ma_calculators.clear()
+        
+        # Create 60 liquidations to test sliding window behavior
+        liquidations = []
+        base_time = 1609459200000
+        
+        for i in range(60):
+            liquidations.append({
+                "timestamp": base_time + (i * 60 * 1000),  # Each minute
+                "side": "buy",
+                "cumulated_usd_size": float(i + 1)  # Values 1 to 60
+            })
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT_OVERFLOW_TEST"  # Use unique symbol for isolation
+        )
+        
+        assert len(result) == 60
+        
+        # Check MA calculation for last bucket (index 59)
+        # Should use last 50 values (11 to 60)
+        last_bucket = result[59]
+        
+        # Expected MA: average of values 11 through 60 (50 values)
+        expected_sum = sum(range(11, 61))  # 11 + 12 + ... + 60
+        expected_ma = expected_sum / 50
+        
+        assert last_bucket["ma_value"] == str(expected_ma)
+        assert last_bucket["ma_value_formatted"] is not None
+        assert float(last_bucket["ma_value"]) == expected_ma
+    
+    @pytest.mark.asyncio
+    async def test_aggregate_liquidations_ma_insufficient_data(self):
+        """Test MA calculation edge case with insufficient non-zero data."""
+        # Clear MA calculator state for clean test
+        liquidation_service.ma_calculators.clear()
+        
+        # Single liquidation that results in zero delta
+        liquidations = [
+            {
+                "timestamp": 1609459200000,
+                "side": "buy",
+                "cumulated_usd_size": 100.0
+            },
+            {
+                "timestamp": 1609459200000,  # Same timestamp
+                "side": "sell",
+                "cumulated_usd_size": 100.0  # Cancels out
+            }
+        ]
+        
+        result = await liquidation_service.aggregate_liquidations_for_timeframe(
+            liquidations, "1m", "BTCUSDT_INSUFFICIENT_TEST"  # Use unique symbol for isolation
+        )
+        
+        assert len(result) == 1
+        
+        # Should have zero delta and no MA
+        assert result[0]["delta_volume"] == "0.0"
+        assert result[0]["ma_value"] is None
+        assert result[0]["ma_value_formatted"] is None

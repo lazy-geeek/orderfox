@@ -9,16 +9,165 @@ import asyncio
 import json
 import websockets
 import aiohttp
+import math
 from typing import Optional, Dict, List, Callable, Any, Tuple
 from datetime import datetime
 import logging
 from decimal import Decimal
-from collections import defaultdict
+from collections import defaultdict, deque
 import time
 from app.services.formatting_service import formatting_service
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class MovingAverageCalculator:
+    """Efficient moving average calculator using deque for O(1) operations"""
+    
+    def __init__(self, window_size: int = 50):
+        """
+        Initialize moving average calculator
+        
+        Args:
+            window_size: Size of the moving window (default 50)
+        """
+        self.window_size = window_size
+        self.values = deque(maxlen=window_size)
+        self.sum = 0.0
+        
+        # Performance optimization: Cache MA value to avoid recalculation
+        self._cached_ma: Optional[float] = None
+        self._cache_valid = False
+        
+        # Performance monitoring
+        self._calculation_count = 0
+        self._total_calculation_time = 0.0
+        self._max_calculation_time = 0.0
+    
+    def add_value(self, time: int, value: float) -> None:
+        """
+        Add a non-zero value to the moving average calculation
+        
+        Args:
+            time: Timestamp (used for ordering, not stored)
+            value: Value to add (should be non-zero)
+        """
+        if value == 0:
+            return  # Skip zero values as per requirements
+            
+        # If deque is at max capacity, subtract the value being removed
+        if len(self.values) == self.window_size:
+            self.sum -= self.values[0]  # values[0] will be removed by deque
+        
+        # Add new value
+        self.values.append(value)
+        self.sum += value
+        
+        # Invalidate cache since data changed
+        self._cache_valid = False
+    
+    def get_current_ma(self) -> Optional[float]:
+        """
+        Get current moving average value with caching optimization
+        
+        Returns:
+            Moving average value or None if insufficient data
+        """
+        if len(self.values) == 0:
+            return None
+        
+        # Return cached value if still valid
+        if self._cache_valid and self._cached_ma is not None:
+            return self._cached_ma
+        
+        # Performance monitoring: Track calculation time
+        start_time = time.perf_counter()
+        
+        # Calculate MA value
+        ma_value = self.sum / len(self.values)
+        
+        # Update performance metrics
+        calculation_time = time.perf_counter() - start_time
+        self._calculation_count += 1
+        self._total_calculation_time += calculation_time
+        self._max_calculation_time = max(self._max_calculation_time, calculation_time)
+        
+        # Performance logging: Warn if calculation takes too long
+        if calculation_time > 0.001:  # 1ms threshold
+            logger.warning(f"MA calculation took {calculation_time:.4f}s for {len(self.values)} values")
+        
+        # Cache the result
+        self._cached_ma = ma_value
+        self._cache_valid = True
+        
+        return ma_value
+    
+    def clear(self) -> None:
+        """Reset calculator state"""
+        self.values.clear()
+        self.sum = 0.0
+        self._cached_ma = None
+        self._cache_valid = False
+        
+        # Log performance stats before clearing
+        if self._calculation_count > 0:
+            avg_time = self._total_calculation_time / self._calculation_count
+            logger.debug(f"MA Calculator Performance Stats: "
+                        f"calculations={self._calculation_count}, "
+                        f"avg_time={avg_time:.6f}s, "
+                        f"max_time={self._max_calculation_time:.6f}s")
+        
+        # Reset performance metrics
+        self._calculation_count = 0
+        self._total_calculation_time = 0.0
+        self._max_calculation_time = 0.0
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """
+        Get performance statistics for the calculator
+        
+        Returns:
+            Dictionary with performance metrics
+        """
+        if self._calculation_count == 0:
+            return {
+                "calculation_count": 0,
+                "avg_calculation_time": 0.0,
+                "max_calculation_time": 0.0,
+                "total_calculation_time": 0.0
+            }
+        
+        return {
+            "calculation_count": self._calculation_count,
+            "avg_calculation_time": self._total_calculation_time / self._calculation_count,
+            "max_calculation_time": self._max_calculation_time,
+            "total_calculation_time": self._total_calculation_time,
+            "cache_hit_potential": "Available" if self._cache_valid else "Expired"
+        }
+    
+    def get_memory_usage(self) -> Dict[str, Any]:
+        """
+        Get memory usage information for the calculator
+        
+        Returns:
+            Dictionary with memory usage metrics
+        """
+        import sys
+        
+        # Calculate memory usage of the deque and other components
+        values_memory = sys.getsizeof(self.values)
+        for value in self.values:
+            values_memory += sys.getsizeof(value)
+        
+        return {
+            "window_size": self.window_size,
+            "current_values_count": len(self.values),
+            "values_memory_bytes": values_memory,
+            "total_object_memory_bytes": sys.getsizeof(self),
+            "memory_efficiency": f"{len(self.values)}/{self.window_size} ({100 * len(self.values) / self.window_size:.1f}%)"
+        }
+
 
 class LiquidationService:
     """Service for connecting to Binance liquidation streams"""
@@ -41,6 +190,9 @@ class LiquidationService:
         
         # Store accumulated volume data to prevent overwriting historical data
         self.accumulated_volumes: Dict[str, Dict[str, Dict[int, Dict]]] = {}  # symbol -> timeframe -> bucket_time -> volume_data
+        
+        # Moving average calculators for each symbol/timeframe combination
+        self.ma_calculators: Dict[str, Dict[str, MovingAverageCalculator]] = {}  # symbol -> timeframe -> calculator
         
     async def connect_to_liquidation_stream(self, symbol: str, callback: Callable[[Dict], Any], symbol_info: Optional[Dict] = None):
         """
@@ -343,6 +495,9 @@ class LiquidationService:
         result = []
         symbol_info = self.symbol_info_cache.get(symbol)
         
+        # Get or create MA calculator for this symbol/timeframe
+        ma_calculator = self._get_or_create_ma_calculator(symbol, timeframe)
+        
         # Determine the time range to fill
         if buckets:
             # Get min and max bucket times
@@ -369,6 +524,30 @@ class LiquidationService:
                     delta_volume = 0.0
                     count = 0
                 
+                # Only add non-zero, finite values to MA calculation
+                if abs(delta_volume) > 0 and math.isfinite(delta_volume):
+                    ma_calculator.add_value(current_bucket, abs(delta_volume))
+                
+                # Get current MA value with performance monitoring
+                start_time = time.time()
+                ma_value = ma_calculator.get_current_ma()
+                ma_calc_time = time.time() - start_time
+                
+                # Log if MA calculation takes longer than expected (>1ms)
+                if ma_calc_time > 0.001:
+                    logger.debug(f"Historical MA calculation took {ma_calc_time:.4f}s for {symbol}:{timeframe}")
+                    
+                # Track aggregation performance stats
+                if ma_value is not None:
+                    performance_stats = ma_calculator.get_performance_stats()
+                    if performance_stats['calculation_count'] % 100 == 0:  # Log every 100 calculations
+                        logger.debug(f"MA performance stats for {symbol}:{timeframe}: {performance_stats}")
+                        
+                        # Log memory usage every 500 calculations to monitor memory growth
+                        if performance_stats['calculation_count'] % 500 == 0:
+                            memory_stats = self.get_ma_calculators_memory_stats()
+                            logger.info(f"MA Calculators Memory Usage: {memory_stats}")
+                
                 result.append({
                     "time": int(current_bucket / 1000),  # Convert to seconds for chart
                     "buy_volume": str(buy_volume),
@@ -380,7 +559,9 @@ class LiquidationService:
                     "total_volume_formatted": formatting_service.format_total(total_volume, symbol_info),
                     "delta_volume_formatted": formatting_service.format_total(abs(delta_volume), symbol_info),
                     "count": count,
-                    "timestamp_ms": current_bucket
+                    "timestamp_ms": current_bucket,
+                    "ma_value": str(ma_value) if ma_value else None,
+                    "ma_value_formatted": formatting_service.format_total(ma_value, symbol_info) if ma_value else None
                 })
                 
                 # Move to next bucket
@@ -400,6 +581,54 @@ class LiquidationService:
             "1d": 24 * 60 * 60 * 1000
         }
         return timeframe_map.get(timeframe, 60 * 1000)  # Default to 1m
+    
+    def _get_or_create_ma_calculator(self, symbol: str, timeframe: str) -> MovingAverageCalculator:
+        """
+        Get or create a moving average calculator for symbol/timeframe combination
+        
+        Args:
+            symbol: Trading symbol
+            timeframe: Timeframe string
+            
+        Returns:
+            MovingAverageCalculator instance
+        """
+        if symbol not in self.ma_calculators:
+            self.ma_calculators[symbol] = {}
+        
+        if timeframe not in self.ma_calculators[symbol]:
+            self.ma_calculators[symbol][timeframe] = MovingAverageCalculator(window_size=50)
+        
+        return self.ma_calculators[symbol][timeframe]
+    
+    def get_ma_calculators_memory_stats(self) -> Dict[str, Any]:
+        """
+        Get memory usage statistics for all MA calculators
+        
+        Returns:
+            Dictionary with memory usage metrics for monitoring
+        """
+        total_calculators = 0
+        total_memory_bytes = 0
+        symbols_count = len(self.ma_calculators)
+        timeframes_per_symbol = {}
+        
+        for symbol, timeframes in self.ma_calculators.items():
+            timeframes_per_symbol[symbol] = len(timeframes)
+            total_calculators += len(timeframes)
+            
+            for timeframe, calculator in timeframes.items():
+                memory_info = calculator.get_memory_usage()
+                total_memory_bytes += memory_info["total_object_memory_bytes"]
+        
+        return {
+            "total_symbols": symbols_count,
+            "total_calculators": total_calculators,
+            "total_memory_bytes": total_memory_bytes,
+            "memory_mb": round(total_memory_bytes / (1024 * 1024), 2),
+            "avg_timeframes_per_symbol": round(total_calculators / symbols_count, 1) if symbols_count > 0 else 0,
+            "symbols_breakdown": timeframes_per_symbol
+        }
         
     async def _notify_callbacks(self, symbol: str, data: Dict):
         """Notify all registered callbacks with new data"""
@@ -582,6 +811,12 @@ class LiquidationService:
         if symbol in self.buffer_callbacks:
             del self.buffer_callbacks[symbol]
             
+        # Clear MA calculators for this symbol (all timeframes)
+        if symbol in self.ma_calculators:
+            timeframes_cleared = list(self.ma_calculators[symbol].keys())
+            logger.info(f"Clearing MA calculators for {symbol} (timeframes: {timeframes_cleared})")
+            del self.ma_calculators[symbol]
+            
         if symbol in self.aggregation_tasks:
             # Cancel any running aggregation tasks
             for timeframe, task in self.aggregation_tasks[symbol].items():
@@ -721,6 +956,9 @@ class LiquidationService:
             symbol_info = self.symbol_info_cache.get(symbol)
             volume_updates = []
             
+            # Get or create MA calculator for this symbol/timeframe
+            ma_calculator = self._get_or_create_ma_calculator(symbol, timeframe)
+            
             for bucket_time in sorted(updated_buckets):
                 data = self.accumulated_volumes[symbol][timeframe][bucket_time]
                 buy_volume = float(data["buy_volume"])
@@ -733,6 +971,21 @@ class LiquidationService:
                 logger.debug(f"Volume aggregation for {symbol} {timeframe} bucket {int(bucket_time/1000)}: "
                            f"buy={buy_volume:.2f}, sell={sell_volume:.2f}, delta={delta_volume:.2f}, count={data['count']}")
                 
+                # Only add non-zero, finite values to MA calculation with performance monitoring
+                ma_start_time = time.perf_counter()
+                if abs(delta_volume) > 0 and math.isfinite(delta_volume):
+                    ma_calculator.add_value(bucket_time, abs(delta_volume))
+                
+                # Get current MA value
+                ma_value = ma_calculator.get_current_ma()
+                ma_calculation_time = time.perf_counter() - ma_start_time
+                
+                # Log performance warning for high-frequency scenarios (1m timeframe)
+                if timeframe == "1m" and ma_calculation_time > 0.005:  # 5ms threshold for 1m updates
+                    logger.warning(f"High-frequency MA calculation took {ma_calculation_time:.4f}s for {symbol}/{timeframe}")
+                elif ma_calculation_time > 0.010:  # 10ms threshold for other timeframes
+                    logger.warning(f"MA calculation performance issue: {ma_calculation_time:.4f}s for {symbol}/{timeframe}")
+                
                 volume_updates.append({
                     "time": int(bucket_time / 1000),
                     "buy_volume": str(buy_volume),
@@ -744,7 +997,9 @@ class LiquidationService:
                     "total_volume_formatted": formatting_service.format_total(total_volume, symbol_info),
                     "delta_volume_formatted": formatting_service.format_total(abs(delta_volume), symbol_info),
                     "count": data["count"],
-                    "timestamp_ms": bucket_time
+                    "timestamp_ms": bucket_time,
+                    "ma_value": str(ma_value) if ma_value else None,
+                    "ma_value_formatted": formatting_service.format_total(ma_value, symbol_info) if ma_value else None
                 })
             
             # Notify callbacks with updated data only

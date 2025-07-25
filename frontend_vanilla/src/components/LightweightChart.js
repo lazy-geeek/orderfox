@@ -1,4 +1,4 @@
-import { createChart, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType } from 'lightweight-charts';
 
 // Convert UTC timestamp to local timezone for chart display
 function timeToLocal(originalTime) {
@@ -18,6 +18,7 @@ const TIMEFRAMES = [
 let chartInstance = null;
 let candlestickSeries = null;
 let volumeSeries = null;
+let maLineSeries = null;
 let lastChartData = null;
 let lastSymbol = null;
 let lastTimeframe = null;
@@ -84,6 +85,9 @@ function createChartInstance(chartContainer, chartOptions) {
 
   // Create liquidation volume series as overlay
   volumeSeries = createLiquidationVolumeSeries();
+
+  // Create moving average series as overlay
+  maLineSeries = createMovingAverageSeries();
 
   // Setup responsive sizing with ResizeObserver
   setupResizeObserver(chartContainer);
@@ -178,6 +182,27 @@ function createLiquidationVolumeSeries() {
   return series;
 }
 
+function createMovingAverageSeries() {
+  if (!chartInstance) {
+    console.warn('Cannot create MA series - chart instance not ready');
+    return null;
+  }
+  
+  console.log('Creating moving average line series');
+  
+  const series = chartInstance.addSeries(LineSeries, {
+    color: 'rgba(255, 193, 7, 0.8)', // Yellow with transparency
+    lineWidth: 2,
+    lineStyle: 0, // Solid line
+    priceScaleId: '', // Overlay with histogram
+    crosshairMarkerVisible: false,
+    lastValueVisible: false,
+    priceLineVisible: false
+  });
+  
+  return series;
+}
+
 function setupResizeObserver(container) {
   if (resizeObserver) {
     resizeObserver.disconnect();
@@ -216,6 +241,14 @@ function adjustChartMarginsForScreenSize(width) {
         bottom: 0,   // No margin needed with overflow: visible
       },
     });
+    if (maLineSeries) {
+      maLineSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.65,  // Same as volume series
+          bottom: 0,
+        },
+      });
+    }
   } else if (isMobile) {
     // Mobile screens - balanced view
     candlestickSeries.priceScale().applyOptions({
@@ -230,6 +263,14 @@ function adjustChartMarginsForScreenSize(width) {
         bottom: 0,   // No margin needed with overflow: visible
       },
     });
+    if (maLineSeries) {
+      maLineSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.65,  // Same as volume series
+          bottom: 0,
+        },
+      });
+    }
   } else {
     // Desktop - standard margins
     candlestickSeries.priceScale().applyOptions({
@@ -244,6 +285,14 @@ function adjustChartMarginsForScreenSize(width) {
         bottom: 0,   // No margin needed with overflow: visible
       },
     });
+    if (maLineSeries) {
+      maLineSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.7,   // Same as volume series
+          bottom: 0,
+        },
+      });
+    }
   }
 }
 
@@ -792,6 +841,19 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         volumeSeries.update(histogramBar);
         console.log('Updated liquidation volume bar:', histogramBar);
         
+        // Update MA line series if MA data is available and valid
+        if (maLineSeries && item.ma_value !== null && item.ma_value !== undefined) {
+          const maValue = parseFloat(item.ma_value);
+          if (!isNaN(maValue) && isFinite(maValue)) {
+            const maPoint = {
+              time: timeToLocal(item.time),
+              value: maValue
+            };
+            maLineSeries.update(maPoint);
+            console.log('Updated MA line point:', maPoint);
+          }
+        }
+        
         // Update currentVolumeData for tooltips with converted time to match histogram
         const convertedItem = { ...item, time: timeToLocal(item.time) };
         const convertedTime = timeToLocal(item.time);
@@ -826,6 +888,15 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
         
         try {
           volumeSeries.update(histogramBar);
+          
+          // Update MA line series if MA data is available
+          if (maLineSeries && item.ma_value !== null && item.ma_value !== undefined) {
+            const maPoint = {
+              time: timeToLocal(item.time),
+              value: parseFloat(item.ma_value)
+            };
+            maLineSeries.update(maPoint);
+          }
           
           // Update currentVolumeData for tooltips with converted time to match histogram
           const convertedItem = { ...item, time: timeToLocal(item.time) };
@@ -884,6 +955,25 @@ function updateLiquidationVolume(volumeData, isRealTimeUpdate = false) {
     }
     // CRITICAL: Only use setData() for initial load, not for updates
     volumeSeries.setData(histogramData);
+    
+    // Update MA line series with initial/batch data
+    if (maLineSeries) {
+      const maData = volumeData
+        .filter(item => item.ma_value !== null && item.ma_value !== undefined)
+        .map(item => ({
+          time: timeToLocal(item.time),
+          value: parseFloat(item.ma_value)
+        }))
+        .filter(item => !isNaN(item.value) && isFinite(item.value));
+      
+      if (maData.length > 0) {
+        maLineSeries.setData(maData);
+        console.log('Set MA line data with', maData.length, 'points');
+      } else {
+        // Clear MA data if no MA values available
+        maLineSeries.setData([]);
+      }
+    }
   }
   
   // Don't call fitContent here as it affects the main chart zoom
@@ -899,8 +989,16 @@ function toggleLiquidationVolume() {
   
   if (volumeSeriesVisible) {
     volumeSeries.applyOptions({ visible: true });
+    // Show MA series when volume is visible
+    if (maLineSeries) {
+      maLineSeries.applyOptions({ visible: true });
+    }
   } else {
     volumeSeries.applyOptions({ visible: false });
+    // Hide MA series when volume is hidden
+    if (maLineSeries) {
+      maLineSeries.applyOptions({ visible: false });
+    }
   }
   
   return volumeSeriesVisible;
@@ -918,6 +1016,10 @@ function resetChartData() {
   if (volumeSeries) {
     volumeSeries.setData([]); // Clear volume data
     currentVolumeData = []; // Clear stored volume data
+  }
+  
+  if (maLineSeries) {
+    maLineSeries.setData([]); // Clear MA data
   }
   
   if (tooltipElement) {
@@ -940,6 +1042,7 @@ function disposeLightweightChart() {
   }
   candlestickSeries = null;
   volumeSeries = null;
+  maLineSeries = null;
   lastChartData = null;
   lastSymbol = null;
   lastTimeframe = null;

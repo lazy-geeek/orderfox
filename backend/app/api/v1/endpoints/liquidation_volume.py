@@ -32,7 +32,10 @@ async def get_liquidation_volume(
         end_time: End timestamp in milliseconds (optional)
     
     Returns:
-        LiquidationVolumeResponse with aggregated volume data
+        LiquidationVolumeResponse with aggregated volume data including:
+        - Volume data for each time bucket (buy, sell, total, delta)
+        - Moving average values (ma_value, ma_value_formatted) calculated from
+          last 50 non-zero volume periods
     """
     try:
         # Validate timeframe

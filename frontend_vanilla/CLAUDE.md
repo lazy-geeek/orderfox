@@ -483,6 +483,28 @@ For adding UI overlays to charts (symbol indicators, status badges, info panels)
 - **Responsive Behavior**: Area detection adapts to screen size matching chart scale margins
 - **UI Separation**: Ensures volume tooltips never appear in price chart area, maintaining clear UX boundaries
 
+### Moving Average Line Overlay
+- **Implementation**: TradingView LineSeries overlay for liquidation volume moving average
+- **Visual Style**: 2px yellow semi-transparent line (`rgba(255, 193, 7, 0.8)`)
+- **Series Configuration**:
+  - `priceScaleId: ''` - Shares scale with volume histogram for proper overlay
+  - `crosshairMarkerVisible: false` - Clean appearance without markers
+  - `lastValueVisible: false` - No value labels
+  - `priceLineVisible: false` - No horizontal price lines
+- **Data Processing**:
+  - Filters MA data: `item.ma_value !== null && item.ma_value !== undefined`
+  - Validates numeric values: `!isNaN(maValue) && isFinite(maValue)`
+  - Uses `timeToLocal()` for time conversion consistency
+- **Update Patterns**:
+  - Real-time updates: `maLineSeries.update(maPoint)` for single data points
+  - Initial/batch data: `maLineSeries.setData(maData)` for arrays
+  - Empty data handling: `maLineSeries.setData([])` when no MA values available
+- **Visibility Synchronization**: MA line follows volume histogram visibility toggle
+- **Integration**: Created alongside volume series in `createLightweightChart()`
+- **Cleanup**: Series data cleared in `resetChartData()`, reference nullified in `disposeLightweightChart()`
+- **Error Handling**: Graceful handling of missing chart instance, invalid data, and series method failures
+- **Testing**: 11 unit tests covering data processing logic, visibility toggle, and error scenarios
+
 ### Order Book Display
 - **Four Columns**: Price, Size for both bids and asks
 - **Color Coding**: Green for bids, red for asks

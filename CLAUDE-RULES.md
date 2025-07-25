@@ -16,10 +16,11 @@
     - 1 test for expected use
     - 1 edge case
     - 1 failure case
-- For the frontend, simulate the browser in the terminal as we can not run a real browser in the current environment.
+- Each playright e2e test should monitor the browser console for errors and warnings, and fail if any are detected.
 
 ### MCP Server
 - Use context7 to understand a module, package, library or API in more depth if you don't have enough information yourself.
+- Use jina to do webresearch and fetch web content.
 
 ### When Implementing New Features or Changing Code  
 - All python files must pass pyright linting and type checking and all JavaScript files must pass ESLint linting and type checking.

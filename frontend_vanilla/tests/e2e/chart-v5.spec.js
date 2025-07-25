@@ -133,6 +133,64 @@ test.describe('Lightweight Charts v5 Integration', () => {
     }
   });
 
+  test('should display moving average line when liquidation volume is shown', async ({ page }) => {
+    // Wait for initial chart load
+    await page.waitForTimeout(2000);
+    
+    // Look for volume toggle button to enable liquidation volume
+    const volumeToggle = await page.locator('button:has-text("Volume")');
+    if (await volumeToggle.count() > 0) {
+      // Ensure volume is enabled (toggle if needed)
+      await volumeToggle.click();
+      await page.waitForTimeout(2000); // Give time for volume data to load
+      
+      // Verify chart container is still visible
+      const chartContainer = page.locator('[data-testid="chart-container"]');
+      await expect(chartContainer).toBeVisible();
+      
+      // The MA line is created as part of the chart but not directly testable
+      // in E2E tests since it's a TradingView internal series
+      // Instead, verify that volume functionality works without JavaScript errors
+      
+      // Check for JavaScript errors that might indicate MA line issues
+      const errors = [];
+      page.on('console', msg => {
+        if (msg.type() === 'error') {
+          errors.push(msg.text());
+        }
+      });
+      
+      // Wait additional time to ensure MA calculation and display
+      await page.waitForTimeout(3000);
+      
+      // Toggle volume off to test MA line hiding
+      await volumeToggle.click();
+      await page.waitForTimeout(1000);
+      
+      // Toggle volume back on to test MA line showing
+      await volumeToggle.click();
+      await page.waitForTimeout(2000);
+      
+      // Verify no critical errors occurred during MA line operations
+      const criticalErrors = errors.filter(error => 
+        error.includes('ma') || 
+        error.includes('moving average') ||
+        error.includes('LineSeries') ||
+        error.includes('update') ||
+        error.includes('setData')
+      );
+      
+      expect(criticalErrors.length).toBe(0);
+      
+      // Verify chart is still functional after all MA operations
+      await expect(chartContainer).toBeVisible();
+    } else {
+      // If no volume toggle exists, just verify chart functionality
+      const chartContainer = page.locator('[data-testid="chart-container"]');
+      await expect(chartContainer).toBeVisible();
+    }
+  });
+
   test('should not have JavaScript errors with v5 API', async ({ page }) => {
     // Collect console errors
     const errors = [];

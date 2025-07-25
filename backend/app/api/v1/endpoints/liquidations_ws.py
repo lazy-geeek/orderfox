@@ -187,6 +187,7 @@ async def liquidation_stream(
                         # Check if WebSocket is still connected before sending
                         if websocket.client_state.name == "CONNECTED":
                             # Convert dict objects to LiquidationVolume models
+                            # Includes MA fields (ma_value, ma_value_formatted) when available
                             volume_data = [LiquidationVolume(**vol) for vol in historical_volume]
                             
                             volume_update = LiquidationVolumeUpdate(
