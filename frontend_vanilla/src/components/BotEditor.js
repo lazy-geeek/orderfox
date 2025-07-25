@@ -9,6 +9,8 @@
  * - Error handling
  */
 
+import { createSearchableDropdown } from './SearchableDropdown.js';
+
 export function createBotEditor() {
   const modal = document.createElement('div');
   modal.id = 'bot-editor-modal';
@@ -49,15 +51,7 @@ export function createBotEditor() {
           <label class="label">
             <span class="label-text font-semibold">Trading Symbol *</span>
           </label>
-          <select 
-            id="bot-symbol" 
-            name="symbol"
-            class="select select-bordered w-full"
-            required
-            data-testid="bot-symbol-select"
-          >
-            <option value="">Select a trading pair</option>
-          </select>
+          <div id="symbol-dropdown-container"></div>
           <label class="label">
             <span class="label-text-alt text-error hidden" id="symbol-error"></span>
           </label>
@@ -141,6 +135,23 @@ export function createBotEditor() {
     </div>
   `;
   
+  // Create searchable dropdown
+  const symbolDropdown = createSearchableDropdown({
+    id: 'bot-symbol',
+    name: 'symbol',
+    placeholder: 'Select a trading pair',
+    required: true,
+    className: 'w-full',
+    testId: 'bot-symbol-dropdown'
+  });
+  
+  // Add dropdown to container
+  const dropdownContainer = modal.querySelector('#symbol-dropdown-container');
+  dropdownContainer.appendChild(symbolDropdown);
+  
+  // Store reference to dropdown on modal
+  modal._symbolDropdown = symbolDropdown;
+  
   return modal;
 }
 
@@ -165,20 +176,18 @@ export function showBotEditor(modal, options = {}) {
   }
   
   // Populate symbol dropdown
-  const symbolSelect = modal.querySelector('#bot-symbol');
-  symbolSelect.innerHTML = '<option value="">Select a trading pair</option>';
+  const symbolOptions = symbols.map(symbol => ({
+    id: symbol.id,
+    label: `${symbol.uiName} (${symbol.volume24hFormatted})`,
+    data: symbol
+  }));
   
-  symbols.forEach(symbol => {
-    const option = document.createElement('option');
-    option.value = symbol.id;
-    option.textContent = `${symbol.uiName} (${symbol.volume24hFormatted})`;
-    symbolSelect.appendChild(option);
-  });
+  modal._symbolDropdown.setOptions(symbolOptions);
   
   // Populate form if editing
   if (mode === 'edit' && bot) {
     modal.querySelector('#bot-name').value = bot.name;
-    modal.querySelector('#bot-symbol').value = bot.symbol;
+    modal._symbolDropdown.setValue(bot.symbol);
     modal.querySelector('#bot-active').checked = bot.isActive;
     modal.querySelector('#bot-paper-trading').checked = bot.isPaperTrading ?? true;
     modal.querySelector('#bot-description').value = bot.description || '';
@@ -219,6 +228,7 @@ export function resetBotForm(modal) {
   const form = modal.querySelector('#bot-form');
   form.reset();
   modal.querySelector('#bot-active').checked = true;
+  modal._symbolDropdown.setValue(null);
   updateStatusText(modal);
   updateDescriptionCount(modal);
 }
@@ -354,7 +364,7 @@ export function getFormData(modal) {
   
   return {
     name: formData.get('name').trim(),
-    symbol: formData.get('symbol'),
+    symbol: modal._symbolDropdown.getValue(),
     isActive: modal.querySelector('#bot-active').checked,
     isPaperTrading: modal.querySelector('#bot-paper-trading').checked,
     description: formData.get('description').trim()

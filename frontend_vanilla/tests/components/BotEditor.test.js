@@ -71,13 +71,13 @@ describe('BotEditor Component', () => {
       
       // Check for required form fields
       const nameInput = modal.querySelector('#bot-name');
-      const symbolSelect = modal.querySelector('#bot-symbol');
+      const symbolDropdown = modal._symbolDropdown;
       const activeToggle = modal.querySelector('#bot-active');
       const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput).toBeTruthy();
-      expect(symbolSelect).toBeTruthy();
+      expect(symbolDropdown).toBeTruthy();
       expect(activeToggle).toBeTruthy();
       expect(paperTradingToggle).toBeTruthy();
       expect(descriptionTextarea).toBeTruthy();
@@ -92,13 +92,13 @@ describe('BotEditor Component', () => {
 
     it('should have correct initial form values', () => {
       const nameInput = modal.querySelector('#bot-name');
-      const symbolSelect = modal.querySelector('#bot-symbol');
+      const symbolDropdown = modal._symbolDropdown;
       const activeToggle = modal.querySelector('#bot-active');
       const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput.value).toBe('');
-      expect(symbolSelect.value).toBe('');
+      expect(symbolDropdown.getValue()).toBeNull();
       expect(activeToggle.checked).toBe(true);
       expect(paperTradingToggle.checked).toBe(true); // Default to paper trading
       expect(descriptionTextarea.value).toBe('');
@@ -142,13 +142,13 @@ describe('BotEditor Component', () => {
       });
       
       const nameInput = modal.querySelector('#bot-name');
-      const symbolSelect = modal.querySelector('#bot-symbol');
+      const symbolDropdown = modal._symbolDropdown;
       const activeToggle = modal.querySelector('#bot-active');
       const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
       expect(nameInput.value).toBe(mockBot.name);
-      expect(symbolSelect.value).toBe(mockBot.symbol);
+      expect(symbolDropdown.getValue()).toBe(mockBot.symbol);
       expect(activeToggle.checked).toBe(mockBot.isActive);
       expect(paperTradingToggle.checked).toBe(mockBot.isPaperTrading);
       expect(descriptionTextarea.value).toBe(mockBot.description);
@@ -157,13 +157,11 @@ describe('BotEditor Component', () => {
     it('should populate symbol dropdown', () => {
       showBotEditor(modal, { symbols: mockSymbols, mode: 'create' });
       
-      const symbolSelect = modal.querySelector('#bot-symbol');
-      const options = symbolSelect.querySelectorAll('option');
-      
-      // Should have default option + mock symbols
-      expect(options.length).toBe(3);
-      expect(options[1].value).toBe('BTCUSDT');
-      expect(options[1].textContent).toBe('BTC/USDT (1.2B)');
+      const symbolDropdown = modal._symbolDropdown;
+      // Check that options were set on the dropdown
+      expect(symbolDropdown._searchableDropdown.options.length).toBe(2);
+      expect(symbolDropdown._searchableDropdown.options[0].id).toBe('BTCUSDT');
+      expect(symbolDropdown._searchableDropdown.options[0].label).toBe('BTC/USDT (1.2B)');
     });
   });
 
@@ -327,16 +325,16 @@ describe('BotEditor Component', () => {
   describe('getFormData', () => {
     it('should extract form data correctly', () => {
       const nameInput = modal.querySelector('#bot-name');
-      const symbolSelect = modal.querySelector('#bot-symbol');
+      const symbolDropdown = modal._symbolDropdown;
       const activeToggle = modal.querySelector('#bot-active');
       const paperTradingToggle = modal.querySelector('#bot-paper-trading');
       const descriptionTextarea = modal.querySelector('#bot-description');
       
-      // Add an option to the select for testing
-      symbolSelect.innerHTML = '<option value="BTCUSDT">BTCUSDT</option>';
+      // Set options and value for testing
+      symbolDropdown.setOptions([{ id: 'BTCUSDT', label: 'BTC/USDT' }]);
       
       nameInput.value = 'Test Bot';
-      symbolSelect.value = 'BTCUSDT';
+      symbolDropdown.setValue('BTCUSDT');
       activeToggle.checked = false;
       paperTradingToggle.checked = false;
       descriptionTextarea.value = 'Test description';
@@ -421,13 +419,13 @@ describe('BotEditor Component', () => {
       
       // Fill form with valid data
       const nameInput = modal.querySelector('#bot-name');
-      const symbolSelect = modal.querySelector('#bot-symbol');
+      const symbolDropdown = modal._symbolDropdown;
       
-      // Add an option to the select for testing
-      symbolSelect.innerHTML = '<option value="BTCUSDT">BTCUSDT</option>';
+      // Set options and value for testing
+      symbolDropdown.setOptions([{ id: 'BTCUSDT', label: 'BTC/USDT' }]);
       
       nameInput.value = 'Test Bot';
-      symbolSelect.value = 'BTCUSDT';
+      symbolDropdown.setValue('BTCUSDT');
       
       // Submit form
       const form = modal.querySelector('#bot-form');

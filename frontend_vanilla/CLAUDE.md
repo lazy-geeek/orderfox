@@ -78,6 +78,11 @@ All tabs initialized immediately to prevent missing data.
 </div>
 ```
 
+### SearchableDropdown Component
+- Replaces select elements with searchable dropdowns
+- Used in BotEditor for symbol selection
+- Case-insensitive search with partial matching
+
 ### Chart Component
 - Container width optimization
 - Preserve zoom/pan during updates
@@ -128,6 +133,7 @@ npm test -- ComponentName
 # - Test UI elements, not WebSocket data
 # - No real-time data validation
 # - Robust modal waiting patterns
+# - Use helper functions for complex UI interactions (e.g., selectSymbol)
 ```
 
 ## Common Tasks
